@@ -1,0 +1,225 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum ServiceType {
+  doctor_queue
+  diagnostic
+  home_service
+}
+
+enum AppointmentStatus {
+  booked
+  arrived
+  missed
+  cancelled
+}
+
+enum UserRole {
+  super_admin
+  clinic_admin
+  doctor
+  receptionist
+  patient
+}
+
+// ─── CORE MODELS ─────────────────────────────────────────────────────────────
+
+model Clinic {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?
+  address     String?
+  logoUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branches     Branch[]
+  services     Service[]
+  doctors      Doctor[]
+  staff        Staff[]
+  users        User[]
+  appointments Appointment[]
+  slots        Slot[]
+
+  @@map("clinics")
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  clinicId  String
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  doctors      Doctor[]
+  staff        Staff[]
+  appointments Appointment[]
+  slots        Slot[]
+
+  @@index([clinicId])
+  @@map("branches")
+}
+
+model Service {
+  id              String      @id @default(cuid())
+  clinicId        String
+  name            String
+  type            ServiceType
+  price           Decimal     @db.Decimal(10, 2)
+  description     String?
+  requiresSlot    Boolean     @default(false)
+  requiresAddress Boolean     @default(false)
+  dailyLimit      Int?
+  isActive        Boolean     @default(true)
+  sortOrder       Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  slots        Slot[]
+
+  @@index([clinicId])
+  @@index([clinicId, type])
+  @@map("services")
+}
+
+model Doctor {
+  id           String   @id @default(cuid())
+  clinicId     String
+  branchId     String?
+  userId       String?  @unique
+  firstName    String
+  lastName     String
+  specialty    String
+  phone        String?
+  photoUrl     String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  branch       Branch?       @relation(fields: [branchId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+
+  @@index([clinicId])
+  @@map("doctors")
+}
+
+model Staff {
+  id         String   @id @default(cuid())
+  clinicId   String
+  branchId   String?
+  userId     String?  @unique
+  firstName  String
+  lastName   String
+  role       UserRole @default(receptionist)
+  phone      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  clinic               Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  branch               Branch?       @relation(fields: [branchId], references: [id])
+  user                 User?         @relation(fields: [userId], references: [id])
+  assignedAppointments Appointment[] @relation("AssignedStaff")
+
+  @@index([clinicId])
+  @@map("staff")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  clinicId     String?
+  telegramId   String?  @unique
+  tibId        String?  @unique
+  phone        String?
+  firstName    String
+  lastName     String?
+  role         UserRole @default(patient)
+  passwordHash String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clinic       Clinic?       @relation(fields: [clinicId], references: [id])
+  doctor       Doctor?
+  staff        Staff?
+  appointments Appointment[]
+
+  @@index([clinicId])
+  @@index([telegramId])
+  @@map("users")
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  clinicId    String
+  branchId    String?
+  serviceId   String
+  doctorId    String?
+  userId      String?
+  slotId      String?
+  staffId     String?
+
+  patientName  String
+  patientPhone String
+  address      String?
+  queueNumber  Int?
+  date         DateTime          @db.Date
+  status       AppointmentStatus @default(booked)
+  notes        String?
+  notifiedDayBefore Boolean      @default(false)
+  notifiedTwoHours  Boolean      @default(false)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  clinic        Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  service       Service  @relation(fields: [serviceId], references: [id])
+  doctor        Doctor?  @relation(fields: [doctorId], references: [id])
+  user          User?    @relation(fields: [userId], references: [id])
+  slot          Slot?    @relation(fields: [slotId], references: [id])
+  assignedStaff Staff?   @relation("AssignedStaff", fields: [staffId], references: [id])
+
+  @@index([clinicId])
+  @@index([clinicId, date])
+  @@index([doctorId, date])
+  @@index([serviceId, date])
+  @@map("appointments")
+}
+
+model Slot {
+  id        String   @id @default(cuid())
+  clinicId  String
+  branchId  String?
+  serviceId String
+  date      DateTime @db.Date
+  startTime String
+  endTime   String
+  capacity  Int      @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  branch       Branch?       @relation(fields: [branchId], references: [id])
+  service      Service       @relation(fields: [serviceId], references: [id])
+  appointments Appointment[]
+
+  @@index([clinicId, serviceId, date])
+  @@map("slots")
+}

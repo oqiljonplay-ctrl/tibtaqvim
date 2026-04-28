@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/reminders?type=day_before",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/reminders?type=two_hours",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
