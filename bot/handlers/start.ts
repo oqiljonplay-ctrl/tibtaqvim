@@ -44,7 +44,8 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  if (savedUser) {
+  // Welcome back faqat phone mavjud bo'lganda — phone yo'q bo'lsa yangi bron oqimi
+  if (savedUser?.phone) {
     const sent = await bot.sendMessage(
       chatId,
       `👋 *Qaytib keldingiz!*\n\n👤 Ism: *${savedUser.firstName}*\n📞 Tel: *${savedUser.phone}*\n\nUshbu ma'lumotlardan foydalanasizmi?`,

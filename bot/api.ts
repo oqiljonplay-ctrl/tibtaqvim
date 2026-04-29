@@ -82,7 +82,7 @@ export async function registerUserAtStart(
 
 export async function fetchUserByTelegramId(
   telegramId: number
-): Promise<{ firstName: string; phone: string; tibId?: string | null } | null> {
+): Promise<{ firstName: string; phone: string | null; tibId?: string | null; hasPhone: boolean } | null> {
   try {
     const res = await fetch(`${API_URL}/api/user/by-telegram?telegramId=${telegramId}`);
     const json = await res.json();

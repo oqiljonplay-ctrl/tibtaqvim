@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/Calendar";
 import { formatDateLabel } from "@/lib/calendar";
 
@@ -74,6 +74,8 @@ export default function WebApp() {
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
   const [bookingTibId, setBookingTibId] = useState<string | null>(null);
   const [telegramId, setTelegramId] = useState<number | null>(null);
+  // Ref: always holds latest tgUser — avoids stale closure in goAfterDateSlot
+  const tgUserRef = useRef<TgUser | null>(null);
 
   const clinicId =
     typeof window !== "undefined"
@@ -103,6 +105,7 @@ export default function WebApp() {
           .then((json) => {
             if (json.success && json.data) {
               const u: TgUser = json.data;
+              tgUserRef.current = u;
               setTgUser(u);
               setForm((f) => ({
                 ...f,
@@ -170,11 +173,12 @@ export default function WebApp() {
   }
 
   // Routing: telefon bo'lsa confirm, yo'q bo'lsa form
+  // tgUserRef ishlatiladi — React state closure stale bo'lishi mumkin
   function goAfterDateSlot() {
-    if (tgUser?.hasPhone) {
-      setStep("confirm");         // Telefon bor → form o'tkazib yuboriladi
+    if (tgUserRef.current?.hasPhone) {
+      setStep("confirm");
     } else {
-      setStep("form");            // Telefon yo'q yoki yangi user → form ko'rsatiladi
+      setStep("form");
     }
   }
 
@@ -289,7 +293,7 @@ export default function WebApp() {
           <div>
             {userLoading && (
               <div className="text-xs text-center text-gray-400 mb-3 animate-pulse">
-                Foydalanuvchi tekshirilmoqda...
+                ⏳ Foydalanuvchi tekshirilmoqda...
               </div>
             )}
             <h2 className="font-semibold text-gray-900 mb-4">Xizmatni tanlang</h2>
@@ -300,10 +304,10 @@ export default function WebApp() {
                 {services.map((s) => (
                   <button
                     key={s.id}
-                    disabled={!s.isAvailable}
+                    disabled={!s.isAvailable || userLoading}
                     onClick={() => selectService(s)}
                     className={`w-full text-left rounded-2xl border-2 p-4 transition-all ${
-                      s.isAvailable
+                      s.isAvailable && !userLoading
                         ? "bg-white border-transparent shadow-sm active:scale-95 hover:border-blue-100"
                         : "bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed"
                     }`}
@@ -458,7 +462,7 @@ export default function WebApp() {
           <div>
             <button
               onClick={() => setStep(
-                tgUser?.hasPhone
+                tgUserRef.current?.hasPhone
                   ? (selectedService?.requiresSlot ? "slots" : "date")
                   : "form"
               )}

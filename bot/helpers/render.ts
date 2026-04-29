@@ -2,6 +2,13 @@ import TelegramBot, { InlineKeyboardButton } from "node-telegram-bot-api";
 import { mkCalendarKeyboard, currentYearMonth } from "./calendar";
 
 const WEBAPP_URL = process.env.NEXT_PUBLIC_WEBAPP_URL || "";
+const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
+
+// clinicId ni URL ga qo'shib qaytaradi — WebApp clinicId'ni URL dan oladi
+function webAppUrl(): string {
+  if (!WEBAPP_URL) return "";
+  return DEFAULT_CLINIC_ID ? `${WEBAPP_URL}?clinicId=${DEFAULT_CLINIC_ID}` : WEBAPP_URL;
+}
 
 const typeEmojis: Record<string, string> = {
   doctor_queue: "👨‍⚕️",
@@ -52,7 +59,7 @@ export async function editOrSend(
 // Pastki persistent tugma uchun (reply keyboard)
 export function mkWebAppReplyKeyboard() {
   return {
-    keyboard: [[{ text: "🌐 Onlayn bron (Web App)", web_app: { url: WEBAPP_URL } }]],
+    keyboard: [[{ text: "🌐 Onlayn bron (Web App)", web_app: { url: webAppUrl() } }]],
     resize_keyboard: true,
     one_time_keyboard: false,
   };
@@ -66,7 +73,7 @@ export function mkServiceKeyboard(services: any[], showWebAppInline = false): In
   const rows: InlineKeyboardButton[][] = [];
 
   if (showWebAppInline && WEBAPP_URL) {
-    rows.push([{ text: "📱 Onlayn bron (Web App)", web_app: { url: WEBAPP_URL } } as any]);
+    rows.push([{ text: "📱 Onlayn bron (Web App)", web_app: { url: webAppUrl() } } as any]);
   }
 
   for (const s of services) {

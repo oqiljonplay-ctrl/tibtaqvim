@@ -91,7 +91,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       patientPhone = state.patientPhone;
       if (!patientName || !patientPhone) {
         const saved = await fetchUserByTelegramId(chatId);
-        if (saved) { patientName = saved.firstName; patientPhone = saved.phone; }
+        if (saved) { patientName = saved.firstName; patientPhone = saved.phone ?? undefined; }
       }
     }
 
