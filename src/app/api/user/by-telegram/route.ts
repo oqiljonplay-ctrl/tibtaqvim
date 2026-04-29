@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok, notFound, error } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
+import { assignTibId } from "@/lib/services/tib-id.service";
 
 // GET /api/user/by-telegram?telegramId=123456789
 export async function GET(req: NextRequest) {
@@ -11,15 +12,21 @@ export async function GET(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { telegramId },
-      select: { firstName: true, phone: true, tibId: true },
+      select: { id: true, firstName: true, phone: true, tibId: true },
     });
 
     if (!user || !user.phone) return notFound("User not found");
 
+    // tibId yo'q bo'lsa — hozir tayinlab qaytarish
+    let tibId = user.tibId;
+    if (!tibId) {
+      tibId = await assignTibId(user.id);
+    }
+
     return ok({
       firstName: user.firstName,
       phone: user.phone,
-      tibId: user.tibId ?? null,
+      tibId,
     });
   } catch {
     return error("Server error", 500);

@@ -15,10 +15,16 @@ interface Service {
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
 interface TgUser { firstName: string; phone: string; tibId: string | null }
 
-type Step = "services" | "date" | "slots" | "form" | "done";
+// Known user:   services → date → (slots) → confirm → done
+// Unknown user: services → date → (slots) → form → confirm → done
+type Step = "services" | "date" | "slots" | "form" | "confirm" | "done";
 
-const typeEmojis: Record<string, string> = { doctor_queue: "👨‍⚕️", diagnostic: "🔬", home_service: "🏠" };
-const typeLabels: Record<string, string> = { doctor_queue: "Shifokor navbati", diagnostic: "Diagnostika", home_service: "Uyga chiqish" };
+const typeEmojis: Record<string, string> = {
+  doctor_queue: "👨‍⚕️", diagnostic: "🔬", home_service: "🏠",
+};
+const typeLabels: Record<string, string> = {
+  doctor_queue: "Shifokor navbati", diagnostic: "Diagnostika", home_service: "Uyga chiqish",
+};
 
 export default function WebApp() {
   const [step, setStep] = useState<Step>("services");
@@ -29,6 +35,7 @@ export default function WebApp() {
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [form, setForm] = useState({ name: "", phone: "", address: "" });
   const [loading, setLoading] = useState(false);
+  const [userLoading, setUserLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -41,35 +48,30 @@ export default function WebApp() {
         process.env.NEXT_PUBLIC_CLINIC_ID || ""
       : "";
 
-  const today = new Date();
-
-  // WebApp init: Telegram user resolve → pre-fill form
+  // ─── Init: Telegram user resolve ────────────────────────────────────────────
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
-    }
+    tg?.ready();
+    tg?.expand();
 
     const telegramId = tg?.initDataUnsafe?.user?.id;
-    if (telegramId) {
-      fetch(`/api/user/by-telegram?telegramId=${telegramId}`)
-        .then((r) => r.json())
-        .then((json) => {
-          if (json.success && json.data) {
-            const u: TgUser = json.data;
-            setTgUser(u);
-            setForm((f) => ({
-              ...f,
-              name: f.name || u.firstName,
-              phone: f.phone || u.phone || "",
-            }));
-          }
-        })
-        .catch(() => {});
-    }
 
-    loadServices(today.toISOString().split("T")[0]);
+    const resolveUser = telegramId
+      ? fetch(`/api/user/by-telegram?telegramId=${telegramId}`)
+          .then((r) => r.json())
+          .then((json) => {
+            if (json.success && json.data?.phone) {
+              const u: TgUser = json.data;
+              setTgUser(u);
+              setForm((f) => ({ ...f, name: u.firstName, phone: u.phone }));
+            }
+          })
+          .catch(() => {})
+      : Promise.resolve();
+
+    resolveUser.finally(() => setUserLoading(false));
+
+    loadServices(new Date().toISOString().split("T")[0]);
   }, []);
 
   async function loadServices(date: string) {
@@ -79,9 +81,9 @@ export default function WebApp() {
       const res = await fetch(`/api/services?clinicId=${clinicId}&date=${date}`);
       const json = await res.json();
       if (json.success) setServices(json.data);
-      else setErrorMsg(json.error?.message ?? json.error ?? "Xizmatlarni yuklashda xatolik");
+      else setErrorMsg(json.error?.message ?? "Xizmatlarni yuklashda xatolik");
     } catch {
-      setErrorMsg("Tarmoq xatosi. Internet aloqasini tekshiring.");
+      setErrorMsg("Tarmoq xatosi.");
     } finally {
       setLoading(false);
     }
@@ -105,33 +107,57 @@ export default function WebApp() {
         if (json.success) {
           const available = json.data.filter((s: Slot) => s.available);
           setSlots(available);
-          setStep(available.length > 0 ? "slots" : "form");
+          if (available.length > 0) {
+            setStep("slots");
+          } else {
+            afterSlotOrDate();
+          }
         } else {
-          setErrorMsg(json.error?.message ?? json.error ?? "Uyachalarni yuklashda xatolik");
-          setStep("form");
+          setErrorMsg(json.error?.message ?? "Uyachalarni yuklashda xatolik");
+          afterSlotOrDate();
         }
       } catch {
-        setErrorMsg("Tarmoq xatosi. Internet aloqasini tekshiring.");
-        setStep("form");
+        setErrorMsg("Tarmoq xatosi.");
+        afterSlotOrDate();
       } finally {
         setLoading(false);
       }
+    } else {
+      afterSlotOrDate();
+    }
+  }
+
+  function selectSlot(slotId: string) {
+    setSelectedSlot(slotId);
+    afterSlotOrDate();
+  }
+
+  // Known user → confirm; unknown user → form
+  function afterSlotOrDate() {
+    if (tgUser?.phone) {
+      setStep("confirm");
     } else {
       setStep("form");
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Form to'ldirilgandan keyin → confirm
+  function handleFormNext(e: React.FormEvent) {
     e.preventDefault();
+    setStep("confirm");
+  }
+
+  // ─── Booking ────────────────────────────────────────────────────────────────
+  async function handleBook() {
     if (!selectedService || !selectedDate || submitting) return;
     setSubmitting(true);
     setErrorMsg(null);
 
     try {
-      // 1. User resolve → tibId olish (getOrCreate)
       const telegramId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
       let resolvedTibId: string | null = tgUser?.tibId ?? null;
 
+      // User resolve → tibId olish (getOrCreate, sequential)
       const regRes = await fetch("/api/user/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,14 +165,14 @@ export default function WebApp() {
           phone: form.phone,
           firstName: form.name,
           ...(telegramId ? { telegramId } : {}),
-          clinicId: clinicId || undefined,
+          ...(clinicId ? { clinicId } : {}),
         }),
       });
       const regJson = await regRes.json();
       if (regJson.success) resolvedTibId = regJson.data?.tibId ?? resolvedTibId;
 
-      // 2. Booking
-      const payload: any = {
+      // Booking
+      const payload: Record<string, unknown> = {
         clinicId,
         serviceId: selectedService.id,
         date: selectedDate,
@@ -155,7 +181,7 @@ export default function WebApp() {
         source: "webapp",
       };
       if (selectedSlot) payload.slotId = selectedSlot;
-      if (selectedService.requiresAddress) payload.address = form.address;
+      if (selectedService.requiresAddress && form.address) payload.address = form.address;
 
       const res = await fetch("/api/book", {
         method: "POST",
@@ -168,28 +194,33 @@ export default function WebApp() {
         setResult(json.data);
         setBookingTibId(resolvedTibId);
         setStep("done");
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.sendData(JSON.stringify({ success: true, appointmentId: json.data.id }));
-        }
+        window.Telegram?.WebApp?.sendData?.(
+          JSON.stringify({ success: true, appointmentId: json.data.id })
+        );
       } else {
-        setErrorMsg(json.error?.message ?? json.error ?? "Xatolik yuz berdi. Qayta urinib ko'ring.");
+        setErrorMsg(json.error?.message ?? "Xatolik yuz berdi.");
       }
     } catch {
-      setErrorMsg("Tarmoq xatosi. Internet aloqasini tekshiring.");
+      setErrorMsg("Tarmoq xatosi.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  // ─── Progress bar ──────────────────────────────────────────────────────────
-  const steps: Step[] = selectedService?.requiresSlot
-    ? ["services", "date", "slots", "form", "done"]
-    : ["services", "date", "form", "done"];
-  const stepIdx = steps.indexOf(step);
-  const progress = step === "done" ? 100 : Math.round((stepIdx / (steps.length - 1)) * 100);
+  // ─── Progress ────────────────────────────────────────────────────────────────
+  const allSteps: Step[] = tgUser?.phone
+    ? (selectedService?.requiresSlot
+        ? ["services", "date", "slots", "confirm", "done"]
+        : ["services", "date", "confirm", "done"])
+    : (selectedService?.requiresSlot
+        ? ["services", "date", "slots", "form", "confirm", "done"]
+        : ["services", "date", "form", "confirm", "done"]);
+  const stepIdx = allSteps.indexOf(step);
+  const progress = step === "done" ? 100 : Math.round((stepIdx / (allSteps.length - 1)) * 100);
 
   const displayTibId = tgUser?.tibId ?? bookingTibId;
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto flex flex-col">
       {/* Header */}
@@ -197,7 +228,7 @@ export default function WebApp() {
         <div className="flex items-center justify-between">
           <h1 className="font-bold text-lg">🏥 Qabulga yozilish</h1>
           {displayTibId && (
-            <span className="text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono font-semibold">
+            <span className="text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono font-semibold tracking-wide">
               🆔 {displayTibId}
             </span>
           )}
@@ -217,7 +248,7 @@ export default function WebApp() {
 
       <div className="flex-1 p-4">
 
-        {/* ── Global error banner ── */}
+        {/* Error banner */}
         {errorMsg && (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
             <span className="text-red-500 flex-shrink-0 mt-0.5">⚠️</span>
@@ -229,6 +260,9 @@ export default function WebApp() {
         {/* ── Step: Services ── */}
         {step === "services" && (
           <div>
+            {userLoading && (
+              <div className="text-xs text-gray-400 mb-3 text-center">Foydalanuvchi aniqlanmoqda...</div>
+            )}
             <h2 className="font-semibold text-gray-900 mb-4">Xizmatni tanlang</h2>
             {loading ? (
               <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Yuklanmoqda...</div>
@@ -287,15 +321,8 @@ export default function WebApp() {
               </div>
             )}
             <h2 className="font-semibold text-gray-900 mb-3">Sanani tanlang</h2>
-            <Calendar
-              value={selectedDate || null}
-              onChange={(date) => selectDate(date)}
-            />
-            {selectedDate && (
-              <p className="text-xs text-gray-400 mt-2 text-center">
-                Tanlangan: {formatDateLabel(selectedDate)}
-              </p>
-            )}
+            <Calendar value={selectedDate || null} onChange={(date) => selectDate(date)} />
+            {loading && <div className="text-center text-gray-400 text-sm mt-3">Tekshirilmoqda...</div>}
           </div>
         )}
 
@@ -304,9 +331,7 @@ export default function WebApp() {
           <div>
             <button onClick={() => setStep("date")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
             <h2 className="font-semibold text-gray-900 mb-4">Vaqtni tanlang</h2>
-            {loading ? (
-              <div className="text-center text-gray-400 text-sm py-8">Yuklanmoqda...</div>
-            ) : slots.length === 0 ? (
+            {slots.length === 0 ? (
               <div className="text-center py-8">
                 <div className="text-4xl mb-2">😔</div>
                 <p className="text-gray-500 text-sm">Bu kunda bo'sh uyacha yo'q</p>
@@ -319,7 +344,7 @@ export default function WebApp() {
                 {slots.map((s) => (
                   <button
                     key={s.id}
-                    onClick={() => { setSelectedSlot(s.id); setStep("form"); }}
+                    onClick={() => selectSlot(s.id)}
                     className="p-4 rounded-2xl bg-white border-2 border-transparent shadow-sm text-center hover:border-blue-200 active:scale-95 transition-all"
                   >
                     <div className="text-sm font-bold text-gray-900">{s.startTime}</div>
@@ -331,9 +356,9 @@ export default function WebApp() {
           </div>
         )}
 
-        {/* ── Step: Form ── */}
+        {/* ── Step: Form (FAQAT noma'lum foydalanuvchilar) ── */}
         {step === "form" && (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleFormNext}>
             <button
               type="button"
               onClick={() => setStep(selectedService?.requiresSlot ? "slots" : "date")}
@@ -341,28 +366,7 @@ export default function WebApp() {
             >
               ← Orqaga
             </button>
-
-            {/* Summary */}
-            <div className="bg-blue-50 rounded-xl p-3 mb-5 space-y-1">
-              {selectedService && (
-                <div className="flex items-center gap-2 text-sm">
-                  <span>{typeEmojis[selectedService.type]}</span>
-                  <span className="font-semibold text-blue-900">{selectedService.name}</span>
-                  <span className="text-blue-600 ml-auto">{selectedService.price.toLocaleString()} so'm</span>
-                </div>
-              )}
-              <div className="text-xs text-blue-700">
-                📅 {selectedDate ? formatDateLabel(selectedDate) : ""}
-              </div>
-              {selectedSlot && (
-                <div className="text-xs text-blue-700">
-                  🕐 {slots.find((s) => s.id === selectedSlot)?.startTime} —{" "}
-                  {slots.find((s) => s.id === selectedSlot)?.endTime}
-                </div>
-              )}
-            </div>
-
-            <h2 className="font-semibold text-gray-900 mb-4">Ma'lumotlaringiz</h2>
+            <h2 className="font-semibold text-gray-900 mb-4">Ma'lumotlaringizni kiriting</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Ism Familya *</label>
@@ -397,20 +401,72 @@ export default function WebApp() {
                     rows={3}
                     value={form.address}
                     onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    placeholder="Toshkent sh., Yunusobod t., Ko'k sariq ko'ch., 5-uy"
+                    placeholder="Toshkent sh., Yunusobod t., 5-uy"
                   />
                 </div>
               )}
             </div>
+            <button type="submit" className="btn-primary w-full mt-6 py-3.5 text-base">
+              Davom etish →
+            </button>
+          </form>
+        )}
+
+        {/* ── Step: Confirm ── */}
+        {step === "confirm" && (
+          <div>
+            <button
+              onClick={() => setStep(tgUser?.phone
+                ? (selectedService?.requiresSlot ? "slots" : "date")
+                : "form")}
+              className="text-blue-600 text-sm mb-4"
+            >
+              ← Orqaga
+            </button>
+            <h2 className="font-semibold text-gray-900 mb-4">Tasdiqlash</h2>
+
+            {/* Booking summary */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 mb-5">
+              {selectedService && (
+                <SummaryRow label="Xizmat" value={`${typeEmojis[selectedService.type]} ${selectedService.name}`} />
+              )}
+              <SummaryRow label="Narx" value={`${selectedService?.price.toLocaleString()} so'm`} />
+              <SummaryRow label="Sana" value={selectedDate ? formatDateLabel(selectedDate) : ""} />
+              {selectedSlot && slots.find((s) => s.id === selectedSlot) && (
+                <SummaryRow
+                  label="Vaqt"
+                  value={`${slots.find((s) => s.id === selectedSlot)!.startTime} — ${slots.find((s) => s.id === selectedSlot)!.endTime}`}
+                />
+              )}
+              <div className="border-t border-gray-100 pt-3 space-y-2">
+                <SummaryRow label="Ism" value={form.name} />
+                <SummaryRow label="Telefon" value={form.phone} />
+                {displayTibId && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">ID raqam</span>
+                    <span className="font-mono text-sm font-bold text-blue-600">🆔 {displayTibId}</span>
+                  </div>
+                )}
+              </div>
+              {selectedService?.requiresAddress && form.address && (
+                <SummaryRow label="Manzil" value={form.address} />
+              )}
+            </div>
+
+            {tgUser && (
+              <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-2.5 mb-4 text-xs text-green-700">
+                ✅ Siz allaqachon ro'yxatdan o'tgansiz. Ma'lumotlar avtomatik to'ldirildi.
+              </div>
+            )}
 
             <button
-              type="submit"
+              onClick={handleBook}
               disabled={submitting}
-              className="btn-primary w-full mt-6 py-3.5 text-base"
+              className="btn-primary w-full py-3.5 text-base"
             >
               {submitting ? "Yuborilmoqda..." : "✅ Qabulga yozilish"}
             </button>
-          </form>
+          </div>
         )}
 
         {/* ── Step: Done ── */}
@@ -427,12 +483,17 @@ export default function WebApp() {
                   <span className="text-blue-600 font-bold font-mono text-base">🆔 {bookingTibId}</span>
                 </div>
               )}
-              <Row label="Xizmat" value={result.service?.name} />
-              {result.queueNumber && <Row label="Navbat raqami" value={`#${result.queueNumber}`} highlight />}
-              {result.slot && <Row label="Vaqt" value={`${result.slot.startTime} — ${result.slot.endTime}`} />}
-              <Row label="Sana" value={selectedDate ? formatDateLabel(selectedDate) : selectedDate} />
-              <Row label="Ism" value={result.patientName} />
-              <Row label="Telefon" value={result.patientPhone} />
+              <SummaryRow label="Xizmat" value={result.service?.name} />
+              {result.queueNumber && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Navbat raqami</span>
+                  <span className="text-blue-600 font-bold text-lg">#{result.queueNumber}</span>
+                </div>
+              )}
+              {result.slot && <SummaryRow label="Vaqt" value={`${result.slot.startTime} — ${result.slot.endTime}`} />}
+              <SummaryRow label="Sana" value={selectedDate ? formatDateLabel(selectedDate) : selectedDate} />
+              <SummaryRow label="Ism" value={result.patientName} />
+              <SummaryRow label="Telefon" value={result.patientPhone} />
             </div>
 
             {bookingTibId && (
@@ -448,13 +509,11 @@ export default function WebApp() {
   );
 }
 
-function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between items-center">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className={`text-sm font-semibold ${highlight ? "text-blue-600 text-lg" : "text-gray-900"}`}>
-        {value}
-      </span>
+    <div className="flex justify-between items-start gap-4">
+      <span className="text-sm text-gray-500 flex-shrink-0">{label}</span>
+      <span className="text-sm font-semibold text-gray-900 text-right">{value}</span>
     </div>
   );
 }
