@@ -13,10 +13,11 @@ interface Service {
   dailyLimit: number | null; todayCount: number; isAvailable: boolean;
 }
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
-interface TgUser { firstName: string; phone: string; tibId: string | null }
+interface TgUser { firstName: string; phone: string | null; tibId: string | null; hasPhone: boolean }
 
-// Known user:   services → date → (slots) → confirm → done
-// Unknown user: services → date → (slots) → form → confirm → done
+// Known user (hasPhone): services → date → (slots) → confirm → done
+// Known user (no phone): services → date → (slots) → phone-form → confirm → done
+// New user:             services → date → (slots) → full-form → confirm → done
 type Step = "services" | "date" | "slots" | "form" | "confirm" | "done";
 
 const typeEmojis: Record<string, string> = {
@@ -25,6 +26,37 @@ const typeEmojis: Record<string, string> = {
 const typeLabels: Record<string, string> = {
   doctor_queue: "Shifokor navbati", diagnostic: "Diagnostika", home_service: "Uyga chiqish",
 };
+
+// Telegram WebApp dan telegramId ni ishonchli olish (initDataUnsafe + fallback parsing)
+function getTelegramId(tg: any): number | null {
+  if (!tg) return null;
+  // Usul 1: to'g'ridan-to'g'ri
+  if (tg.initDataUnsafe?.user?.id) return tg.initDataUnsafe.user.id;
+  // Usul 2: initData stringidan parse qilish
+  if (tg.initData) {
+    try {
+      const params = new URLSearchParams(tg.initData);
+      const userStr = params.get("user");
+      if (userStr) {
+        const user = JSON.parse(decodeURIComponent(userStr));
+        if (user?.id) return user.id;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function getTelegramFirstName(tg: any): string {
+  if (tg?.initDataUnsafe?.user?.first_name) return tg.initDataUnsafe.user.first_name;
+  if (tg?.initData) {
+    try {
+      const params = new URLSearchParams(tg.initData);
+      const userStr = params.get("user");
+      if (userStr) return JSON.parse(decodeURIComponent(userStr))?.first_name || "";
+    } catch {}
+  }
+  return "";
+}
 
 export default function WebApp() {
   const [step, setStep] = useState<Step>("services");
@@ -41,6 +73,7 @@ export default function WebApp() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
   const [bookingTibId, setBookingTibId] = useState<string | null>(null);
+  const [telegramId, setTelegramId] = useState<number | null>(null);
 
   const clinicId =
     typeof window !== "undefined"
@@ -48,29 +81,40 @@ export default function WebApp() {
         process.env.NEXT_PUBLIC_CLINIC_ID || ""
       : "";
 
-  // ─── Init: Telegram user resolve ────────────────────────────────────────────
+  // ─── Init ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     tg?.ready();
     tg?.expand();
 
-    const telegramId = tg?.initDataUnsafe?.user?.id;
+    const tgId = getTelegramId(tg);
+    const tgFirstName = getTelegramFirstName(tg);
 
-    const resolveUser = telegramId
-      ? fetch(`/api/user/by-telegram?telegramId=${telegramId}`)
+    setTelegramId(tgId);
+
+    // Telegram ismi bilan formani oldindan to'ldirish (hatto user topilmasa ham)
+    if (tgFirstName) {
+      setForm((f) => ({ ...f, name: f.name || tgFirstName }));
+    }
+
+    const resolveUser = tgId
+      ? fetch(`/api/user/by-telegram?telegramId=${tgId}`)
           .then((r) => r.json())
           .then((json) => {
-            if (json.success && json.data?.phone) {
+            if (json.success && json.data) {
               const u: TgUser = json.data;
               setTgUser(u);
-              setForm((f) => ({ ...f, name: u.firstName, phone: u.phone }));
+              setForm((f) => ({
+                ...f,
+                name: f.name || u.firstName,
+                phone: f.phone || u.phone || "",
+              }));
             }
           })
           .catch(() => {})
       : Promise.resolve();
 
     resolveUser.finally(() => setUserLoading(false));
-
     loadServices(new Date().toISOString().split("T")[0]);
   }, []);
 
@@ -107,41 +151,33 @@ export default function WebApp() {
         if (json.success) {
           const available = json.data.filter((s: Slot) => s.available);
           setSlots(available);
-          if (available.length > 0) {
-            setStep("slots");
-          } else {
-            afterSlotOrDate();
-          }
+          if (available.length > 0) { setStep("slots"); return; }
         } else {
           setErrorMsg(json.error?.message ?? "Uyachalarni yuklashda xatolik");
-          afterSlotOrDate();
         }
       } catch {
         setErrorMsg("Tarmoq xatosi.");
-        afterSlotOrDate();
       } finally {
         setLoading(false);
       }
-    } else {
-      afterSlotOrDate();
     }
+    goAfterDateSlot();
   }
 
   function selectSlot(slotId: string) {
     setSelectedSlot(slotId);
-    afterSlotOrDate();
+    goAfterDateSlot();
   }
 
-  // Known user → confirm; unknown user → form
-  function afterSlotOrDate() {
-    if (tgUser?.phone) {
-      setStep("confirm");
+  // Routing: telefon bo'lsa confirm, yo'q bo'lsa form
+  function goAfterDateSlot() {
+    if (tgUser?.hasPhone) {
+      setStep("confirm");         // Telefon bor → form o'tkazib yuboriladi
     } else {
-      setStep("form");
+      setStep("form");            // Telefon yo'q yoki yangi user → form ko'rsatiladi
     }
   }
 
-  // Form to'ldirilgandan keyin → confirm
   function handleFormNext(e: React.FormEvent) {
     e.preventDefault();
     setStep("confirm");
@@ -154,10 +190,9 @@ export default function WebApp() {
     setErrorMsg(null);
 
     try {
-      const telegramId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
       let resolvedTibId: string | null = tgUser?.tibId ?? null;
 
-      // User resolve → tibId olish (getOrCreate, sequential)
+      // User resolve → bir xil tibId olish (ketma-ket: telegramId → phone)
       const regRes = await fetch("/api/user/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,20 +242,12 @@ export default function WebApp() {
     }
   }
 
-  // ─── Progress ────────────────────────────────────────────────────────────────
-  const allSteps: Step[] = tgUser?.phone
-    ? (selectedService?.requiresSlot
-        ? ["services", "date", "slots", "confirm", "done"]
-        : ["services", "date", "confirm", "done"])
-    : (selectedService?.requiresSlot
-        ? ["services", "date", "slots", "form", "confirm", "done"]
-        : ["services", "date", "form", "confirm", "done"]);
-  const stepIdx = allSteps.indexOf(step);
-  const progress = step === "done" ? 100 : Math.round((stepIdx / (allSteps.length - 1)) * 100);
-
   const displayTibId = tgUser?.tibId ?? bookingTibId;
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  // Form faqat telefon so'rashimi yoki to'liq ko'rsatilishimi
+  const nameIsKnown = !!(tgUser?.firstName || form.name);
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto flex flex-col">
       {/* Header */}
@@ -228,7 +255,7 @@ export default function WebApp() {
         <div className="flex items-center justify-between">
           <h1 className="font-bold text-lg">🏥 Qabulga yozilish</h1>
           {displayTibId && (
-            <span className="text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono font-semibold tracking-wide">
+            <span className="text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono font-semibold">
               🆔 {displayTibId}
             </span>
           )}
@@ -240,7 +267,7 @@ export default function WebApp() {
           <div className="mt-3 h-1.5 bg-blue-500 rounded-full overflow-hidden">
             <div
               className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${ step === "done" ? 100 : step === "confirm" ? 85 : step === "form" ? 70 : step === "slots" ? 55 : 35 }%` }}
             />
           </div>
         )}
@@ -261,7 +288,9 @@ export default function WebApp() {
         {step === "services" && (
           <div>
             {userLoading && (
-              <div className="text-xs text-gray-400 mb-3 text-center">Foydalanuvchi aniqlanmoqda...</div>
+              <div className="text-xs text-center text-gray-400 mb-3 animate-pulse">
+                Foydalanuvchi tekshirilmoqda...
+              </div>
             )}
             <h2 className="font-semibold text-gray-900 mb-4">Xizmatni tanlang</h2>
             {loading ? (
@@ -335,9 +364,7 @@ export default function WebApp() {
               <div className="text-center py-8">
                 <div className="text-4xl mb-2">😔</div>
                 <p className="text-gray-500 text-sm">Bu kunda bo'sh uyacha yo'q</p>
-                <button onClick={() => setStep("date")} className="btn-primary mt-4 text-sm">
-                  Boshqa kun tanlash
-                </button>
+                <button onClick={() => setStep("date")} className="btn-primary mt-4 text-sm">Boshqa kun tanlash</button>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -356,7 +383,7 @@ export default function WebApp() {
           </div>
         )}
 
-        {/* ── Step: Form (FAQAT noma'lum foydalanuvchilar) ── */}
+        {/* ── Step: Form ── */}
         {step === "form" && (
           <form onSubmit={handleFormNext}>
             <button
@@ -366,19 +393,31 @@ export default function WebApp() {
             >
               ← Orqaga
             </button>
-            <h2 className="font-semibold text-gray-900 mb-4">Ma'lumotlaringizni kiriting</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Ism Familya *</label>
-                <input
-                  className="input"
-                  required
-                  minLength={2}
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Alisher Karimov"
-                />
+
+            {nameIsKnown && (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 mb-4 text-sm text-blue-700">
+                👤 {form.name}
               </div>
+            )}
+
+            <h2 className="font-semibold text-gray-900 mb-4">
+              {nameIsKnown ? "Telefon raqamingizni kiriting" : "Ma'lumotlaringizni kiriting"}
+            </h2>
+
+            <div className="space-y-4">
+              {!nameIsKnown && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Ism Familya *</label>
+                  <input
+                    className="input"
+                    required
+                    minLength={2}
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Alisher Karimov"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefon *</label>
                 <input
@@ -388,6 +427,7 @@ export default function WebApp() {
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   placeholder="+998 90 000 00 00"
+                  autoFocus
                 />
               </div>
               {selectedService?.requiresAddress && (
@@ -406,6 +446,7 @@ export default function WebApp() {
                 </div>
               )}
             </div>
+
             <button type="submit" className="btn-primary w-full mt-6 py-3.5 text-base">
               Davom etish →
             </button>
@@ -416,16 +457,17 @@ export default function WebApp() {
         {step === "confirm" && (
           <div>
             <button
-              onClick={() => setStep(tgUser?.phone
-                ? (selectedService?.requiresSlot ? "slots" : "date")
-                : "form")}
+              onClick={() => setStep(
+                tgUser?.hasPhone
+                  ? (selectedService?.requiresSlot ? "slots" : "date")
+                  : "form"
+              )}
               className="text-blue-600 text-sm mb-4"
             >
               ← Orqaga
             </button>
             <h2 className="font-semibold text-gray-900 mb-4">Tasdiqlash</h2>
 
-            {/* Booking summary */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 mb-5">
               {selectedService && (
                 <SummaryRow label="Xizmat" value={`${typeEmojis[selectedService.type]} ${selectedService.name}`} />
@@ -453,9 +495,9 @@ export default function WebApp() {
               )}
             </div>
 
-            {tgUser && (
+            {tgUser?.hasPhone && (
               <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-2.5 mb-4 text-xs text-green-700">
-                ✅ Siz allaqachon ro'yxatdan o'tgansiz. Ma'lumotlar avtomatik to'ldirildi.
+                ✅ Ma'lumotlar botdagi hisobingizdan olindi
               </div>
             )}
 
@@ -504,6 +546,7 @@ export default function WebApp() {
             <p className="text-xs text-gray-400 mt-2">Klinikaga o'z vaqtida keling 🏥</p>
           </div>
         )}
+
       </div>
     </div>
   );

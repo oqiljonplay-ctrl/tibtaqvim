@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { assignTibId } from "@/lib/services/tib-id.service";
 
 // GET /api/user/by-telegram?telegramId=123456789
+// phone yo'q userlarni ham qaytaradi (phone: null)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -15,9 +16,8 @@ export async function GET(req: NextRequest) {
       select: { id: true, firstName: true, phone: true, tibId: true },
     });
 
-    if (!user || !user.phone) return notFound("User not found");
+    if (!user) return notFound("User not found");
 
-    // tibId yo'q bo'lsa — hozir tayinlab qaytarish
     let tibId = user.tibId;
     if (!tibId) {
       tibId = await assignTibId(user.id);
@@ -25,8 +25,9 @@ export async function GET(req: NextRequest) {
 
     return ok({
       firstName: user.firstName,
-      phone: user.phone,
+      phone: user.phone ?? null,
       tibId,
+      hasPhone: !!user.phone,
     });
   } catch {
     return error("Server error", 500);

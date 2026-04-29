@@ -1,5 +1,5 @@
 import TelegramBot, { Message } from "node-telegram-bot-api";
-import { fetchServices, fetchUserByTelegramId } from "../api";
+import { fetchServices, fetchUserByTelegramId, registerUserAtStart } from "../api";
 import { userState } from "../state";
 import {
   mkServiceKeyboard,
@@ -15,9 +15,14 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
 
   const today = new Date().toISOString().split("T")[0];
+  const tgFirstName = msg.from?.first_name || "Foydalanuvchi";
+
+  // /start bosib kelgan har bir user DB'ga yoziladi (phone keyinroq qo'shiladi)
+  // Maqsad: WebApp ochilganda by-telegram orqali topilsin, bir xil tibId bo'lsin
   const [{ services, enableWebapp }, savedUser] = await Promise.all([
     fetchServices(DEFAULT_CLINIC_ID, today),
     fetchUserByTelegramId(chatId),
+    registerUserAtStart(chatId, tgFirstName),
   ]);
 
   // Pastki persistent tugmani ko'rsatish yoki olib tashlash

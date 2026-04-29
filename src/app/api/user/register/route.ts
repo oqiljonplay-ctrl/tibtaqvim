@@ -5,36 +5,35 @@ import { normalizePhone } from "@/lib/utils/phone";
 import { assignTibId } from "@/lib/services/tib-id.service";
 
 // POST /api/user/register — getOrCreateUser
+// phone ixtiyoriy: telegramId bo'lsa phone yo'q ham yaratiladi (bot /start uchun)
 // Ketma-ket izlash: telegramId → phone → yaratish
-// Har doim tibId qaytaradi
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { phone, firstName, telegramId, clinicId } = body;
 
-    if (!phone || !firstName) {
-      return error("phone va firstName majburiy", 400);
-    }
+    if (!firstName) return error("firstName majburiy", 400);
+    if (!phone && !telegramId) return error("phone yoki telegramId kerak", 400);
 
-    const normalized = normalizePhone(phone);
+    const normalized = phone ? normalizePhone(phone) : null;
     const tgId = telegramId ? String(telegramId) : null;
 
     let user = null;
 
-    // 1. TelegramId bo'yicha izlash (eng ishonchli — bitta kishi)
+    // 1. TelegramId bo'yicha (eng ishonchli)
     if (tgId) {
       user = await prisma.user.findUnique({ where: { telegramId: tgId } });
     }
 
-    // 2. Phone bo'yicha izlash (telegramId topilmagan holda)
-    if (!user) {
+    // 2. Phone bo'yicha (telegramId topilmasa)
+    if (!user && normalized) {
       user = await prisma.user.findFirst({ where: { phone: normalized } });
     }
 
     if (user) {
       // Mavjud user — bo'sh maydonlarni to'ldirish
       const updates: Record<string, string | null> = {};
-      if (!user.phone) updates.phone = normalized;
+      if (!user.phone && normalized) updates.phone = normalized;
       if (!user.telegramId && tgId) updates.telegramId = tgId;
       if (!user.firstName || user.firstName === "—") updates.firstName = firstName.trim();
       if (Object.keys(updates).length > 0) {
@@ -54,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     const tibId = user.tibId ?? (await assignTibId(user.id));
-    return ok({ tibId, userId: user.id });
+    return ok({ tibId, userId: user.id, hasPhone: !!user.phone });
   } catch {
     return error("Server xatosi", 500);
   }

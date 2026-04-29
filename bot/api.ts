@@ -65,6 +65,21 @@ export async function fetchSlots(serviceId: string, date: string) {
   return json.success ? json.data : [];
 }
 
+// /start da chaqiriladi — phone yo'q, faqat telegramId + firstName
+// Maqsad: user DB'da yaratilsin, WebApp ochilganda topilsin
+export async function registerUserAtStart(
+  telegramId: number,
+  firstName: string
+): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/user/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telegramId, firstName }),
+    });
+  } catch {}
+}
+
 export async function fetchUserByTelegramId(
   telegramId: number
 ): Promise<{ firstName: string; phone: string; tibId?: string | null } | null> {
