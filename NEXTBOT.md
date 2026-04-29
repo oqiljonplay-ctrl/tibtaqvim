@@ -405,6 +405,29 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-04-29 — Unified User Resolution (bot ↔ WebApp bir xil tibId)
+**Muammo:** Bot va WebApp mustaqil user yaratar edi — bir foydalanuvchi ikki xil tibId olardi.
+**O'zgartirilgan fayllar:**
+- `src/app/api/user/register/route.ts` — phone endi ixtiyoriy (telegramId bo'lsa yetarli); ketma-ket qidiruv: `findUnique(telegramId)` → `findFirst(phone)` → `create`; `hasPhone` field qaytariladi
+- `src/app/api/user/by-telegram/route.ts` — phone bo'lmagan userlarni ham qaytaradi (avval `!user.phone` check bor edi → 404 berardi); `hasPhone` field qo'shildi
+- `bot/api.ts` — `registerUserAtStart(telegramId, firstName)` yangi funksiya: /start da, booking'dan oldin, faqat telegramId+firstName bilan user yaratadi
+- `bot/handlers/start.ts` — `registerUserAtStart` parallel chaqiriladi (`Promise.all`): user /start bosgunida DB'ga tushadi, WebApp ochilganda topiladi
+- `src/app/webapp/page.tsx` — `getTelegramId()`: `initDataUnsafe.user.id` + `initData` string fallback; `getTelegramFirstName()` bir xil fallback; `goAfterDateSlot()`: `tgUser?.hasPhone` → `confirm` (form'ni o'tkazib yuboradi) yoki `form`; form step: name allaqachon bo'lsa faqat telefon so'raladi
+
+**Oqim (yangi):**
+```
+/start → registerUserAtStart (telegramId+firstName, phone yo'q)
+WebApp ochilish → by-telegram → bir xil user topildi → bir xil tibId
+Phone kiritilganda → /api/user/register → phone qo'shildi (update), tibId o'zgarmadi
+```
+
+**Muhim qoidalar:**
+- tibId HECH QACHON o'zgarmaydi — yangi user yaratilmaydi, mavjud update qilinadi
+- Ketma-ket qidiruv majburiy: telegramId → phone → create (OR lookup emas!)
+- Bot /start'da ro'yxatdan o'tkazish WebApp uchun sharoit yaratadi (pre-registration)
+
+---
+
 ### 2026-04-29 — tibId Global Identity Integration (barcha qatlamlar)
 **Nima o'zgardi:** tibId barcha qatlamlarda ko'rinadigan qilindi. Bot ↔ WebApp bir xil foydalanuvchini ifodalaydi. Takroriy user yaratish bartaraf qilindi.
 **O'zgartirilgan fayllar:**
