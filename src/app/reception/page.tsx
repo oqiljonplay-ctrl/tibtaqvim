@@ -8,6 +8,7 @@ interface Appointment {
   service: { name: string; type: string };
   doctor: { firstName: string; lastName: string } | null;
   slot: { startTime: string; endTime: string } | null;
+  user: { tibId: string | null } | null;
 }
 interface Service { id: string; name: string }
 
@@ -29,6 +30,7 @@ export default function ReceptionPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [search, setSearch] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -106,6 +108,13 @@ export default function ReceptionPage() {
 
   const filtered = appointments.filter((a) => {
     if (statusFilter !== "all" && a.status !== statusFilter) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const tibId = a.user?.tibId?.toLowerCase() ?? "";
+      const name = a.patientName.toLowerCase();
+      const phone = a.patientPhone.toLowerCase();
+      if (!tibId.includes(q) && !name.includes(q) && !phone.includes(q)) return false;
+    }
     return true;
   });
 
@@ -156,6 +165,13 @@ export default function ReceptionPage() {
           <option value="all">Barcha xizmatlar</option>
           {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="input text-sm flex-1 min-w-[160px]"
+          placeholder="🔍 Ism, telefon yoki 🆔 tibId"
+        />
       </div>
 
       {/* Status tabs */}
@@ -188,8 +204,9 @@ export default function ReceptionPage() {
               <tr className="border-b border-gray-100">
                 <th className="text-left py-3 px-4 font-medium text-gray-500 w-12">№</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-500">Bemor</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-500 hidden md:table-cell">🆔 ID</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-500">Xizmat</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-500">Shifokor</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-500 hidden lg:table-cell">Shifokor</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-500">Vaqt</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-500">Holat</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-500">Amal</th>
@@ -210,8 +227,13 @@ export default function ReceptionPage() {
                       <div className="text-xs text-gray-400">{a.patientPhone}</div>
                       {a.address && <div className="text-xs text-orange-500 mt-0.5">📍 {a.address}</div>}
                     </td>
+                    <td className="py-3 px-4 hidden md:table-cell">
+                      {a.user?.tibId
+                        ? <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{a.user.tibId}</span>
+                        : <span className="text-xs text-gray-300">—</span>}
+                    </td>
                     <td className="py-3 px-4 text-gray-700">{a.service.name}</td>
-                    <td className="py-3 px-4 text-gray-700">
+                    <td className="py-3 px-4 text-gray-700 hidden lg:table-cell">
                       {a.doctor ? `${a.doctor.firstName} ${a.doctor.lastName}` : "—"}
                     </td>
                     <td className="py-3 px-4 text-gray-600 whitespace-nowrap">

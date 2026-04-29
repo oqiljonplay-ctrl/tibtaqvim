@@ -10,6 +10,7 @@ export interface BookingInput {
   patientPhone: string;
   address?: string;
   source?: "bot" | "webapp";
+  userId?: string;
 }
 
 function sanitizeText(value: string): string {

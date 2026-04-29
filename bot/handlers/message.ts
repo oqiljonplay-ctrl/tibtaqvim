@@ -1,6 +1,14 @@
 import TelegramBot, { Message } from "node-telegram-bot-api";
 import { userState } from "../state";
 import { normalizePhone } from "../../src/lib/utils/phone";
+import {
+  editOrSend,
+  mkNameKeyboard,
+  mkPhoneKeyboard,
+  mkAddressKeyboard,
+  mkConfirmKeyboard,
+  mkConfirmText,
+} from "../helpers/render";
 
 export async function handleMessage(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
@@ -12,14 +20,24 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
     return;
   }
 
+  const msgId: number | undefined = state.messageId;
+
   // ─── Ism ────────────────────────────────────────────────────────────────
   if (state.step === "enter_name") {
     if (text.length < 2) {
-      await bot.sendMessage(chatId, "❌ Iltimos, to'liq ismingizni kiriting (kamida 2 belgi):");
+      await editOrSend(
+        bot, chatId, msgId,
+        "❌ Iltimos, to'liq ismingizni kiriting (kamida 2 belgi):\n\n👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+        mkNameKeyboard(state._nameBack || "select_date")
+      );
       return;
     }
-    userState.set(chatId, { ...state, patientName: text, step: "enter_phone" });
-    await bot.sendMessage(chatId, "📞 Telefon raqamingizni kiriting:\nMasalan: +998901234567");
+    const newMsgId = await editOrSend(
+      bot, chatId, msgId,
+      `👤 Ism: *${text}*\n\n📞 *Telefon raqamingizni kiriting:*\n\n_+998XXXXXXXXX formatida_ 👇`,
+      mkPhoneKeyboard()
+    );
+    userState.set(chatId, { ...state, patientName: text, step: "enter_phone", messageId: newMsgId });
     return;
   }
 
@@ -27,54 +45,51 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
   if (state.step === "enter_phone") {
     const normalized = normalizePhone(text);
     if (!/^\+998\d{9}$/.test(normalized)) {
-      await bot.sendMessage(chatId, "❌ Noto'g'ri raqam. Qaytadan kiriting:\nMasalan: +998901234567");
+      await editOrSend(
+        bot, chatId, msgId,
+        `👤 Ism: *${state.patientName}*\n\n❌ Noto'g'ri raqam. Qaytadan kiriting:\n\n📞 *Telefon raqamingizni kiriting:*\n\n_+998XXXXXXXXX formatida_ 👇`,
+        mkPhoneKeyboard()
+      );
       return;
     }
 
     if (state.serviceType === "home_service") {
-      userState.set(chatId, { ...state, patientPhone: normalized, step: "enter_address" });
-      await bot.sendMessage(chatId, "📍 To'liq manzilingizni kiriting:\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy");
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        `👤 Ism: *${state.patientName}*\n📞 Tel: *${normalized}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
+        mkAddressKeyboard()
+      );
+      userState.set(chatId, { ...state, patientPhone: normalized, step: "enter_address", messageId: newMsgId });
       return;
     }
 
-    userState.set(chatId, { ...state, patientPhone: normalized, step: "confirm" });
-    await sendConfirmation(bot, chatId, { ...state, patientPhone: normalized });
+    const updatedState = { ...state, patientPhone: normalized, step: "confirm" };
+    const newMsgId = await editOrSend(
+      bot, chatId, msgId,
+      mkConfirmText(updatedState),
+      mkConfirmKeyboard()
+    );
+    userState.set(chatId, { ...updatedState, messageId: newMsgId });
     return;
   }
 
   // ─── Manzil ──────────────────────────────────────────────────────────────
   if (state.step === "enter_address") {
     if (text.length < 5) {
-      await bot.sendMessage(chatId, "❌ Iltimos, to'liq manzil kiriting:");
+      await editOrSend(
+        bot, chatId, msgId,
+        `👤 Ism: *${state.patientName}*\n📞 Tel: *${state.patientPhone}*\n\n❌ Iltimos, to'liq manzil kiriting:\n\n📍 *To'liq manzilingizni kiriting:* 👇`,
+        mkAddressKeyboard()
+      );
       return;
     }
-    userState.set(chatId, { ...state, address: text, step: "confirm" });
-    await sendConfirmation(bot, chatId, { ...state, address: text });
+    const updatedState = { ...state, address: text, step: "confirm" };
+    const newMsgId = await editOrSend(
+      bot, chatId, msgId,
+      mkConfirmText(updatedState),
+      mkConfirmKeyboard()
+    );
+    userState.set(chatId, { ...updatedState, messageId: newMsgId });
     return;
   }
-}
-
-async function sendConfirmation(bot: TelegramBot, chatId: number, state: any) {
-  const dateLabel = new Date(state.date).toLocaleDateString("uz-UZ", {
-    weekday: "long", day: "numeric", month: "long",
-  });
-
-  const lines = [
-    "📋 *Ma'lumotlarni tasdiqlang:*",
-    "",
-    `👤 Ism: *${state.patientName}*`,
-    `📞 Telefon: *${state.patientPhone}*`,
-    `📅 Sana: *${dateLabel}*`,
-    state.address ? `📍 Manzil: *${state.address}*` : "",
-  ].filter(Boolean).join("\n");
-
-  await bot.sendMessage(chatId, lines, {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [[
-        { text: "✅ Tasdiqlash", callback_data: "confirm" },
-        { text: "❌ Bekor", callback_data: "cancel" },
-      ]],
-    },
-  });
 }

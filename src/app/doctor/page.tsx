@@ -6,6 +6,7 @@ interface Appointment {
   queueNumber: number | null; status: string; address: string | null;
   service: { name: string; type: string };
   slot: { startTime: string; endTime: string } | null;
+  user: { tibId: string | null } | null;
 }
 
 const STATUS_CFG = {
@@ -154,6 +155,9 @@ function AppointmentCard({
         <div>
           <div className="font-semibold text-gray-900">{a.patientName}</div>
           <div className="text-sm text-gray-500">{a.patientPhone}</div>
+          {a.user?.tibId && (
+            <div className="text-xs text-blue-500 font-mono mt-0.5">🆔 {a.user.tibId}</div>
+          )}
           <div className="text-xs text-gray-400 mt-0.5">{a.service.name}</div>
           {a.slot && <div className="text-xs text-blue-500">🕐 {a.slot.startTime} — {a.slot.endTime}</div>}
           {a.address && <div className="text-xs text-orange-500">📍 {a.address}</div>}

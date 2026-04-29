@@ -1,13 +1,19 @@
 const API_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-export async function fetchServices(clinicId: string, date?: string) {
+export async function fetchServices(
+  clinicId: string,
+  date?: string
+): Promise<{ services: any[]; enableWebapp: boolean }> {
   const url = new URL(`${API_URL}/api/services`);
   url.searchParams.set("clinicId", clinicId);
   if (date) url.searchParams.set("date", date);
 
   const res = await fetch(url.toString());
   const json = await res.json();
-  return json.success ? json.data : [];
+  return {
+    services: json.success ? json.data : [],
+    enableWebapp: json.enableWebapp ?? true,
+  };
 }
 
 export async function fetchDoctors(clinicId: string) {
@@ -34,9 +40,18 @@ export async function bookAppointment(data: {
   return res.json();
 }
 
-export async function fetchTibId(phone: string): Promise<string | null> {
+export async function registerPatient(opts: {
+  phone: string;
+  firstName: string;
+  telegramId: number;
+  clinicId: string;
+}): Promise<string | null> {
   try {
-    const res = await fetch(`${API_URL}/api/user/tib?phone=${encodeURIComponent(phone)}`);
+    const res = await fetch(`${API_URL}/api/user/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
+    });
     const json = await res.json();
     return json.success ? (json.data?.tibId ?? null) : null;
   } catch {
@@ -48,4 +63,16 @@ export async function fetchSlots(serviceId: string, date: string) {
   const res = await fetch(`${API_URL}/api/slots?serviceId=${serviceId}&date=${date}`);
   const json = await res.json();
   return json.success ? json.data : [];
+}
+
+export async function fetchUserByTelegramId(
+  telegramId: number
+): Promise<{ firstName: string; phone: string; tibId?: string | null } | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/user/by-telegram?telegramId=${telegramId}`);
+    const json = await res.json();
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
 }

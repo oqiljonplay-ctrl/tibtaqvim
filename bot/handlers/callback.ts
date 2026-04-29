@@ -1,26 +1,19 @@
 import TelegramBot, { CallbackQuery } from "node-telegram-bot-api";
-import { fetchDoctors, fetchSlots, bookAppointment, fetchTibId } from "../api";
+import { fetchDoctors, fetchSlots, bookAppointment, registerPatient, fetchServices, fetchUserByTelegramId } from "../api";
 import { userState } from "../state";
-
-const TZ = process.env.CLINIC_TIMEZONE || "Asia/Tashkent";
-
-function getTodayTomorrow() {
-  // Server UTC bo'lsa ham klinika vaqt zonasida "bugun/ertaga" aniq bo'lishi uchun
-  const fmt = (offset: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offset);
-    return d.toLocaleDateString("sv-SE", { timeZone: TZ }); // YYYY-MM-DD format
-  };
-  const label = (offset: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offset);
-    return d.toLocaleDateString("uz-UZ", { weekday: "long", day: "numeric", month: "long", timeZone: TZ });
-  };
-  return [
-    { date: fmt(0), label: `📅 Bugun — ${label(0)}` },
-    { date: fmt(1), label: `📅 Ertaga — ${label(1)}` },
-  ];
-}
+import {
+  editOrSend,
+  mkServiceKeyboard,
+  mkDateKeyboard,
+  mkDateKeyboardForMonth,
+  mkDoctorKeyboard,
+  mkSlotKeyboard,
+  mkNameKeyboard,
+  mkPhoneKeyboard,
+  mkAddressKeyboard,
+  mkConfirmKeyboard,
+  mkConfirmText,
+} from "../helpers/render";
 
 export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   const chatId = query.message?.chat.id;
@@ -28,104 +21,482 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     await bot.answerCallbackQuery(query.id, { text: "Xatolik. /start ni bosing." });
     return;
   }
-  const data = query.data || "";
-  await bot.answerCallbackQuery(query.id);
 
+  let data = query.data || "";
   const state = userState.get(chatId) || {};
 
-  // TTL tekshiruvi (confirm bundan mustasno — u state'ni o'chiradi)
+  // messageId: query.message is always the message with the button — most accurate source
+  const msgId: number | undefined = query.message?.message_id ?? state.messageId;
+
+  // ─── full: — alert before general answer ──────────────────────────────────
+  if (data.startsWith("full:")) {
+    await bot.answerCallbackQuery(query.id, {
+      text: "❌ Bu xizmat bugungi limitiga yetdi! Ertaga urinib ko'ring.",
+      show_alert: true,
+    });
+    return;
+  }
+
+  await bot.answerCallbackQuery(query.id);
+
+  // ─── cal:noop — keyboard placeholder buttons ──────────────────────────────
+  if (data === "cal:noop") return;
+
+  // ─── cal:month: — calendar month navigation (no state needed) ────────────
+  if (data.startsWith("cal:month:")) {
+    const ym = data.slice("cal:month:".length);         // "2026-04"
+    const [yearStr, monthStr] = ym.split("-");
+    const keyboard = mkDateKeyboardForMonth(parseInt(yearStr), parseInt(monthStr));
+    if (msgId) {
+      try {
+        await (bot as any).editMessageReplyMarkup(
+          { inline_keyboard: keyboard },
+          { chat_id: chatId, message_id: msgId }
+        );
+      } catch {}
+    }
+    return;
+  }
+
+  // ─── TTL check ────────────────────────────────────────────────────────────
   if (data !== "confirm" && data !== "cancel" && state._createdAt) {
-    const age = Date.now() - state._createdAt;
-    if (age > 30 * 60 * 1000) {
+    if (Date.now() - state._createdAt > 30 * 60 * 1000) {
       userState.delete(chatId);
       await bot.sendMessage(chatId, "⏰ Sessiya muddati tugadi. Qaytadan boshlang:\n\n/start");
       return;
     }
   }
 
-  // ─── Service selected ─────────────────────────────────────────────────────
-  if (data.startsWith("svc:")) {
-    const [, serviceId, serviceType] = data.split(":");
-    userState.set(chatId, { ...state, serviceId, serviceType, step: "select_date", _createdAt: Date.now() });
+  // ─── use_saved / change_info — welcome back flow ─────────────────────────
+  if (data === "use_saved" || data === "change_info") {
+    const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
+    const clinicId = state.clinicId || DEFAULT_CLINIC_ID;
 
-    const dates = getTodayTomorrow();
-    const keyboard = dates.map((d) => [{ text: d.label, callback_data: `date:${d.date}` }]);
+    // State may be lost (serverless cold start) — re-fetch services if needed
+    let services = state._services;
+    if (!services?.length) {
+      const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
+      services = await fetchServices(clinicId, today);
+    }
+    if (!services?.length) {
+      await bot.sendMessage(chatId, "⚠️ Hozirda mavjud xizmatlar yo'q. /start");
+      return;
+    }
 
-    await bot.sendMessage(chatId, "📅 Qaysi kunga yozilmoqchisiz?", {
-      reply_markup: { inline_keyboard: keyboard },
+    // For use_saved: restore name/phone from state or re-fetch from DB if lost
+    let patientName: string | undefined = undefined;
+    let patientPhone: string | undefined = undefined;
+    if (data === "use_saved") {
+      patientName = state.patientName;
+      patientPhone = state.patientPhone;
+      if (!patientName || !patientPhone) {
+        const saved = await fetchUserByTelegramId(chatId);
+        if (saved) { patientName = saved.firstName; patientPhone = saved.phone; }
+      }
+    }
+
+    const newMsgId = await editOrSend(
+      bot, chatId, msgId,
+      "🏥 *ClinicBot ga xush kelibsiz!*\n\nQaysi xizmatdan foydalanmoqchisiz?",
+      mkServiceKeyboard(services)
+    );
+    userState.set(chatId, {
+      step: "select_service",
+      clinicId,
+      messageId: newMsgId,
+      _services: services,
+      _createdAt: Date.now(),
+      ...(patientName && patientPhone ? { patientName, patientPhone } : {}),
     });
     return;
   }
 
-  // ─── Date selected ────────────────────────────────────────────────────────
+  // ─── back: navigation ─────────────────────────────────────────────────────
+  if (data.startsWith("back:")) {
+    const target = data.slice(5);
+
+    if (target === "select_service") {
+      let services = state._services;
+      if (!services?.length) {
+        const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
+        const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
+        services = await fetchServices(clinicId, today);
+      }
+      if (!services?.length) {
+        await bot.sendMessage(chatId, "Qaytadan boshlang: /start");
+        return;
+      }
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        "🏥 *ClinicBot ga xush kelibsiz!*\n\nQaysi xizmatdan foydalanmoqchisiz?",
+        mkServiceKeyboard(services)
+      );
+      userState.set(chatId, {
+        ...state,
+        step: "select_service",
+        messageId: newMsgId,
+        serviceId: undefined,
+        serviceType: undefined,
+        servicePrice: undefined,
+        date: undefined,
+        doctorId: undefined,
+        slotId: undefined,
+        patientName: undefined,
+        patientPhone: undefined,
+        address: undefined,
+      });
+      return;
+    }
+
+    if (target === "select_date") {
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        "📅 Qaysi kunga yozilmoqchisiz?",
+        mkDateKeyboard()
+      );
+      userState.set(chatId, {
+        ...state,
+        step: "select_date",
+        messageId: newMsgId,
+        date: undefined,
+        doctorId: undefined,
+        slotId: undefined,
+        patientName: undefined,
+        patientPhone: undefined,
+        address: undefined,
+      });
+      return;
+    }
+
+    if (target === "select_doctor_or_slot") {
+      const { _doctors, _slots, serviceType } = state;
+      if (serviceType === "doctor_queue" && _doctors?.length) {
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          "👨‍⚕️ Shifokorni tanlang:",
+          mkDoctorKeyboard(_doctors)
+        );
+        userState.set(chatId, {
+          ...state,
+          step: "select_doctor_or_slot",
+          messageId: newMsgId,
+          doctorId: undefined,
+          slotId: undefined,
+          patientName: undefined,
+          patientPhone: undefined,
+          address: undefined,
+        });
+      } else if (_slots?.length) {
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          "🕐 Bo'sh vaqtni tanlang:",
+          mkSlotKeyboard(_slots)
+        );
+        userState.set(chatId, {
+          ...state,
+          step: "select_doctor_or_slot",
+          messageId: newMsgId,
+          doctorId: undefined,
+          slotId: undefined,
+          patientName: undefined,
+          patientPhone: undefined,
+          address: undefined,
+        });
+      } else {
+        // No cached list — go back to date selection
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          "📅 Qaysi kunga yozilmoqchisiz?",
+          mkDateKeyboard()
+        );
+        userState.set(chatId, {
+          ...state,
+          step: "select_date",
+          messageId: newMsgId,
+          date: undefined,
+          doctorId: undefined,
+          slotId: undefined,
+          patientName: undefined,
+          patientPhone: undefined,
+          address: undefined,
+        });
+      }
+      return;
+    }
+
+    if (target === "enter_name") {
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+        mkNameKeyboard(state._nameBack || "select_date")
+      );
+      userState.set(chatId, {
+        ...state,
+        step: "enter_name",
+        messageId: newMsgId,
+        patientName: undefined,
+        patientPhone: undefined,
+        address: undefined,
+      });
+      return;
+    }
+
+    if (target === "enter_phone") {
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        `👤 Ism: *${state.patientName}*\n\n📞 *Telefon raqamingizni kiriting:*\n\n_+998XXXXXXXXX formatida_ 👇`,
+        mkPhoneKeyboard()
+      );
+      userState.set(chatId, {
+        ...state,
+        step: "enter_phone",
+        messageId: newMsgId,
+        patientPhone: undefined,
+        address: undefined,
+      });
+      return;
+    }
+
+    // Unknown back target — restart
+    await bot.sendMessage(chatId, "Qaytadan boshlang: /start");
+    return;
+  }
+
+  // ─── cal:day: — calendar day selected (same logic as date:) ─────────────
+  if (data.startsWith("cal:day:")) {
+    // Re-use date: handler by rewriting data and falling through
+    data = "date:" + data.slice("cal:day:".length);
+  }
+
+  // ─── svc: — service selected ──────────────────────────────────────────────
+  if (data.startsWith("svc:")) {
+    const [, serviceId, serviceType] = data.split(":");
+    const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
+    const service = state._services?.find((s: any) => s.id === serviceId);
+    const newMsgId = await editOrSend(
+      bot, chatId, msgId,
+      "📅 Qaysi kunga yozilmoqchisiz?",
+      mkDateKeyboard()
+    );
+    userState.set(chatId, {
+      ...state,
+      clinicId,
+      serviceId,
+      serviceType,
+      servicePrice: service?.price ?? null,
+      step: "select_date",
+      messageId: newMsgId,
+      _createdAt: Date.now(),
+    });
+    return;
+  }
+
+  // ─── date: — date selected ────────────────────────────────────────────────
   if (data.startsWith("date:")) {
     const selectedDate = data.split(":")[1];
-    const { serviceId, serviceType, clinicId } = state;
-    userState.set(chatId, { ...state, date: selectedDate, step: "select_doctor_or_slot" });
+    const { serviceId, serviceType } = state;
+    const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
 
     if (serviceType === "doctor_queue") {
       const doctors = await fetchDoctors(clinicId);
-      if (!doctors.length) {
-        userState.set(chatId, { ...state, date: selectedDate, step: "enter_name" });
-        await bot.sendMessage(chatId, "👤 Ismingizni kiriting:");
-        return;
+      if (doctors.length) {
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          "👨‍⚕️ Shifokorni tanlang:",
+          mkDoctorKeyboard(doctors)
+        );
+        userState.set(chatId, {
+          ...state,
+          date: selectedDate,
+          step: "select_doctor_or_slot",
+          messageId: newMsgId,
+          _doctors: doctors,
+        });
+      } else if (state.patientName && state.patientPhone) {
+        // No doctors + name/phone saved → skip to confirm
+        const confirmState = {
+          ...state,
+          date: selectedDate,
+          step: "confirm",
+          _nameBack: "select_date",
+          _doctors: [],
+        };
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          mkConfirmText(confirmState),
+          mkConfirmKeyboard()
+        );
+        userState.set(chatId, { ...confirmState, messageId: newMsgId });
+      } else {
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+          mkNameKeyboard("select_date")
+        );
+        userState.set(chatId, {
+          ...state,
+          date: selectedDate,
+          step: "enter_name",
+          messageId: newMsgId,
+          _nameBack: "select_date",
+          _doctors: [],
+        });
       }
-      const keyboard = [
-        ...doctors.map((d: any) => [{
-          text: `👨‍⚕️ ${d.firstName} ${d.lastName} — ${d.specialty}`,
-          callback_data: `doc:${d.id}`,
-        }]),
-        [{ text: "➡️ Shifokor tanlashsiz davom etish", callback_data: "doc:none" }],
-      ];
-      await bot.sendMessage(chatId, "Shifokorni tanlang:", { reply_markup: { inline_keyboard: keyboard } });
-    } else if (serviceType === "home_service") {
-      userState.set(chatId, { ...state, date: selectedDate, step: "enter_name" });
-      await bot.sendMessage(chatId, "👤 Ismingizni kiriting:");
+      return;
+    }
+
+    if (serviceType === "home_service") {
+      if (state.patientName && state.patientPhone) {
+        // Name/phone saved → skip to enter_address
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          `👤 Ism: *${state.patientName}*\n📞 Tel: *${state.patientPhone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
+          mkAddressKeyboard()
+        );
+        userState.set(chatId, {
+          ...state,
+          date: selectedDate,
+          step: "enter_address",
+          messageId: newMsgId,
+        });
+      } else {
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+          mkNameKeyboard("select_date")
+        );
+        userState.set(chatId, {
+          ...state,
+          date: selectedDate,
+          step: "enter_name",
+          messageId: newMsgId,
+          _nameBack: "select_date",
+        });
+      }
+      return;
+    }
+
+    // diagnostic
+    const slots = await fetchSlots(serviceId, selectedDate);
+    const available = slots.filter((s: any) => s.available);
+    if (available.length) {
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        "🕐 Bo'sh vaqtni tanlang:",
+        mkSlotKeyboard(available)
+      );
+      userState.set(chatId, {
+        ...state,
+        date: selectedDate,
+        step: "select_doctor_or_slot",
+        messageId: newMsgId,
+        _slots: available,
+      });
+    } else if (state.patientName && state.patientPhone) {
+      // No slots + name/phone saved → skip to confirm
+      const confirmState = {
+        ...state,
+        date: selectedDate,
+        step: "confirm",
+        _nameBack: "select_date",
+        _slots: [],
+      };
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        mkConfirmText(confirmState),
+        mkConfirmKeyboard()
+      );
+      userState.set(chatId, { ...confirmState, messageId: newMsgId });
     } else {
-      // diagnostic — check slots
-      const slots = await fetchSlots(serviceId, selectedDate);
-      const available = slots.filter((s: any) => s.available);
-      if (!available.length) {
-        // No slots — book without slot
-        userState.set(chatId, { ...state, date: selectedDate, step: "enter_name" });
-        await bot.sendMessage(chatId, "👤 Ismingizni kiriting:");
-        return;
-      }
-      const keyboard = available.map((s: any) => [{
-        text: `🕐 ${s.startTime} — ${s.endTime}`,
-        callback_data: `slot:${s.id}`,
-      }]);
-      await bot.sendMessage(chatId, "Bo'sh vaqtni tanlang:", { reply_markup: { inline_keyboard: keyboard } });
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+        mkNameKeyboard("select_date")
+      );
+      userState.set(chatId, {
+        ...state,
+        date: selectedDate,
+        step: "enter_name",
+        messageId: newMsgId,
+        _nameBack: "select_date",
+        _slots: [],
+      });
     }
     return;
   }
 
-  // ─── Doctor selected ──────────────────────────────────────────────────────
+  // ─── doc: — doctor selected ───────────────────────────────────────────────
   if (data.startsWith("doc:")) {
     const doctorId = data.split(":")[1];
-    userState.set(chatId, {
-      ...state,
-      doctorId: doctorId === "none" ? null : doctorId,
-      step: "enter_name",
-    });
-    await bot.sendMessage(chatId, "👤 Ismingizni kiriting:");
+    const resolvedDoctorId = doctorId === "none" ? null : doctorId;
+
+    if (state.patientName && state.patientPhone) {
+      // Skip name/phone → go directly to confirm
+      const confirmState = {
+        ...state,
+        doctorId: resolvedDoctorId,
+        step: "confirm",
+        _nameBack: "select_doctor_or_slot",
+      };
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        mkConfirmText(confirmState),
+        mkConfirmKeyboard()
+      );
+      userState.set(chatId, { ...confirmState, messageId: newMsgId });
+    } else {
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+        mkNameKeyboard("select_doctor_or_slot")
+      );
+      userState.set(chatId, {
+        ...state,
+        doctorId: resolvedDoctorId,
+        step: "enter_name",
+        messageId: newMsgId,
+        _nameBack: "select_doctor_or_slot",
+      });
+    }
     return;
   }
 
-  // ─── Slot selected ────────────────────────────────────────────────────────
+  // ─── slot: — slot selected ────────────────────────────────────────────────
   if (data.startsWith("slot:")) {
-    userState.set(chatId, { ...state, slotId: data.split(":")[1], step: "enter_name" });
-    await bot.sendMessage(chatId, "👤 Ismingizni kiriting:");
+    const slotId = data.split(":")[1];
+
+    if (state.patientName && state.patientPhone) {
+      // Skip name/phone → go directly to confirm
+      const confirmState = {
+        ...state,
+        slotId,
+        step: "confirm",
+        _nameBack: "select_doctor_or_slot",
+      };
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        mkConfirmText(confirmState),
+        mkConfirmKeyboard()
+      );
+      userState.set(chatId, { ...confirmState, messageId: newMsgId });
+    } else {
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+        mkNameKeyboard("select_doctor_or_slot")
+      );
+      userState.set(chatId, {
+        ...state,
+        slotId,
+        step: "enter_name",
+        messageId: newMsgId,
+        _nameBack: "select_doctor_or_slot",
+      });
+    }
     return;
   }
 
-  // ─── Full service ─────────────────────────────────────────────────────────
-  if (data.startsWith("full:")) {
-    await bot.sendMessage(chatId, "❌ Bu xizmat bugungi limitiga yetdi. Ertaga urinib ko'ring.\n\n/start — Boshidan boshlash");
-    return;
-  }
-
-  // ─── Confirm ──────────────────────────────────────────────────────────────
+  // ─── confirm ──────────────────────────────────────────────────────────────
   if (data === "confirm") {
     if (state.step !== "confirm") {
       await bot.sendMessage(chatId, "❌ Eskirgan havola. Qaytadan boshlang:\n\n/start");
@@ -138,64 +509,111 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       userState.delete(chatId);
       return;
     }
-    // Prevent double-confirm: delete state before async API call
-    userState.delete(chatId);
-    await bot.sendMessage(chatId, "⏳ Bron qilinmoqda...");
 
-    const result = await bookAppointment({ clinicId, serviceId, doctorId, slotId, date, patientName, patientPhone, address });
+    userState.delete(chatId);
+
+    if (msgId) {
+      try {
+        await (bot as any).editMessageText("⏳ *Bron qilinmoqda...*", {
+          chat_id: chatId,
+          message_id: msgId,
+          parse_mode: "Markdown",
+        });
+      } catch {}
+    }
+
+    const result = await bookAppointment({
+      clinicId, serviceId, doctorId, slotId, date, patientName, patientPhone, address,
+    });
 
     if (result.success) {
       const a = result.data;
-
-      // tibId — mavjud bo'lsa ko'rsatiladi, xato bo'lsa e'tiborga olinmaydi
       let tibId: string | null = null;
       try {
-        tibId = await fetchTibId(patientPhone);
-      } catch {
-        // tibId olishda xato — tasdiqlashni buzmasin
-      }
+        tibId = await registerPatient({ phone: patientPhone, firstName: patientName, telegramId: chatId, clinicId });
+      } catch {}
 
-      const doctorName = a.doctor
-        ? `${a.doctor.firstName} ${a.doctor.lastName}`
-        : undefined;
-      const slotTime = a.slot
-        ? `${a.slot.startTime} — ${a.slot.endTime}`
-        : undefined;
+      const doctorName = a.doctor ? `${a.doctor.firstName} ${a.doctor.lastName}` : undefined;
+      const slotTime = a.slot ? `${a.slot.startTime} — ${a.slot.endTime}` : undefined;
 
-      const lines = [
-        "✅ *Qabul tasdiqlandi*",
+      const successText = [
+        "✅ *Qabul tasdiqlandi!*",
         "",
         `👤 Ism: *${patientName}*`,
         `📅 Sana: *${date}*`,
         a.service?.name ? `📋 Xizmat: *${a.service.name}*` : "",
-        a.queueNumber
-          ? `🔢 Navbat: *${a.queueNumber}*`
-          : "📋 Navbat: ro'yxatga qo'shildingiz",
+        state.servicePrice != null ? `💰 Narx: *${formatPrice(state.servicePrice)}*` : "",
+        a.queueNumber ? `🔢 Navbat raqami: *${a.queueNumber}*` : "📋 Navbat: ro'yxatga qo'shildingiz",
         doctorName ? `👨‍⚕️ Shifokor: *${doctorName}*` : "",
         slotTime ? `🕐 Vaqt: *${slotTime}*` : "",
         tibId ? `🆔 ID: *${tibId}*` : "",
         "",
-        tibId
-          ? "📍 Klinikaga kelganda ushbu kodni ko'rsating"
-          : "Klinikaga o'z vaqtida keling! 🏥",
+        tibId ? "📍 Klinikaga kelganda ushbu kodni ko'rsating" : "Klinikaga o'z vaqtida keling! 🏥",
       ].filter(Boolean).join("\n");
 
-      await bot.sendMessage(chatId, lines, { parse_mode: "Markdown" });
+      if (msgId) {
+        try {
+          await (bot as any).editMessageText(successText, {
+            chat_id: chatId,
+            message_id: msgId,
+            parse_mode: "Markdown",
+          });
+        } catch {
+          await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+        }
+      } else {
+        await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+      }
     } else {
-      const errMsg = typeof result.error === "object" ? result.error.message : (result.error || "Qayta urinib ko'ring");
-      await bot.sendMessage(chatId, `❌ Xatolik: ${errMsg}\n\n/start — Boshidan boshlash`);
+      const errMsg = typeof result.error === "object"
+        ? result.error.message
+        : (result.error || "Qayta urinib ko'ring");
+      const errText = `❌ *Xatolik:* ${errMsg}\n\nQaytadan boshlash: /start`;
+
+      if (msgId) {
+        try {
+          await (bot as any).editMessageText(errText, {
+            chat_id: chatId,
+            message_id: msgId,
+            parse_mode: "Markdown",
+          });
+        } catch {
+          await bot.sendMessage(chatId, errText, { parse_mode: "Markdown" });
+        }
+      } else {
+        await bot.sendMessage(chatId, errText, { parse_mode: "Markdown" });
+      }
     }
     return;
   }
 
-  // ─── Cancel ───────────────────────────────────────────────────────────────
+  // ─── cancel ───────────────────────────────────────────────────────────────
   if (data === "cancel") {
     userState.delete(chatId);
-    await bot.sendMessage(chatId, "❌ Bekor qilindi.\n\n/start — Boshidan boshlash");
+    const cancelText = "❌ *Bekor qilindi.*\n\nQaytadan boshlash: /start";
+    if (msgId) {
+      try {
+        await (bot as any).editMessageText(cancelText, {
+          chat_id: chatId,
+          message_id: msgId,
+          parse_mode: "Markdown",
+        });
+      } catch {
+        await bot.sendMessage(chatId, cancelText, { parse_mode: "Markdown" });
+      }
+    } else {
+      await bot.sendMessage(chatId, cancelText, { parse_mode: "Markdown" });
+    }
     return;
   }
 
-  // ─── Unknown / stale callback ─────────────────────────────────────────────
+  // ─── unknown / stale ──────────────────────────────────────────────────────
   await bot.sendMessage(chatId, "⚠️ Eskirgan havola. Qaytadan boshlang:\n\n/start");
   userState.delete(chatId);
+}
+
+// ─── Private ──────────────────────────────────────────────────────────────────
+
+function formatPrice(price: number): string {
+  return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " so'm";
 }

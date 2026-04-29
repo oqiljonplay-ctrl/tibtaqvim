@@ -200,6 +200,12 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
     return bookingError("SERVICE_NOT_FOUND", "Xizmat topilmadi yoki nofaol", 404);
   }
 
+  const { getModuleConfig } = await import("@/lib/services/config.service");
+  const mod = await getModuleConfig(input.clinicId, service.type);
+  if (!mod.enabled) {
+    return bookingError("MODULE_DISABLED", "Bu xizmat hozir mavjud emas", 403);
+  }
+
   const bookingDate = new Date(input.date);
   bookingDate.setHours(0, 0, 0, 0);
 
@@ -219,9 +225,14 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
         return bookingError("UNKNOWN_SERVICE_TYPE", "Noma'lum xizmat turi", 400);
     }
 
-    // Webapp bronlar uchun Telegram notification (bot bronlarda bot o'zi yuboradi)
-    if (result.success && input.source !== "bot") {
-      notifyPatientAsync(result.data, input.patientPhone);
+    if (result.success) {
+      // User mavjud bo'lsa appointmentga userId bog'lash (background, bron bloklanmaydi)
+      linkUserToAppointment(result.data.id, input.patientPhone).catch(() => {});
+
+      // Webapp bronlar uchun Telegram notification (bot bronlarda bot o'zi yuboradi)
+      if (input.source !== "bot") {
+        notifyPatientAsync(result.data, input.patientPhone);
+      }
     }
 
     return result;
@@ -229,6 +240,16 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
     logger.error("Booking failed", { error: String(err), input });
     return bookingError("SERVER_ERROR", "Server xatosi", 500);
   }
+}
+
+// User phone orqali topib appointmentga userId bog'laydi
+async function linkUserToAppointment(appointmentId: string, phone: string): Promise<void> {
+  const user = await prisma.user.findFirst({
+    where: { phone: normalizePhone(phone) },
+    select: { id: true },
+  });
+  if (!user) return;
+  await prisma.appointment.update({ where: { id: appointmentId }, data: { userId: user.id } });
 }
 
 // Fire-and-forget: bronni buzmasin, faqat try/catch ichida ishlaydi

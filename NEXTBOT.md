@@ -405,6 +405,82 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-04-29 — tibId Global Identity Integration (barcha qatlamlar)
+**Nima o'zgardi:** tibId barcha qatlamlarda ko'rinadigan qilindi. Bot ↔ WebApp bir xil foydalanuvchini ifodalaydi. Takroriy user yaratish bartaraf qilindi.
+**O'zgartirilgan fayllar:**
+- `src/lib/validators/booking.ts` — `BookingInput.userId?: string` qo'shildi
+- `src/lib/services/booking.service.ts` — `linkUserToAppointment()` qo'shildi: har bron yaratilgandan keyin phone orqali user topib `appointment.userId` ga bog'laydi (background)
+- `src/lib/services/appointment.service.ts` — `getAppointments()` → `user: { select: { tibId: true } }` include qilindi
+- `src/app/webapp/page.tsx` — Telegram `initDataUnsafe.user.id` → `/api/user/by-telegram` → user pre-fill + tibId; submit'da `/api/user/register` (getOrCreate) → tibId; header'da `🆔 tib000123` (doim ko'rinadigan); done screen'da tibId
+- `src/app/doctor/page.tsx` — `Appointment.user.tibId` field; `AppointmentCard`'da `🆔 tibId` ko'rsatiladi
+- `src/app/reception/page.tsx` — `Appointment.user.tibId` field; jadvalga `🆔 ID` ustun (md+ ekranlarda); search input (ism/telefon/tibId bo'yicha filterlash)
+
+**Bot (o'zgarishsiz — allaqachon to'g'ri):**
+- `registerPatient()` → `/api/user/register` → getOrCreate + tibId
+- Tasdiqlash xabarida `🆔 ID: tib000123` allaqachon bor
+
+**Vazifalar taqsimoti:**
+- Bot: interaktiv dialog, state machine, user resolve, booking, tasdiqlash xabari
+- WebApp: vizual service/sana/slot tanlash, user pre-fill (Telegram initData orqali), booking, tibId ko'rsatish
+- Reception/Doctor panel: tibId bo'yicha qidirish, navbat ro'yxatida tibId ustun
+
+**`linkUserToAppointment()` qoidasi:**
+- `processBooking()` ichida `result.success` bo'lganda chaqiriladi
+- Fire-and-forget — bron bloklanmaydi
+- User topilmasa — silent skip
+
+---
+
+### 2026-04-29 — SuperAdmin Panel (Clinic OS)
+**Nima o'zgardi:** To'liq SuperAdmin boshqaruv paneli qo'shildi — multi-clinic konfiguratsiya tizimi.
+**Yangi fayllar:**
+- `prisma/schema.prisma` — 4 yangi model: `ClinicSettings`, `FeatureFlag`, `ModuleConfig`, `AuditLog`; `Clinic`ga `deletedAt` (soft delete)
+- `src/lib/services/config.service.ts` — `getClinicConfig`, `isFeatureEnabled`, `getModuleConfig`, `upsertModuleConfig`, `upsertFeatureFlag`, `createAuditLog`
+- `src/app/api/admin/super/stats/route.ts` — Dashboard statistika
+- `src/app/api/admin/super/clinics/route.ts` — GET list + POST create
+- `src/app/api/admin/super/clinics/[id]/route.ts` — GET/PATCH/DELETE (soft delete)
+- `src/app/api/admin/super/clinics/[id]/settings/route.ts` — GET/PUT sozlamalar
+- `src/app/api/admin/super/clinics/[id]/modules/route.ts` — GET/PUT modullar
+- `src/app/api/admin/super/clinics/[id]/features/route.ts` — GET/PUT feature flags
+- `src/app/api/admin/super/audit/route.ts` — Audit log
+- `src/app/admin/super/layout.tsx` — Dark sidebar layout
+- `src/app/admin/super/page.tsx` — Dashboard (stat cards + klinika list + audit)
+- `src/app/admin/super/clinics/page.tsx` — Klinika ro'yxati (create/toggle/delete)
+- `src/app/admin/super/clinics/[id]/page.tsx` — Clinic Builder (tabs: sozlamalar/modullar/flaglar/audit)
+- `src/app/admin/super/audit/page.tsx` — To'liq audit log sahifasi
+**O'zgartirilgan:**
+- `src/lib/services/booking.service.ts` — modul yoqilgan/o'chirilganini tekshiradi (`MODULE_DISABLED` error)
+- `src/middleware.ts` — `/admin/super` → faqat `super_admin` roli
+
+**URL:** `/admin/super` — faqat super_admin
+**Xavfsizlik:** Barcha API routelar `super_admin` rolini tekshiradi. Soft delete. AuditLog.
+
+---
+
+### 2026-04-28 — One Message UI + Back Button Navigation
+**Nima o'zgardi:** Telegram bot har bir qadam uchun yangi xabar yuborish o'rniga bitta xabarni `editMessageText` bilan yangilaydi. Barcha qadamlarda "⬅️ Orqaga" tugmasi qo'shildi.
+**Fayllar:**
+- `bot/helpers/render.ts` (YANGI) — `editOrSend()`, barcha keyboard va text builder'lar
+- `bot/handlers/start.ts` — `messageId` va `_services` state'da saqlanadi
+- `bot/handlers/callback.ts` — to'liq qayta yozildi: barcha navigatsiya `editOrSend` orqali, `back:` handler, `full:` show_alert, TTL check, `_nameBack`/`_doctors`/`_slots` cache
+- `bot/handlers/message.ts` — barcha validatsiya xatolari va promptlar `editOrSend` orqali; `messageId` state'da yangilanadi
+
+**Bot UI oqimi (yangi):**
+```
+[bitta xabar, editlanadi] → xizmat → sana → shifokor/slot → ism → telefon → (manzil) → tasdiqlash
+                                   ↑_______⬅️ Orqaga har qadamda_______↑
+```
+
+**`editOrSend()` qoidasi:**
+- `messageId` bo'lsa `editMessageText` urinadi
+- "message is not modified" → xatosiz o'tkazib yuboriladi
+- Boshqa xatolar (xabar o'chirilgan, eskir) → `sendMessage` bilan yangi xabar
+
+**`back:` target'lar:** `select_service`, `select_date`, `select_doctor_or_slot`, `enter_name`, `enter_phone`
+**Cache maydonlar:** `_services`, `_doctors`, `_slots`, `_nameBack` — orqaga qaytganda qayta fetch qilinmaydi
+
+---
+
 ### 2026-04-28 — Pre-deploy critical fixes
 **Nima o'zgardi:** Webhook mode to'liq ishlash uchun 6 ta kritik fix
 **Fayllar:**

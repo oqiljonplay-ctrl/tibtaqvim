@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const roleRedirects: Record<string, string> = {
   super_admin: "/admin",
@@ -9,8 +9,10 @@ const roleRedirects: Record<string, string> = {
   receptionist: "/reception",
 };
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get("returnUrl");
   const [form, setForm] = useState({ phone: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,10 @@ export default function LoginPage() {
       const json = await res.json();
 
       if (!json.success) {
-        setError(json.error || "Login yoki parol noto'g'ri");
+        const msg = typeof json.error === "object"
+          ? (json.error?.message || "Login yoki parol noto'g'ri")
+          : (json.error || "Login yoki parol noto'g'ri");
+        setError(msg);
         return;
       }
 
@@ -40,10 +45,9 @@ export default function LoginPage() {
       localStorage.setItem("user_name", user.firstName);
       if (user.clinicId) localStorage.setItem("clinicId", user.clinicId);
 
-      // Set cookie for middleware
       document.cookie = `auth_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}`;
 
-      const redirect = roleRedirects[user.role] || "/";
+      const redirect = returnUrl || roleRedirects[user.role] || "/";
       router.push(redirect);
     } catch {
       setError("Server bilan bog'lanishda xatolik");
@@ -108,10 +112,24 @@ export default function LoginPage() {
 
         <div className="mt-6 pt-5 border-t border-gray-100">
           <p className="text-xs text-gray-400 text-center">
-            Demo: <code className="bg-gray-50 px-1 rounded">+998 90 000 00 00</code> / <code className="bg-gray-50 px-1 rounded">admin123</code>
+            Admin: <code className="bg-gray-50 px-1 rounded">+998900000000</code> / <code className="bg-gray-50 px-1 rounded">admin123</code>
+          </p>
+          <p className="text-xs text-gray-400 text-center mt-1">
+            Shifokor: <code className="bg-gray-50 px-1 rounded">+998901111111</code> / <code className="bg-gray-50 px-1 rounded">doctor123</code>
+          </p>
+          <p className="text-xs text-gray-400 text-center mt-1">
+            Qabulxona: <code className="bg-gray-50 px-1 rounded">+998902222222</code> / <code className="bg-gray-50 px-1 rounded">reception123</code>
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

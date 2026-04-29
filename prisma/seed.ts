@@ -103,17 +103,33 @@ async function main() {
     });
   }
 
+  // SuperAdmin foydalanuvchi (barcha klinikalar ustidan nazorat)
+  const superAdminHash = await bcrypt.hash("super123", 12);
+  await prisma.user.upsert({
+    where: { id: "user-superadmin" },
+    update: { phone: "+998999999999", passwordHash: superAdminHash },
+    create: {
+      id: "user-superadmin",
+      clinicId: null,
+      firstName: "SuperAdmin",
+      lastName: "ClinicOS",
+      phone: "+998999999999",
+      role: "super_admin",
+      passwordHash: superAdminHash,
+    },
+  });
+
   // Admin foydalanuvchi
   const passwordHash = await bcrypt.hash("admin123", 12);
   await prisma.user.upsert({
     where: { id: "user-admin" },
-    update: {},
+    update: { phone: "+998900000000", passwordHash },
     create: {
       id: "user-admin",
       clinicId: clinic.id,
       firstName: "Admin",
       lastName: "ClinicBot",
-      phone: "+998 90 000 00 00",
+      phone: "+998900000000",
       role: "clinic_admin",
       passwordHash,
     },
@@ -151,9 +167,50 @@ async function main() {
     });
   }
 
+  // Shifokor foydalanuvchi
+  const doctorPasswordHash = await bcrypt.hash("doctor123", 12);
+  const doctorUser = await prisma.user.upsert({
+    where: { id: "user-doctor" },
+    update: { phone: "+998901111111", passwordHash: doctorPasswordHash },
+    create: {
+      id: "user-doctor",
+      clinicId: clinic.id,
+      firstName: "Jasur",
+      lastName: "Toshmatov",
+      phone: "+998901111111",
+      role: "doctor",
+      passwordHash: doctorPasswordHash,
+    },
+  });
+
+  // Shifokorni user bilan bog'lash
+  await prisma.doctor.update({
+    where: { id: "doc-1" },
+    data: { userId: doctorUser.id },
+  });
+
+  // Qabulxona foydalanuvchi
+  const recPasswordHash = await bcrypt.hash("reception123", 12);
+  await prisma.user.upsert({
+    where: { id: "user-reception" },
+    update: { phone: "+998902222222", passwordHash: recPasswordHash },
+    create: {
+      id: "user-reception",
+      clinicId: clinic.id,
+      firstName: "Qabulxona",
+      lastName: "Xodim",
+      phone: "+998902222222",
+      role: "receptionist",
+      passwordHash: recPasswordHash,
+    },
+  });
+
   console.log("✅ Seed muvaffaqiyatli yakunlandi!");
   console.log(`📌 Klinika ID: ${clinic.id}`);
-  console.log("🔑 Admin login: +998 90 000 00 00 / admin123");
+  console.log("🔑 SuperAdmin login: +998999999999 / super123");
+  console.log("🔑 Admin login:      +998900000000 / admin123");
+  console.log("🔑 Shifokor login:   +998901111111 / doctor123");
+  console.log("🔑 Qabulxona login:  +998902222222 / reception123");
 }
 
 main()

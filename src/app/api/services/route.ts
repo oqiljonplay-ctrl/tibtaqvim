@@ -24,7 +24,15 @@ export async function GET(req: NextRequest) {
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
 
-    if (!dateParam) return ok(services);
+    const settings = await prisma.clinicSettings.findUnique({ where: { clinicId } });
+    const enableWebapp = settings?.enableWebapp ?? true;
+
+    if (!dateParam) {
+      return new Response(
+        JSON.stringify({ success: true, data: services, enableWebapp }),
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
 
     const date = new Date(dateParam);
 
@@ -47,7 +55,10 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    return ok(enriched);
+    return new Response(
+      JSON.stringify({ success: true, data: enriched, enableWebapp }),
+      { headers: { "Content-Type": "application/json" } }
+    );
   } catch {
     return error("Server error", 500);
   }
