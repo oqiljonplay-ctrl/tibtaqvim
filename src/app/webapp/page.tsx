@@ -606,8 +606,8 @@ export default function WebApp() {
       <div className="bg-blue-600 text-white px-4 pt-4 pb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Back to dashboard for returning users */}
-            {tgUser?.hasPhone && step !== "done" && (
+            {/* Back to dashboard for any Telegram user */}
+            {telegramId && step !== "done" && (
               <button
                 onClick={goToDashboard}
                 className="text-blue-200 hover:text-white text-sm mr-1"
@@ -898,8 +898,7 @@ export default function WebApp() {
             )}
             <p className="text-xs text-gray-400 mb-6">Klinikaga o'z vaqtida keling 🏥</p>
 
-            {/* Back to dashboard for returning users */}
-            {tgUser?.hasPhone && (
+            {telegramId && (
               <button
                 onClick={goToDashboard}
                 className="w-full py-3 rounded-2xl border-2 border-blue-100 text-blue-600 text-sm font-medium hover:bg-blue-50 active:scale-95 transition-all"
