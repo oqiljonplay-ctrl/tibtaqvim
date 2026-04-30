@@ -413,6 +413,24 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-04-30 — SaaSid.md kritik bug fixlar (requiresSlot, race condition, UTC date)
+
+**O'zgartirilgan fayllar:**
+- `bot/handlers/callback.ts`:
+  - `svc:` handlerda `serviceRequiresSlot` va `serviceRequiresAddress` state'ga saqlanadi
+  - `date:` handlerda `diagnostic` turi: `requiresSlot=false` → slot fetchsiz to'g'ridan ism/confirmga; `requiresSlot=true` + slot yo'q → "bo'sh vaqt yo'q" xabari (avval confirmga yuborar edi → API rad etardi)
+  - `confirm` handleri: `userState.delete` bookAppointment'dan KEYIN (avval oldinda edi → double-click "Eskirgan havola" berardi); `step: "booking_in_progress"` guard qo'shildi
+- `src/lib/services/booking.service.ts`: `bookingDate = new Date(input.date + "T00:00:00.000Z")` — UTC midnight (@db.Date bug fix)
+- `src/app/api/user/register/route.ts`: `prisma.user.create` P2002 (unique constraint) → `resolveUser` qayta chaqirish; yangi `resolveUser()` helper funksiyasi
+
+**Xato sabablari:**
+- "bu xizmat uchun uyacha tanlash majburiy" — bot `requiresSlot` flag'ini bilmasdi, `requiresSlot=true` + bo'sh vaqt yo'q bo'lsa confirmga yuborar edi
+- "Eskirgan havola" — state booking'dan OLDIN o'chirilardi
+- UTC bug — lokal midnight @db.Date bilan mos kelmasdi (local dev'da kritik)
+- Concurrent register — P2002 da 500 error qaytarar edi
+
+---
+
 ### 2026-04-30 — WebApp Dashboard (botwebUI.md) + tgid URL fallback
 
 **Maqsad:** `/webapp` booking formani takrorlamaslik — bot foydalanuvchilari dashboard ko'rsin.
