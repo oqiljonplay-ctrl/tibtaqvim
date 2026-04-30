@@ -150,12 +150,36 @@ export default function WebApp() {
     const resolveUser = tgId
       ? fetch(`/api/user/by-telegram?telegramId=${tgId}`)
           .then((r) => r.json())
-          .then((json) => {
+          .then(async (json) => {
             if (json.success && json.data) {
+              // Mavjud user — to'liq ma'lumot bilan qaytarish
               const u: TgUser = json.data;
               tgUserRef.current = u;
               setTgUser(u);
               setForm((f) => ({ ...f, name: f.name || u.firstName, phone: f.phone || u.phone || "" }));
+              return u;
+            }
+            // Yangi Telegram user — DB'ga yozib, dashboard ko'rsatish
+            // (bot ishlatmagan bo'lsa ham WebApp da dashboard chiqadi)
+            const regRes = await fetch("/api/user/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                telegramId: tgId,
+                firstName: tgFirstName || "Foydalanuvchi",
+                clinicId: clinicId || undefined,
+              }),
+            });
+            const regJson = await regRes.json();
+            if (regJson.success) {
+              const u: TgUser = {
+                firstName: tgFirstName || "Foydalanuvchi",
+                phone: null,
+                tibId: regJson.data.tibId ?? null,
+                hasPhone: false,
+              };
+              tgUserRef.current = u;
+              setTgUser(u);
               return u;
             }
             return null;
@@ -165,8 +189,8 @@ export default function WebApp() {
 
     resolveUser
       .then((user) => {
-        // Bot user (DB'da bor, telefonsiz ham) → Dashboard
-        // Mutlaqo yangi user (DB'da yo'q, telegramId ham yo'q) → Booking
+        // Telegram user (DB'da bor yoki yangi yaratildi) → Dashboard
+        // telegramId yo'q (to'g'ridan brauzerda ochilgan) → Booking
         if (user !== null) {
           setAppMode("dashboard");
           if (tgId) fetchDashboardAppointments(tgId, clinicId);
