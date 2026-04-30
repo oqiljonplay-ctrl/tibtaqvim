@@ -61,7 +61,7 @@ export default function ReceptionPage() {
       ]);
       const [apptJson, svcJson] = await Promise.all([apptRes.json(), svcRes.json()]);
       if (apptJson.success) setAppointments(apptJson.data.items ?? apptJson.data);
-      else setErrorMsg(apptJson.error ?? "Qabullar yuklanmadi");
+      else setErrorMsg(apptJson.error?.message ?? apptJson.error ?? "Qabullar yuklanmadi");
       if (svcJson.success) setServices(svcJson.data);
       setLastRefresh(new Date().toLocaleTimeString("uz-UZ"));
     } catch {
@@ -81,7 +81,7 @@ export default function ReceptionPage() {
       const res = await fetch(`/api/appointments?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       if (json.success) { setAppointments(json.data.items ?? json.data); setLastRefresh(new Date().toLocaleTimeString("uz-UZ")); setErrorMsg(null); }
-      else setErrorMsg(json.error ?? "Qabullar yuklanmadi");
+      else setErrorMsg(json.error?.message ?? json.error ?? "Qabullar yuklanmadi");
     } catch {
       setErrorMsg("Tarmoq xatosi.");
     }
@@ -99,7 +99,7 @@ export default function ReceptionPage() {
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        setErrorMsg(json.error ?? "Holat o'zgartirilmadi");
+        setErrorMsg(json.error?.message ?? json.error ?? "Holat o'zgartirilmadi");
         if (prev) setAppointments((list) => list.map((a) => a.id === id ? { ...a, status: prev } : a));
       }
     } catch {

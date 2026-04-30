@@ -47,7 +47,7 @@ export default function DoctorPage() {
         setLastRefresh(new Date().toLocaleTimeString("uz-UZ"));
         setErrorMsg(null);
       } else {
-        setErrorMsg(json.error ?? "Ma'lumot yuklanmadi");
+        setErrorMsg(json.error?.message ?? json.error ?? "Ma'lumot yuklanmadi");
       }
     } catch {
       setErrorMsg("Tarmoq xatosi. Qayta urinilmoqda...");
@@ -68,7 +68,7 @@ export default function DoctorPage() {
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        setErrorMsg(json.error ?? "Holat o'zgartirilmadi");
+        setErrorMsg(json.error?.message ?? json.error ?? "Holat o'zgartirilmadi");
         if (prev) setAppointments((list) => list.map((a) => a.id === id ? { ...a, status: prev } : a));
       }
     } catch {
