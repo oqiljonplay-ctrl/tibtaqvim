@@ -5,7 +5,7 @@ const startedAt = Date.now();
 
 export async function GET() {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$queryRawUnsafe("SELECT 1");
     return ok({
       status: "ok",
       db: "connected",

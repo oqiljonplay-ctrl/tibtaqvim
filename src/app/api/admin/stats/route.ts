@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
       ? new URL(req.url).searchParams.get("clinicId") || undefined
       : auth.clinicId!;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStr = new Date().toISOString().split("T")[0];
+    const today = new Date(todayStr);
 
     const [
       totalAppointments,
