@@ -128,9 +128,14 @@ export default function WebApp() {
   // ─── Init ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    // Telegram SDK beforeInteractive orqali yuklangan bo'ladi
+    // ready() va expand() chaqirib WebApp'ni to'liq ishga tushuramiz
     const tg = window.Telegram?.WebApp;
-    tg?.ready();
-    tg?.expand();
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      tg.setHeaderColor?.("#2563eb");
+    }
 
     const tgId = getTelegramId(tg);
     const tgFirstName = getTelegramFirstName(tg);
