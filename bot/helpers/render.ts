@@ -4,10 +4,14 @@ import { mkCalendarKeyboard, currentYearMonth } from "./calendar";
 const WEBAPP_URL = process.env.NEXT_PUBLIC_WEBAPP_URL || "";
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
 
-// clinicId ni URL ga qo'shib qaytaradi — WebApp clinicId'ni URL dan oladi
-function webAppUrl(): string {
+// clinicId + tgid ni URL ga qo'shadi — tgid SDK fallback sifatida ishlaydi
+function webAppUrl(chatId?: number): string {
   if (!WEBAPP_URL) return "";
-  return DEFAULT_CLINIC_ID ? `${WEBAPP_URL}?clinicId=${DEFAULT_CLINIC_ID}` : WEBAPP_URL;
+  const params = new URLSearchParams();
+  if (DEFAULT_CLINIC_ID) params.set("clinicId", DEFAULT_CLINIC_ID);
+  if (chatId) params.set("tgid", String(chatId));
+  const qs = params.toString();
+  return qs ? `${WEBAPP_URL}?${qs}` : WEBAPP_URL;
 }
 
 const typeEmojis: Record<string, string> = {
@@ -57,9 +61,9 @@ export async function editOrSend(
 // ─── Keyboard builders ────────────────────────────────────────────────────────
 
 // Pastki persistent tugma uchun (reply keyboard)
-export function mkWebAppReplyKeyboard() {
+export function mkWebAppReplyKeyboard(chatId?: number) {
   return {
-    keyboard: [[{ text: "🌐 Onlayn bron (Web App)", web_app: { url: webAppUrl() } }]],
+    keyboard: [[{ text: "🌐 Onlayn bron (Web App)", web_app: { url: webAppUrl(chatId) } }]],
     resize_keyboard: true,
     one_time_keyboard: false,
   };
@@ -69,11 +73,11 @@ export function mkRemoveKeyboard() {
   return { remove_keyboard: true as const };
 }
 
-export function mkServiceKeyboard(services: any[], showWebAppInline = false): InlineKeyboardButton[][] {
+export function mkServiceKeyboard(services: any[], showWebAppInline = false, chatId?: number): InlineKeyboardButton[][] {
   const rows: InlineKeyboardButton[][] = [];
 
   if (showWebAppInline && WEBAPP_URL) {
-    rows.push([{ text: "📱 Onlayn bron (Web App)", web_app: { url: webAppUrl() } } as any]);
+    rows.push([{ text: "📱 Onlayn bron (Web App)", web_app: { url: webAppUrl(chatId) } } as any]);
   }
 
   for (const s of services) {

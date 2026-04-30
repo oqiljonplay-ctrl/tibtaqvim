@@ -29,7 +29,7 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
   if (enableWebapp && WEBAPP_URL) {
     await bot.sendMessage(chatId, "👇 *Web orqali ham bron qilishingiz mumkin:*", {
       parse_mode: "Markdown",
-      reply_markup: mkWebAppReplyKeyboard() as any,
+      reply_markup: mkWebAppReplyKeyboard(chatId) as any,
     });
   } else {
     // WebApp o'chirilgan — persistent tugmani olib tashlash

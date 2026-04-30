@@ -137,7 +137,9 @@ export default function WebApp() {
       tg.setHeaderColor?.("#2563eb");
     }
 
-    const tgId = getTelegramId(tg);
+    // Primary: Telegram WebApp SDK; fallback: ?tgid= URL param (bot appends it)
+    const urlParams = new URLSearchParams(window.location.search);
+    const tgId = getTelegramId(tg) || urlParams.get("tgid") || null;
     const tgFirstName = getTelegramFirstName(tg);
 
     setTelegramId(tgId);
