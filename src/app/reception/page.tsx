@@ -26,7 +26,7 @@ export default function ReceptionPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [lastRefresh, setLastRefresh] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
@@ -58,7 +58,7 @@ export default function ReceptionPage() {
       if (apptJson.success) setAppointments(apptJson.data.items ?? apptJson.data);
       else setErrorMsg(apptJson.error ?? "Qabullar yuklanmadi");
       if (svcJson.success) setServices(svcJson.data);
-      setLastRefresh(new Date());
+      setLastRefresh(new Date().toLocaleTimeString("uz-UZ"));
     } catch {
       setErrorMsg("Tarmoq xatosi. Qayta urinib ko'ring.");
     } finally {
@@ -75,7 +75,7 @@ export default function ReceptionPage() {
       if (serviceFilter !== "all") params.set("serviceId", serviceFilter);
       const res = await fetch(`/api/appointments?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
-      if (json.success) { setAppointments(json.data.items ?? json.data); setLastRefresh(new Date()); setErrorMsg(null); }
+      if (json.success) { setAppointments(json.data.items ?? json.data); setLastRefresh(new Date().toLocaleTimeString("uz-UZ")); setErrorMsg(null); }
       else setErrorMsg(json.error ?? "Qabullar yuklanmadi");
     } catch {
       setErrorMsg("Tarmoq xatosi.");
@@ -132,7 +132,7 @@ export default function ReceptionPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Navbat ro'yxati</h1>
           <p className="text-xs text-gray-400 mt-0.5">
-            Oxirgi yangilanish: {lastRefresh.toLocaleTimeString("uz-UZ")}
+            {lastRefresh ? `Oxirgi yangilanish: ${lastRefresh}` : "Yuklanmoqda..."}
             <span className="ml-2 text-blue-400">(har 30s avtomatik)</span>
           </p>
         </div>

@@ -20,26 +20,31 @@ export default function DoctorPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [lastRefresh, setLastRefresh] = useState<string>("");
+  const [dateLabel, setDateLabel] = useState<string>("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const today = new Date().toISOString().split("T")[0];
+  const todayRef = useRef(new Date().toISOString().split("T")[0]);
 
   useEffect(() => {
+    // Client-only: avoid SSR/hydration mismatch with date strings
+    todayRef.current = new Date().toISOString().split("T")[0];
+    setDateLabel(new Date().toLocaleDateString("uz-UZ", { weekday: "long", day: "numeric", month: "long" }));
     fetchAppointments();
     timerRef.current = setInterval(fetchAppointments, 30_000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchAppointments() {
     try {
       const token = localStorage.getItem("auth_token") || "";
-      const res = await fetch(`/api/appointments?date=${today}`, {
+      const res = await fetch(`/api/appointments?date=${todayRef.current}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
       if (json.success) {
         setAppointments(json.data.items ?? json.data);
-        setLastRefresh(new Date());
+        setLastRefresh(new Date().toLocaleTimeString("uz-UZ"));
         setErrorMsg(null);
       } else {
         setErrorMsg(json.error ?? "Ma'lumot yuklanmadi");
@@ -81,8 +86,8 @@ export default function DoctorPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bugungi navbat</h1>
           <p className="text-xs text-gray-400 mt-0.5">
-            {new Date().toLocaleDateString("uz-UZ", { weekday: "long", day: "numeric", month: "long" })}
-            {" · "}Oxirgi yangilanish: {lastRefresh.toLocaleTimeString("uz-UZ")}
+            {dateLabel}
+            {lastRefresh ? ` · Oxirgi yangilanish: ${lastRefresh}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-4">
