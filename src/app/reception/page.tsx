@@ -32,9 +32,12 @@ export default function ReceptionPage() {
   const [selectedDate, setSelectedDate] = useState("");
   const [search, setSearch] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Prevents duplicate fetch when setSelectedDate triggers [selectedDate] effect on init
+  const skipNextDateFetch = useRef(false);
 
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
+    skipNextDateFetch.current = true;
     setSelectedDate(today);
     fetchAll(today);
     timerRef.current = setInterval(() => fetchAppointments(), AUTO_REFRESH_MS);
@@ -43,6 +46,7 @@ export default function ReceptionPage() {
 
   useEffect(() => {
     if (!selectedDate) return;
+    if (skipNextDateFetch.current) { skipNextDateFetch.current = false; return; }
     fetchAppointments();
   }, [selectedDate, serviceFilter]);
 

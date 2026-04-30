@@ -22,7 +22,10 @@ export default function AdminDoctorsPage() {
   async function fetchDoctors() {
     setLoading(true);
     const token = localStorage.getItem("auth_token") || "";
-    const res = await fetch("/api/admin/doctors", { headers: { Authorization: `Bearer ${token}` } });
+    const clinicId = localStorage.getItem("clinicId") || "";
+    const res = await fetch(`/api/admin/doctors${clinicId ? `?clinicId=${clinicId}` : ""}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     const json = await res.json();
     if (json.success) setDoctors(json.data);
     setLoading(false);

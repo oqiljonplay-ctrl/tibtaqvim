@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       prisma.doctor.count({ where: { ...(clinicId ? { clinicId } : {}), isActive: true } }),
       prisma.service.count({ where: { ...(clinicId ? { clinicId } : {}), isActive: true } }),
       prisma.appointment.findMany({
-        where: { ...(clinicId ? { clinicId } : {}), date: today },
+        where: { ...(clinicId ? { clinicId } : {}) },
         orderBy: { createdAt: "desc" },
         take: 10,
         include: {

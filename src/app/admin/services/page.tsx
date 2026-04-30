@@ -33,7 +33,10 @@ export default function AdminServicesPage() {
   async function fetchServices() {
     setLoading(true);
     const token = localStorage.getItem("auth_token") || "";
-    const res = await fetch("/api/admin/services", { headers: { Authorization: `Bearer ${token}` } });
+    const clinicId = localStorage.getItem("clinicId") || "";
+    const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     const json = await res.json();
     if (json.success) setServices(json.data);
     setLoading(false);

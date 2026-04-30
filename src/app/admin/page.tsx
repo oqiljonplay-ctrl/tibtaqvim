@@ -16,6 +16,7 @@ interface Stats {
     patientPhone: string;
     status: string;
     queueNumber: number | null;
+    createdAt: string;
     service: { name: string; type: string };
     doctor: { firstName: string; lastName: string } | null;
   }[];
@@ -97,7 +98,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Bugungi so'nggi qabullar</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">So'nggi qabullar</h2>
         {stats.recentAppointments.length === 0 ? (
           <p className="text-gray-400 text-sm">Bugun hali qayd yo'q</p>
         ) : (
@@ -105,6 +106,7 @@ export default function AdminDashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
+                  <th className="text-left py-2 font-medium text-gray-500">Sana</th>
                   <th className="text-left py-2 font-medium text-gray-500">Bemor</th>
                   <th className="text-left py-2 font-medium text-gray-500">Xizmat</th>
                   <th className="text-left py-2 font-medium text-gray-500">Shifokor</th>
@@ -115,6 +117,9 @@ export default function AdminDashboard() {
               <tbody>
                 {stats.recentAppointments.map((a) => (
                   <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="py-2 text-xs text-gray-500 whitespace-nowrap">
+                      {new Date(a.createdAt).toLocaleDateString("uz-UZ", { day: "numeric", month: "short" })}
+                    </td>
                     <td className="py-2">
                       <div>{a.patientName}</div>
                       <div className="text-xs text-gray-400">{a.patientPhone}</div>

@@ -38,7 +38,10 @@ export default function DoctorPage() {
   async function fetchAppointments() {
     try {
       const token = localStorage.getItem("auth_token") || "";
-      const res = await fetch(`/api/appointments?date=${todayRef.current}`, {
+      const clinicId = localStorage.getItem("clinicId") || "";
+      const params = new URLSearchParams({ date: todayRef.current });
+      if (clinicId) params.set("clinicId", clinicId);
+      const res = await fetch(`/api/appointments?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
