@@ -160,7 +160,9 @@ export default function WebApp() {
 
     resolveUser
       .then((user) => {
-        if (user?.hasPhone) {
+        // Bot user (DB'da bor, telefonsiz ham) → Dashboard
+        // Mutlaqo yangi user (DB'da yo'q, telegramId ham yo'q) → Booking
+        if (user !== null) {
           setAppMode("dashboard");
           if (tgId) fetchDashboardAppointments(tgId, clinicId);
         } else {
@@ -402,10 +404,26 @@ export default function WebApp() {
               </span>
             )}
           </div>
-          <p className="text-blue-200 text-xs mt-2">📞 {tgUser?.phone}</p>
+          {tgUser?.phone
+            ? <p className="text-blue-200 text-xs mt-2">📞 {tgUser.phone}</p>
+            : <p className="text-blue-300 text-xs mt-2 italic">Telefon raqam kiritilmagan</p>
+          }
         </div>
 
         <div className="flex-1 px-4 -mt-3 pb-24 space-y-4">
+
+          {/* No phone prompt */}
+          {!tgUser?.hasPhone && (
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 flex items-start gap-3">
+              <span className="text-xl shrink-0">📱</span>
+              <div>
+                <p className="text-amber-800 text-sm font-semibold">Telefon raqam kerak</p>
+                <p className="text-amber-700 text-xs mt-0.5">
+                  Bronlarni ko'rish va bekor qilish uchun quyida bron qiling va telefon raqamingizni kiriting
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Error */}
           {errorMsg && (
