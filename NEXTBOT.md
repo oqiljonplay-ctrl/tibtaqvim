@@ -12,12 +12,16 @@
 **Asosiy oqim:**
 ```
 Telegram Bot → xizmat/sana/shifokor tanlash → ism/telefon → API /book → DB → Telegram tasdiqlash
-Telegram WebApp → service/slot tanlash → forma → API /book → DB → Telegram tasdiqlash
+Telegram WebApp (qaytuvchi user) → Dashboard: bronlar/navbat/bekor/qayta bron
+Telegram WebApp (yangi user) → Booking flow → telefon kiritish → /api/book
 Reception Panel → keldi/kelmadi belgilash
-Doctor Panel → bugungi bemonlar ro'yxati
+Doctor Panel → bugungi bemorlar ro'yxati
 ```
 
-**Hozirgi holat:** Mahalliy ishlamoqda (polling rejimida). Production deploy uchun webhook rejimiga o'tish kerak.
+**Bot button URL formati:** `https://<domain>/webapp?clinicId=<id>&tgid=<chatId>`
+- `tgid` — Telegram SDK ishlamasa URL'dan fallback sifatida olinadi
+
+**Hozirgi holat:** Production (Vercel webhook). `?pgbouncer=true` Supabase connection pooler uchun.
 
 ---
 
@@ -66,6 +70,10 @@ Doctor Panel → bugungi bemonlar ro'yxati
 │    POST /api/auth/login                                 │
 │    GET  /api/user/tib                                   │
 │    GET  /api/user/by-tibid                              │
+│    GET  /api/user/by-telegram                           │
+│    POST /api/user/register                              │
+│    GET  /api/webapp/appointments (JWT'siz, phone chk)  │
+│    POST /api/webapp/cancel (JWT'siz, phone chk)        │
 │    GET  /api/reminders  (cron)                          │
 │    CRUD /api/admin/*                                    │
 └────────────────┬────────────────────────────────────────┘
@@ -404,6 +412,46 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 ---
 
 ## 12. RECENT CHANGES LOG
+
+### 2026-04-30 — WebApp Dashboard (botwebUI.md) + tgid URL fallback
+
+**Maqsad:** `/webapp` booking formani takrorlamaslik — bot foydalanuvchilari dashboard ko'rsin.
+
+**Yangi fayllar:**
+- `src/app/webapp/layout.tsx` — Telegram WebApp SDK `beforeInteractive` script bilan yuklaydi (`window.Telegram.WebApp`)
+- `src/app/api/webapp/appointments/route.ts` — `GET ?telegramId=&clinicId=` — JWT'siz, telegramId orqali user topib, patientPhone bo'yicha bronlar qaytaradi
+- `src/app/api/webapp/cancel/route.ts` — `POST {appointmentId, telegramId}` — `appointment.patientPhone === user.phone` tekshirib bekor qiladi (403 bo'lmasa)
+
+**O'zgartirilgan fayllar:**
+- `src/app/webapp/page.tsx` — to'liq qayta yozildi: `AppMode = "loading"|"dashboard"|"booking"` state machine; dashboard: tibId header, bugungi qabul (navbat raqami), kelgusi bronlar, tarix, qayta bron, bekor qilish; booking: mavjud flow saqlanib qoldi
+- `bot/helpers/render.ts` — `webAppUrl(chatId?)` → `?clinicId=&tgid=<chatId>` formatida URL (tgid SDK fallback)
+- `bot/handlers/start.ts` — `mkWebAppReplyKeyboard(chatId)` ga chatId uzatiladi
+
+**Routing logikasi (MUHIM):**
+```
+telegramId (SDK yoki URL ?tgid=) topildi
+  → /api/user/by-telegram → topildi → dashboard
+  → topilmadi → /api/user/register (auto-register) → dashboard
+telegramId yo'q (brauzerda tg'ridan ochilgan, tgid ham yo'q)
+  → booking flow
+```
+
+**Auto-register:** Har qanday Telegram user WebApp'ni ochganda DB'ga yoziladi (phone kerak emas). Shu sababli bot `/start` bossmasdan ham WebApp ishlatgan user dashboard ko'radi.
+
+**tgid URL param:** Bot `&tgid=<chatId>` ni WebApp URL'ga qo'shadi. Telegram Desktop / ba'zi client'larda `window.Telegram.WebApp.initDataUnsafe` bo'sh kelsa, URL'dan olinadi.
+
+**Cancel xavfsizligi:** `patientPhone !== user.phone` → 403. Status `booked` bo'lmasa → descriptive xato.
+
+**Yangi API endpoint'lar:**
+- `GET /api/webapp/appointments?telegramId=&clinicId=` — dashboard bronlar (JWT yo'q)
+- `POST /api/webapp/cancel {appointmentId, telegramId}` — bekor qilish (JWT yo'q, phone check bor)
+
+**Admin stats fix (bir session'da):**
+- `src/app/api/admin/stats/route.ts` — `@db.Date` bilan mos kelish uchun `new Date(new Date().toISOString().split("T")[0])` (avval lokal midnight edi)
+- `.env` — `DATABASE_URL` ga `?pgbouncer=true` qo'shildi (Supabase pgBouncer transaction mode'da parallel query'lar xato berardi — `26000: prepared statement does not exist`)
+- `src/app/api/health/route.ts` — `$queryRaw` → `$queryRawUnsafe("SELECT 1")` (pgBouncer muammosi)
+
+---
 
 ### 2026-04-29 — Unified User Resolution (bot ↔ WebApp bir xil tibId)
 **Muammo:** Bot va WebApp mustaqil user yaratar edi — bir foydalanuvchi ikki xil tibId olardi.
