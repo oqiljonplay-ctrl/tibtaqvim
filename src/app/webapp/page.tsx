@@ -74,6 +74,7 @@ export default function WebApp() {
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
   const [bookingTibId, setBookingTibId] = useState<string | null>(null);
   const [telegramId, setTelegramId] = useState<number | null>(null);
+  const [headerDate, setHeaderDate] = useState<string>("");
   // Ref: always holds latest tgUser — avoids stale closure in goAfterDateSlot
   const tgUserRef = useRef<TgUser | null>(null);
 
@@ -93,6 +94,7 @@ export default function WebApp() {
     const tgFirstName = getTelegramFirstName(tg);
 
     setTelegramId(tgId);
+    setHeaderDate(new Date().toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" }));
 
     // Telegram ismi bilan formani oldindan to'ldirish (hatto user topilmasa ham)
     if (tgFirstName) {
@@ -264,9 +266,9 @@ export default function WebApp() {
             </span>
           )}
         </div>
-        <p className="text-blue-200 text-xs mt-0.5">
-          {new Date().toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" })}
-        </p>
+        {headerDate && (
+          <p className="text-blue-200 text-xs mt-0.5">{headerDate}</p>
+        )}
         {step !== "services" && (
           <div className="mt-3 h-1.5 bg-blue-500 rounded-full overflow-hidden">
             <div

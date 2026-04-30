@@ -29,25 +29,30 @@ export default function ReceptionPage() {
   const [lastRefresh, setLastRefresh] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState("");
   const [search, setSearch] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    fetchAll();
+    const today = new Date().toISOString().split("T")[0];
+    setSelectedDate(today);
+    fetchAll(today);
     timerRef.current = setInterval(() => fetchAppointments(), AUTO_REFRESH_MS);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
-  useEffect(() => { fetchAppointments(); }, [selectedDate, serviceFilter]);
+  useEffect(() => {
+    if (!selectedDate) return;
+    fetchAppointments();
+  }, [selectedDate, serviceFilter]);
 
-  async function fetchAll() {
+  async function fetchAll(date: string) {
     setLoading(true);
     try {
       const token = localStorage.getItem("auth_token") || "";
       const clinicId = localStorage.getItem("clinicId") || "";
       const [apptRes, svcRes] = await Promise.all([
-        fetch(`/api/appointments?date=${selectedDate}${clinicId ? `&clinicId=${clinicId}` : ""}`, {
+        fetch(`/api/appointments?date=${date}${clinicId ? `&clinicId=${clinicId}` : ""}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, {
