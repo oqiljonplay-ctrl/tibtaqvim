@@ -25,7 +25,6 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   let data = query.data || "";
   const state = userState.get(chatId) || {};
 
-  // messageId: query.message is always the message with the button — most accurate source
   const msgId: number | undefined = query.message?.message_id ?? state.messageId;
 
   // ─── full: — alert before general answer ──────────────────────────────────
@@ -42,9 +41,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   // ─── cal:noop — keyboard placeholder buttons ──────────────────────────────
   if (data === "cal:noop") return;
 
-  // ─── cal:month: — calendar month navigation (no state needed) ────────────
+  // ─── cal:month: — calendar month navigation ───────────────────────────────
   if (data.startsWith("cal:month:")) {
-    const ym = data.slice("cal:month:".length);         // "2026-04"
+    const ym = data.slice("cal:month:".length);
     const [yearStr, monthStr] = ym.split("-");
     const keyboard = mkDateKeyboardForMonth(parseInt(yearStr), parseInt(monthStr));
     if (msgId) {
@@ -55,6 +54,12 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         );
       } catch {}
     }
+    return;
+  }
+
+  // ─── booking_in_progress guard — prevent double-confirm ───────────────────
+  if (state.step === "booking_in_progress") {
+    await bot.answerCallbackQuery(query.id, { text: "⏳ Bron amalga oshirilmoqda..." });
     return;
   }
 
@@ -72,18 +77,17 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
     const clinicId = state.clinicId || DEFAULT_CLINIC_ID;
 
-    // State may be lost (serverless cold start) — re-fetch services if needed
     let services = state._services;
     if (!services?.length) {
       const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
-      services = await fetchServices(clinicId, today);
+      const fetched = await fetchServices(clinicId, today);
+      services = fetched.services;
     }
     if (!services?.length) {
       await bot.sendMessage(chatId, "⚠️ Hozirda mavjud xizmatlar yo'q. /start");
       return;
     }
 
-    // For use_saved: restore name/phone from state or re-fetch from DB if lost
     let patientName: string | undefined = undefined;
     let patientPhone: string | undefined = undefined;
     if (data === "use_saved") {
@@ -120,7 +124,8 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       if (!services?.length) {
         const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
         const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
-        services = await fetchServices(clinicId, today);
+        const fetched = await fetchServices(clinicId, today);
+        services = fetched.services;
       }
       if (!services?.length) {
         await bot.sendMessage(chatId, "Qaytadan boshlang: /start");
@@ -138,6 +143,8 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         serviceId: undefined,
         serviceType: undefined,
         servicePrice: undefined,
+        serviceRequiresSlot: undefined,
+        serviceRequiresAddress: undefined,
         date: undefined,
         doctorId: undefined,
         slotId: undefined,
@@ -257,14 +264,12 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       return;
     }
 
-    // Unknown back target — restart
     await bot.sendMessage(chatId, "Qaytadan boshlang: /start");
     return;
   }
 
-  // ─── cal:day: — calendar day selected (same logic as date:) ─────────────
+  // ─── cal:day: — calendar day selected ────────────────────────────────────
   if (data.startsWith("cal:day:")) {
-    // Re-use date: handler by rewriting data and falling through
     data = "date:" + data.slice("cal:day:".length);
   }
 
@@ -284,6 +289,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       serviceId,
       serviceType,
       servicePrice: service?.price ?? null,
+      // BUG FIX: store service flags so date handler can gate slot/address steps
+      serviceRequiresSlot: service?.requiresSlot ?? false,
+      serviceRequiresAddress: service?.requiresAddress ?? false,
       step: "select_date",
       messageId: newMsgId,
       _createdAt: Date.now(),
@@ -297,6 +305,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const { serviceId, serviceType } = state;
     const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
 
+    // ── doctor_queue ──
     if (serviceType === "doctor_queue") {
       const doctors = await fetchDoctors(clinicId);
       if (doctors.length) {
@@ -313,7 +322,6 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           _doctors: doctors,
         });
       } else if (state.patientName && state.patientPhone) {
-        // No doctors + name/phone saved → skip to confirm
         const confirmState = {
           ...state,
           date: selectedDate,
@@ -345,9 +353,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       return;
     }
 
+    // ── home_service ──
     if (serviceType === "home_service") {
       if (state.patientName && state.patientPhone) {
-        // Name/phone saved → skip to enter_address
         const newMsgId = await editOrSend(
           bot, chatId, msgId,
           `👤 Ism: *${state.patientName}*\n📞 Tel: *${state.patientPhone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
@@ -376,9 +384,50 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       return;
     }
 
-    // diagnostic
+    // ── diagnostic ────────────────────────────────────────────────────────────
+    // BUG FIX: check requiresSlot flag stored at service selection time.
+    // If false  → skip slot step entirely.
+    // If true   → fetch slots; if none available show error (NOT proceed to confirm).
+    const requiresSlot = state.serviceRequiresSlot ?? false;
+
+    if (!requiresSlot) {
+      // Slot kerak emas — to'g'ridan ism/tasdiqlashga o'tish
+      if (state.patientName && state.patientPhone) {
+        const confirmState = {
+          ...state,
+          date: selectedDate,
+          step: "confirm",
+          _nameBack: "select_date",
+          _slots: [],
+        };
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          mkConfirmText(confirmState),
+          mkConfirmKeyboard()
+        );
+        userState.set(chatId, { ...confirmState, messageId: newMsgId });
+      } else {
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+          mkNameKeyboard("select_date")
+        );
+        userState.set(chatId, {
+          ...state,
+          date: selectedDate,
+          step: "enter_name",
+          messageId: newMsgId,
+          _nameBack: "select_date",
+          _slots: [],
+        });
+      }
+      return;
+    }
+
+    // requiresSlot=true → slotlarni yuklash
     const slots = await fetchSlots(serviceId, selectedDate);
     const available = slots.filter((s: any) => s.available);
+
     if (available.length) {
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
@@ -392,33 +441,18 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         messageId: newMsgId,
         _slots: available,
       });
-    } else if (state.patientName && state.patientPhone) {
-      // No slots + name/phone saved → skip to confirm
-      const confirmState = {
-        ...state,
-        date: selectedDate,
-        step: "confirm",
-        _nameBack: "select_date",
-        _slots: [],
-      };
-      const newMsgId = await editOrSend(
-        bot, chatId, msgId,
-        mkConfirmText(confirmState),
-        mkConfirmKeyboard()
-      );
-      userState.set(chatId, { ...confirmState, messageId: newMsgId });
     } else {
+      // BUG FIX: requiresSlot=true lekin slot yo'q → confirmga yuborma, xabar ber
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
-        "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
-        mkNameKeyboard("select_date")
+        "😔 *Bu kunda bo'sh vaqt mavjud emas.*\n\nBoshqa kunni tanlang:",
+        mkDateKeyboard()
       );
       userState.set(chatId, {
         ...state,
-        date: selectedDate,
-        step: "enter_name",
+        step: "select_date",
         messageId: newMsgId,
-        _nameBack: "select_date",
+        date: undefined,
         _slots: [],
       });
     }
@@ -431,7 +465,6 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const resolvedDoctorId = doctorId === "none" ? null : doctorId;
 
     if (state.patientName && state.patientPhone) {
-      // Skip name/phone → go directly to confirm
       const confirmState = {
         ...state,
         doctorId: resolvedDoctorId,
@@ -466,7 +499,6 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const slotId = data.split(":")[1];
 
     if (state.patientName && state.patientPhone) {
-      // Skip name/phone → go directly to confirm
       const confirmState = {
         ...state,
         slotId,
@@ -510,7 +542,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       return;
     }
 
-    userState.delete(chatId);
+    // BUG FIX: mark in-progress BEFORE async call to prevent double-booking.
+    // State is deleted AFTER bookAppointment returns (success or error).
+    userState.set(chatId, { ...state, step: "booking_in_progress" });
 
     if (msgId) {
       try {
@@ -525,6 +559,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const result = await bookAppointment({
       clinicId, serviceId, doctorId, slotId, date, patientName, patientPhone, address,
     });
+
+    // Delete state after booking completes (not before)
+    userState.delete(chatId);
 
     if (result.success) {
       const a = result.data;

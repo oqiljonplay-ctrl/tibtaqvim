@@ -206,8 +206,9 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
     return bookingError("MODULE_DISABLED", "Bu xizmat hozir mavjud emas", 403);
   }
 
-  const bookingDate = new Date(input.date);
-  bookingDate.setHours(0, 0, 0, 0);
+  // Force UTC midnight so @db.Date stores the correct calendar date
+  // regardless of server timezone (Vercel = UTC, local dev = +5).
+  const bookingDate = new Date(input.date + "T00:00:00.000Z");
 
   try {
     let result: BookingResult;
