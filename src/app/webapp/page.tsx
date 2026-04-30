@@ -7,6 +7,11 @@ declare global {
   interface Window { Telegram?: { WebApp?: any } }
 }
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type AppMode = "loading" | "dashboard" | "booking";
+type BookingStep = "services" | "date" | "slots" | "form" | "confirm" | "done";
+
 interface Service {
   id: string; name: string; type: string; price: number;
   requiresSlot: boolean; requiresAddress: boolean;
@@ -14,11 +19,18 @@ interface Service {
 }
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
 interface TgUser { firstName: string; phone: string | null; tibId: string | null; hasPhone: boolean }
+interface AppointmentItem {
+  id: string;
+  date: string;
+  status: "booked" | "arrived" | "missed" | "cancelled";
+  queueNumber: number | null;
+  patientName: string;
+  serviceId: string;
+  service: { name: string; type: string };
+  slot?: { startTime: string; endTime: string } | null;
+}
 
-// Known user (hasPhone): services → date → (slots) → confirm → done
-// Known user (no phone): services → date → (slots) → phone-form → confirm → done
-// New user:             services → date → (slots) → full-form → confirm → done
-type Step = "services" | "date" | "slots" | "form" | "confirm" | "done";
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const typeEmojis: Record<string, string> = {
   doctor_queue: "👨‍⚕️", diagnostic: "🔬", home_service: "🏠",
@@ -26,21 +38,25 @@ const typeEmojis: Record<string, string> = {
 const typeLabels: Record<string, string> = {
   doctor_queue: "Shifokor navbati", diagnostic: "Diagnostika", home_service: "Uyga chiqish",
 };
+const statusLabels: Record<string, string> = {
+  booked: "Kutilmoqda", arrived: "Keldi", missed: "Kelmadi", cancelled: "Bekor",
+};
+const statusStyle: Record<string, string> = {
+  booked: "bg-blue-50 text-blue-700 border border-blue-200",
+  arrived: "bg-green-50 text-green-700 border border-green-200",
+  missed: "bg-red-50 text-red-700 border border-red-200",
+  cancelled: "bg-gray-100 text-gray-500 border border-gray-200",
+};
 
-// Telegram WebApp dan telegramId ni ishonchli olish (initDataUnsafe + fallback parsing)
-function getTelegramId(tg: any): number | null {
+// ─── Telegram helpers ─────────────────────────────────────────────────────────
+
+function getTelegramId(tg: any): string | null {
   if (!tg) return null;
-  // Usul 1: to'g'ridan-to'g'ri
-  if (tg.initDataUnsafe?.user?.id) return tg.initDataUnsafe.user.id;
-  // Usul 2: initData stringidan parse qilish
+  if (tg.initDataUnsafe?.user?.id) return String(tg.initDataUnsafe.user.id);
   if (tg.initData) {
     try {
-      const params = new URLSearchParams(tg.initData);
-      const userStr = params.get("user");
-      if (userStr) {
-        const user = JSON.parse(decodeURIComponent(userStr));
-        if (user?.id) return user.id;
-      }
+      const u = JSON.parse(decodeURIComponent(new URLSearchParams(tg.initData).get("user") || ""));
+      if (u?.id) return String(u.id);
     } catch {}
   }
   return null;
@@ -50,33 +66,58 @@ function getTelegramFirstName(tg: any): string {
   if (tg?.initDataUnsafe?.user?.first_name) return tg.initDataUnsafe.user.first_name;
   if (tg?.initData) {
     try {
-      const params = new URLSearchParams(tg.initData);
-      const userStr = params.get("user");
-      if (userStr) return JSON.parse(decodeURIComponent(userStr))?.first_name || "";
+      const u = JSON.parse(decodeURIComponent(new URLSearchParams(tg.initData).get("user") || ""));
+      return u?.first_name || "";
     } catch {}
   }
   return "";
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function isToday(iso: string) {
+  return new Date(iso).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+}
+
+function isFuture(iso: string) {
+  return new Date(iso) >= new Date(new Date().toISOString().split("T")[0]);
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function WebApp() {
-  const [step, setStep] = useState<Step>("services");
+  // ── App mode ──
+  const [appMode, setAppMode] = useState<AppMode>("loading");
+
+  // ── Booking state ──
+  const [step, setStep] = useState<BookingStep>("services");
   const [services, setServices] = useState<Service[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [form, setForm] = useState({ name: "", phone: "", address: "" });
-  const [loading, setLoading] = useState(false);
-  const [userLoading, setUserLoading] = useState(true);
+  const [bookingLoading, setBookingLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [bookingResult, setBookingResult] = useState<any>(null);
+
+  // ── Dashboard state ──
+  const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const [dashLoading, setDashLoading] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  // ── Shared state ──
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
-  const [bookingTibId, setBookingTibId] = useState<string | null>(null);
-  const [telegramId, setTelegramId] = useState<number | null>(null);
+  const [telegramId, setTelegramId] = useState<string | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
   const [headerDate, setHeaderDate] = useState<string>("");
-  // Ref: always holds latest tgUser — avoids stale closure in goAfterDateSlot
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [bookingTibId, setBookingTibId] = useState<string | null>(null);
+
   const tgUserRef = useRef<TgUser | null>(null);
+  const rebookServiceIdRef = useRef<string | null>(null);
 
   const clinicId =
     typeof window !== "undefined"
@@ -84,7 +125,8 @@ export default function WebApp() {
         process.env.NEXT_PUBLIC_CLINIC_ID || ""
       : "";
 
-  // ─── Init ────────────────────────────────────────────────────────────────────
+  // ─── Init ─────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     tg?.ready();
@@ -96,7 +138,6 @@ export default function WebApp() {
     setTelegramId(tgId);
     setHeaderDate(new Date().toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" }));
 
-    // Telegram ismi bilan formani oldindan to'ldirish (hatto user topilmasa ham)
     if (tgFirstName) {
       setForm((f) => ({ ...f, name: f.name || tgFirstName }));
     }
@@ -109,32 +150,115 @@ export default function WebApp() {
               const u: TgUser = json.data;
               tgUserRef.current = u;
               setTgUser(u);
-              setForm((f) => ({
-                ...f,
-                name: f.name || u.firstName,
-                phone: f.phone || u.phone || "",
-              }));
+              setForm((f) => ({ ...f, name: f.name || u.firstName, phone: f.phone || u.phone || "" }));
+              return u;
             }
+            return null;
           })
-          .catch(() => {})
-      : Promise.resolve();
+          .catch(() => null)
+      : Promise.resolve(null);
 
-    resolveUser.finally(() => setUserLoading(false));
-    loadServices(new Date().toISOString().split("T")[0]);
+    resolveUser
+      .then((user) => {
+        if (user?.hasPhone) {
+          setAppMode("dashboard");
+          if (tgId) fetchDashboardAppointments(tgId, clinicId);
+        } else {
+          setAppMode("booking");
+          loadServices(new Date().toISOString().split("T")[0]);
+        }
+      })
+      .finally(() => setUserLoading(false));
   }, []);
 
-  async function loadServices(date: string) {
-    setLoading(true);
+  // ─── Dashboard functions ───────────────────────────────────────────────────
+
+  async function fetchDashboardAppointments(tgId: string, cId: string) {
+    if (!cId) return;
+    setDashLoading(true);
+    try {
+      const res = await fetch(`/api/webapp/appointments?telegramId=${tgId}&clinicId=${cId}`);
+      const json = await res.json();
+      if (json.success) setAppointments(json.data);
+    } catch {}
+    finally { setDashLoading(false); }
+  }
+
+  async function cancelAppointment(appointmentId: string) {
+    if (!telegramId || cancellingId) return;
+    setCancellingId(appointmentId);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/webapp/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId, telegramId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setAppointments((prev) =>
+          prev.map((a) => a.id === appointmentId ? { ...a, status: "cancelled" as const } : a)
+        );
+      } else {
+        setErrorMsg(json.error?.message ?? "Bekor qilishda xatolik");
+      }
+    } catch {
+      setErrorMsg("Tarmoq xatosi.");
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  function startRebook(serviceId: string) {
+    rebookServiceIdRef.current = serviceId;
+    setStep("services");
+    setSelectedService(null);
+    setSelectedDate("");
+    setSelectedSlot("");
+    setBookingResult(null);
+    setErrorMsg(null);
+    setAppMode("booking");
+    loadServices(new Date().toISOString().split("T")[0], serviceId);
+  }
+
+  function goToDashboard() {
+    setAppMode("dashboard");
+    setStep("services");
+    setSelectedService(null);
+    setSelectedDate("");
+    setSelectedSlot("");
+    setBookingResult(null);
+    setErrorMsg(null);
+    if (telegramId) fetchDashboardAppointments(telegramId, clinicId);
+  }
+
+  // ─── Booking functions ─────────────────────────────────────────────────────
+
+  async function loadServices(date: string, autoSelectServiceId?: string) {
+    setBookingLoading(true);
     setErrorMsg(null);
     try {
       const res = await fetch(`/api/services?clinicId=${clinicId}&date=${date}`);
       const json = await res.json();
-      if (json.success) setServices(json.data);
-      else setErrorMsg(json.error?.message ?? "Xizmatlarni yuklashda xatolik");
+      if (json.success) {
+        setServices(json.data);
+        // Auto-select for rebook
+        const targetId = autoSelectServiceId ?? rebookServiceIdRef.current;
+        if (targetId) {
+          rebookServiceIdRef.current = null;
+          const match = json.data.find((s: Service) => s.id === targetId);
+          if (match?.isAvailable) {
+            selectService(match);
+            return;
+          }
+        }
+      } else {
+        setErrorMsg(json.error?.message ?? "Xizmatlarni yuklashda xatolik");
+      }
     } catch {
       setErrorMsg("Tarmoq xatosi.");
     } finally {
-      setLoading(false);
+      setBookingLoading(false);
     }
   }
 
@@ -149,7 +273,7 @@ export default function WebApp() {
     setSelectedDate(date);
     setErrorMsg(null);
     if (selectedService?.requiresSlot) {
-      setLoading(true);
+      setBookingLoading(true);
       try {
         const res = await fetch(`/api/slots?serviceId=${selectedService.id}&date=${date}`);
         const json = await res.json();
@@ -163,7 +287,7 @@ export default function WebApp() {
       } catch {
         setErrorMsg("Tarmoq xatosi.");
       } finally {
-        setLoading(false);
+        setBookingLoading(false);
       }
     }
     goAfterDateSlot();
@@ -174,14 +298,8 @@ export default function WebApp() {
     goAfterDateSlot();
   }
 
-  // Routing: telefon bo'lsa confirm, yo'q bo'lsa form
-  // tgUserRef ishlatiladi — React state closure stale bo'lishi mumkin
   function goAfterDateSlot() {
-    if (tgUserRef.current?.hasPhone) {
-      setStep("confirm");
-    } else {
-      setStep("form");
-    }
+    setStep(tgUserRef.current?.hasPhone ? "confirm" : "form");
   }
 
   function handleFormNext(e: React.FormEvent) {
@@ -189,16 +307,13 @@ export default function WebApp() {
     setStep("confirm");
   }
 
-  // ─── Booking ────────────────────────────────────────────────────────────────
   async function handleBook() {
     if (!selectedService || !selectedDate || submitting) return;
     setSubmitting(true);
     setErrorMsg(null);
-
     try {
       let resolvedTibId: string | null = tgUser?.tibId ?? null;
 
-      // User resolve → bir xil tibId olish (ketma-ket: telegramId → phone)
       const regRes = await fetch("/api/user/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -212,7 +327,6 @@ export default function WebApp() {
       const regJson = await regRes.json();
       if (regJson.success) resolvedTibId = regJson.data?.tibId ?? resolvedTibId;
 
-      // Booking
       const payload: Record<string, unknown> = {
         clinicId,
         serviceId: selectedService.id,
@@ -232,7 +346,7 @@ export default function WebApp() {
       const json = await res.json();
 
       if (json.success) {
-        setResult(json.data);
+        setBookingResult(json.data);
         setBookingTibId(resolvedTibId);
         setStep("done");
         window.Telegram?.WebApp?.sendData?.(
@@ -249,31 +363,225 @@ export default function WebApp() {
   }
 
   const displayTibId = tgUser?.tibId ?? bookingTibId;
-
-  // Form faqat telefon so'rashimi yoki to'liq ko'rsatilishimi
   const nameIsKnown = !!(tgUser?.firstName || form.name);
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Render: Loading ───────────────────────────────────────────────────────
+
+  if (appMode === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-3">🏥</div>
+          <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Render: Dashboard ─────────────────────────────────────────────────────
+
+  if (appMode === "dashboard") {
+    const todayAppts = appointments.filter((a) => isToday(a.date));
+    const upcomingAppts = appointments.filter((a) => isFuture(a.date) && !isToday(a.date) && a.status === "booked");
+    const historyAppts = appointments.filter((a) => !isFuture(a.date) || a.status === "cancelled" || a.status === "arrived" || a.status === "missed");
+
+    return (
+      <div className="min-h-screen bg-gray-50 max-w-md mx-auto flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white px-4 pt-5 pb-7">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-blue-200 text-xs mb-0.5">{headerDate}</p>
+              <h1 className="font-bold text-xl">
+                Salom, {tgUser?.firstName || "Foydalanuvchi"}! 👋
+              </h1>
+            </div>
+            {displayTibId && (
+              <span className="text-xs bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-mono font-semibold shrink-0 mt-1">
+                🆔 {displayTibId}
+              </span>
+            )}
+          </div>
+          <p className="text-blue-200 text-xs mt-2">📞 {tgUser?.phone}</p>
+        </div>
+
+        <div className="flex-1 px-4 -mt-3 pb-24 space-y-4">
+
+          {/* Error */}
+          {errorMsg && (
+            <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <span className="text-red-500 shrink-0 mt-0.5">⚠️</span>
+              <p className="text-red-700 text-sm flex-1">{errorMsg}</p>
+              <button onClick={() => setErrorMsg(null)} className="text-red-400 text-lg leading-none shrink-0">×</button>
+            </div>
+          )}
+
+          {/* Today's appointment */}
+          {dashLoading ? (
+            <div className="mt-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 animate-pulse">
+              <div className="h-4 bg-gray-100 rounded w-1/3 mb-3" />
+              <div className="h-6 bg-gray-100 rounded w-2/3 mb-2" />
+              <div className="h-4 bg-gray-100 rounded w-1/2" />
+            </div>
+          ) : todayAppts.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📍 Bugungi qabul</p>
+              {todayAppts.map((a) => (
+                <div key={a.id} className="bg-white rounded-2xl shadow-sm border-2 border-blue-100 p-4 mb-3">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">{typeEmojis[a.service.type] ?? "🏥"}</span>
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm leading-tight">{a.service.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{formatDate(a.date)}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${statusStyle[a.status]}`}>
+                      {statusLabels[a.status]}
+                    </span>
+                  </div>
+
+                  {a.queueNumber && (
+                    <div className="bg-blue-50 rounded-xl px-4 py-3 text-center mb-3">
+                      <p className="text-xs text-blue-500 mb-0.5">Navbat raqami</p>
+                      <p className="text-3xl font-bold text-blue-600">#{a.queueNumber}</p>
+                    </div>
+                  )}
+                  {a.slot && (
+                    <p className="text-xs text-gray-500 text-center mb-3">
+                      🕐 {a.slot.startTime} — {a.slot.endTime}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    {a.status === "booked" && (
+                      <button
+                        onClick={() => cancelAppointment(a.id)}
+                        disabled={cancellingId === a.id}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+                      >
+                        {cancellingId === a.id ? "..." : "❌ Bekor qilish"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => startRebook(a.serviceId)}
+                      className="flex-1 py-2 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all"
+                    >
+                      🔁 Qayta bron
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
+              <div className="text-3xl mb-2">📅</div>
+              <p className="text-gray-500 text-sm font-medium">Bugun qabul yo'q</p>
+              <p className="text-gray-400 text-xs mt-1">Yangi bron qiling yoki kelajakdagi bronlarni ko'ring</p>
+            </div>
+          )}
+
+          {/* Upcoming appointments */}
+          {upcomingAppts.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">⏰ Yaqinlashayotgan bronlar</p>
+              <div className="space-y-2">
+                {upcomingAppts.map((a) => (
+                  <AppointmentCard
+                    key={a.id}
+                    appt={a}
+                    onCancel={cancelAppointment}
+                    onRebook={startRebook}
+                    cancellingId={cancellingId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* History */}
+          {historyAppts.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📋 Tarix</p>
+              <div className="space-y-2">
+                {historyAppts.slice(0, 5).map((a) => (
+                  <AppointmentCard
+                    key={a.id}
+                    appt={a}
+                    onCancel={cancelAppointment}
+                    onRebook={startRebook}
+                    cancellingId={cancellingId}
+                    compact
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!dashLoading && appointments.length === 0 && todayAppts.length === 0 && (
+            <div className="py-4 text-center">
+              <div className="text-4xl mb-2">🏥</div>
+              <p className="text-gray-500 text-sm">Hali bronlar yo'q</p>
+              <p className="text-gray-400 text-xs mt-1">Quyidagi tugmadan yangi bron qiling</p>
+            </div>
+          )}
+        </div>
+
+        {/* Sticky bottom bar */}
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pb-5 pt-3 bg-gray-50 border-t border-gray-100">
+          <button
+            onClick={() => {
+              setAppMode("booking");
+              setStep("services");
+              setSelectedService(null);
+              loadServices(new Date().toISOString().split("T")[0]);
+            }}
+            className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
+          >
+            ➕ Yangi bron qilish
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Render: Booking flow ──────────────────────────────────────────────────
+
+  const bookingProgress =
+    step === "done" ? 100 :
+    step === "confirm" ? 85 :
+    step === "form" ? 70 :
+    step === "slots" ? 55 : 35;
+
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto flex flex-col">
       {/* Header */}
       <div className="bg-blue-600 text-white px-4 pt-4 pb-6">
         <div className="flex items-center justify-between">
-          <h1 className="font-bold text-lg">🏥 Qabulga yozilish</h1>
+          <div className="flex items-center gap-2">
+            {/* Back to dashboard for returning users */}
+            {tgUser?.hasPhone && step !== "done" && (
+              <button
+                onClick={goToDashboard}
+                className="text-blue-200 hover:text-white text-sm mr-1"
+              >
+                ←
+              </button>
+            )}
+            <h1 className="font-bold text-lg">🏥 Qabulga yozilish</h1>
+          </div>
           {displayTibId && (
             <span className="text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono font-semibold">
               🆔 {displayTibId}
             </span>
           )}
         </div>
-        {headerDate && (
-          <p className="text-blue-200 text-xs mt-0.5">{headerDate}</p>
-        )}
+        {headerDate && <p className="text-blue-200 text-xs mt-0.5">{headerDate}</p>}
         {step !== "services" && (
           <div className="mt-3 h-1.5 bg-blue-500 rounded-full overflow-hidden">
             <div
               className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${ step === "done" ? 100 : step === "confirm" ? 85 : step === "form" ? 70 : step === "slots" ? 55 : 35 }%` }}
+              style={{ width: `${bookingProgress}%` }}
             />
           </div>
         )}
@@ -281,25 +589,23 @@ export default function WebApp() {
 
       <div className="flex-1 p-4">
 
-        {/* Error banner */}
+        {/* Error */}
         {errorMsg && (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
-            <span className="text-red-500 flex-shrink-0 mt-0.5">⚠️</span>
+            <span className="text-red-500 shrink-0 mt-0.5">⚠️</span>
             <p className="text-red-700 text-sm flex-1">{errorMsg}</p>
-            <button onClick={() => setErrorMsg(null)} className="text-red-400 text-lg leading-none flex-shrink-0">×</button>
+            <button onClick={() => setErrorMsg(null)} className="text-red-400 text-lg leading-none shrink-0">×</button>
           </div>
         )}
 
-        {/* ── Step: Services ── */}
+        {/* ── Services ── */}
         {step === "services" && (
           <div>
             {userLoading && (
-              <div className="text-xs text-center text-gray-400 mb-3 animate-pulse">
-                ⏳ Foydalanuvchi tekshirilmoqda...
-              </div>
+              <div className="text-xs text-center text-gray-400 mb-3 animate-pulse">⏳ Tekshirilmoqda...</div>
             )}
             <h2 className="font-semibold text-gray-900 mb-4">Xizmatni tanlang</h2>
-            {loading ? (
+            {bookingLoading ? (
               <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Yuklanmoqda...</div>
             ) : (
               <div className="space-y-3">
@@ -322,10 +628,8 @@ export default function WebApp() {
                           <div className="text-xs text-gray-400 mt-0.5">{typeLabels[s.type]}</div>
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-2">
-                        <div className="text-sm font-bold text-blue-600">
-                          {s.price.toLocaleString()} so'm
-                        </div>
+                      <div className="text-right shrink-0 ml-2">
+                        <div className="text-sm font-bold text-blue-600">{s.price.toLocaleString()} so'm</div>
                         {s.dailyLimit && (
                           <div className={`text-xs mt-0.5 ${s.isAvailable ? "text-green-600" : "text-red-500"}`}>
                             {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To'ldi"}
@@ -340,7 +644,7 @@ export default function WebApp() {
           </div>
         )}
 
-        {/* ── Step: Date ── */}
+        {/* ── Date ── */}
         {step === "date" && (
           <div>
             <button onClick={() => setStep("services")} className="text-blue-600 text-sm mb-4 flex items-center gap-1">
@@ -357,11 +661,11 @@ export default function WebApp() {
             )}
             <h2 className="font-semibold text-gray-900 mb-3">Sanani tanlang</h2>
             <Calendar value={selectedDate || null} onChange={(date) => selectDate(date)} />
-            {loading && <div className="text-center text-gray-400 text-sm mt-3">Tekshirilmoqda...</div>}
+            {bookingLoading && <div className="text-center text-gray-400 text-sm mt-3">Tekshirilmoqda...</div>}
           </div>
         )}
 
-        {/* ── Step: Slots ── */}
+        {/* ── Slots ── */}
         {step === "slots" && (
           <div>
             <button onClick={() => setStep("date")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
@@ -389,7 +693,7 @@ export default function WebApp() {
           </div>
         )}
 
-        {/* ── Step: Form ── */}
+        {/* ── Form ── */}
         {step === "form" && (
           <form onSubmit={handleFormNext}>
             <button
@@ -459,15 +763,11 @@ export default function WebApp() {
           </form>
         )}
 
-        {/* ── Step: Confirm ── */}
+        {/* ── Confirm ── */}
         {step === "confirm" && (
           <div>
             <button
-              onClick={() => setStep(
-                tgUserRef.current?.hasPhone
-                  ? (selectedService?.requiresSlot ? "slots" : "date")
-                  : "form"
-              )}
+              onClick={() => setStep(tgUserRef.current?.hasPhone ? (selectedService?.requiresSlot ? "slots" : "date") : "form")}
               className="text-blue-600 text-sm mb-4"
             >
               ← Orqaga
@@ -517,39 +817,49 @@ export default function WebApp() {
           </div>
         )}
 
-        {/* ── Step: Done ── */}
-        {step === "done" && result && (
+        {/* ── Done ── */}
+        {step === "done" && bookingResult && (
           <div className="text-center py-6">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">✅</div>
             <h2 className="text-xl font-bold text-gray-900 mb-1">Muvaffaqiyatli!</h2>
             <p className="text-gray-500 text-sm mb-6">Qabulingiz tasdiqlandi</p>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-left space-y-3">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-left space-y-3 mb-5">
               {bookingTibId && (
                 <div className="flex justify-between items-center pb-3 border-b border-gray-100">
                   <span className="text-sm text-gray-500">ID raqam</span>
                   <span className="text-blue-600 font-bold font-mono text-base">🆔 {bookingTibId}</span>
                 </div>
               )}
-              <SummaryRow label="Xizmat" value={result.service?.name} />
-              {result.queueNumber && (
+              <SummaryRow label="Xizmat" value={bookingResult.service?.name} />
+              {bookingResult.queueNumber && (
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">Navbat raqami</span>
-                  <span className="text-blue-600 font-bold text-lg">#{result.queueNumber}</span>
+                  <span className="text-blue-600 font-bold text-lg">#{bookingResult.queueNumber}</span>
                 </div>
               )}
-              {result.slot && <SummaryRow label="Vaqt" value={`${result.slot.startTime} — ${result.slot.endTime}`} />}
+              {bookingResult.slot && <SummaryRow label="Vaqt" value={`${bookingResult.slot.startTime} — ${bookingResult.slot.endTime}`} />}
               <SummaryRow label="Sana" value={selectedDate ? formatDateLabel(selectedDate) : selectedDate} />
-              <SummaryRow label="Ism" value={result.patientName} />
-              <SummaryRow label="Telefon" value={result.patientPhone} />
+              <SummaryRow label="Ism" value={bookingResult.patientName} />
+              <SummaryRow label="Telefon" value={bookingResult.patientPhone} />
             </div>
 
             {bookingTibId && (
-              <p className="text-xs text-gray-400 mt-4">
+              <p className="text-xs text-gray-400 mb-2">
                 Klinikaga kelganda <span className="font-semibold text-blue-500">{bookingTibId}</span> ni ko'rsating
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-2">Klinikaga o'z vaqtida keling 🏥</p>
+            <p className="text-xs text-gray-400 mb-6">Klinikaga o'z vaqtida keling 🏥</p>
+
+            {/* Back to dashboard for returning users */}
+            {tgUser?.hasPhone && (
+              <button
+                onClick={goToDashboard}
+                className="w-full py-3 rounded-2xl border-2 border-blue-100 text-blue-600 text-sm font-medium hover:bg-blue-50 active:scale-95 transition-all"
+              >
+                ← Mening bronlarim
+              </button>
+            )}
           </div>
         )}
 
@@ -558,10 +868,91 @@ export default function WebApp() {
   );
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function AppointmentCard({
+  appt, onCancel, onRebook, cancellingId, compact = false,
+}: {
+  appt: AppointmentItem;
+  onCancel: (id: string) => void;
+  onRebook: (serviceId: string) => void;
+  cancellingId: string | null;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="text-lg shrink-0">{typeEmojis[appt.service.type] ?? "🏥"}</span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-800 truncate">{appt.service.name}</p>
+            <p className="text-xs text-gray-400">{formatDate(appt.date)}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[appt.status]}`}>
+            {statusLabels[appt.status]}
+          </span>
+          <button
+            onClick={() => onRebook(appt.serviceId)}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            🔁
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xl">{typeEmojis[appt.service.type] ?? "🏥"}</span>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">{appt.service.name}</p>
+            <p className="text-xs text-gray-400">{formatDate(appt.date)}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {appt.queueNumber && (
+            <span className="text-sm font-bold text-blue-600">#{appt.queueNumber}</span>
+          )}
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusStyle[appt.status]}`}>
+            {statusLabels[appt.status]}
+          </span>
+        </div>
+      </div>
+
+      {appt.slot && (
+        <p className="text-xs text-gray-500 mb-3">🕐 {appt.slot.startTime} — {appt.slot.endTime}</p>
+      )}
+
+      <div className="flex gap-2">
+        {appt.status === "booked" && (
+          <button
+            onClick={() => onCancel(appt.id)}
+            disabled={cancellingId === appt.id}
+            className="flex-1 py-2 rounded-xl text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+          >
+            {cancellingId === appt.id ? "..." : "❌ Bekor qilish"}
+          </button>
+        )}
+        <button
+          onClick={() => onRebook(appt.serviceId)}
+          className="flex-1 py-2 rounded-xl text-xs font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 active:scale-95 transition-all"
+        >
+          🔁 Qayta bron
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-start gap-4">
-      <span className="text-sm text-gray-500 flex-shrink-0">{label}</span>
+      <span className="text-sm text-gray-500 shrink-0">{label}</span>
       <span className="text-sm font-semibold text-gray-900 text-right">{value}</span>
     </div>
   );
