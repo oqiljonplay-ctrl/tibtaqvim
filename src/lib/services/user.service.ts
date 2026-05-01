@@ -49,41 +49,25 @@ export async function getOrCreateUser(opts: {
       user = { ...user, tibId };
     }
   } else {
-    // Create user + assign tibId in ONE transaction.
-    // If tibId assignment fails the whole tx rolls back — user is never saved without tibId.
+    // Two-step creation — pgBouncer transaction-pooling safe.
+    // Step 1: create user. Step 2: assign tibId via unique-retry loop.
+    // No $transaction needed — each step is its own atomic DB operation.
     try {
-      user = await prisma.$transaction(async (tx) => {
-        const newUser = await tx.user.create({
-          data: {
-            phone: normalized,
-            firstName: firstName.trim() || "—",
-            telegramId: tgId,
-            clinicId: clinicId || null,
-            role: "patient",
-          },
-        });
-
-        // Inline tibId generation inside the transaction (retry up to 5×)
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const count = await tx.user.count({ where: { tibId: { not: null } } });
-          const tibId = "tib" + String(count + 1).padStart(6, "0");
-          try {
-            const updated = await tx.user.update({
-              where: { id: newUser.id },
-              data: { tibId },
-            });
-            logger.info("User created with tibId", { userId: newUser.id, tibId });
-            return updated;
-          } catch (err: any) {
-            if (err?.code === "P2002" && attempt < 4) continue;
-            throw err;
-          }
-        }
-        throw new Error("tibId: max retries exceeded");
+      const newUser = await prisma.user.create({
+        data: {
+          phone: normalized,
+          firstName: firstName.trim() || "—",
+          telegramId: tgId,
+          clinicId: clinicId || null,
+          role: "patient",
+        },
       });
+      const tibId = await assignTibId(newUser.id);
+      logger.info("User created with tibId", { userId: newUser.id, tibId });
+      user = { ...newUser, tibId };
     } catch (err: any) {
       if (err?.code === "P2002") {
-        // Concurrent creation — find the winner
+        // Concurrent creation race — find whichever insert won
         user = await _findExisting(tgId, normalized);
         if (!user) throw new Error("Concurrent user creation conflict");
       } else {
