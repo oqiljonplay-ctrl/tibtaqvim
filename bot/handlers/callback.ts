@@ -556,8 +556,19 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       } catch {}
     }
 
+    // Register/resolve user BEFORE booking so appointment is created with userId set.
+    // This ensures tibId is visible in reception/doctor panels immediately.
+    let tibId: string | null = null;
+    let resolvedUserId: string | null = null;
+    try {
+      const reg = await registerPatient({ phone: patientPhone, firstName: patientName, telegramId: chatId, clinicId });
+      tibId = reg.tibId;
+      resolvedUserId = reg.userId;
+    } catch {}
+
     const result = await bookAppointment({
       clinicId, serviceId, doctorId, slotId, date, patientName, patientPhone, address,
+      ...(resolvedUserId ? { userId: resolvedUserId } : {}),
     });
 
     // Delete state after booking completes (not before)
@@ -565,10 +576,6 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
 
     if (result.success) {
       const a = result.data;
-      let tibId: string | null = null;
-      try {
-        tibId = await registerPatient({ phone: patientPhone, firstName: patientName, telegramId: chatId, clinicId });
-      } catch {}
 
       const doctorName = a.doctor ? `${a.doctor.firstName} ${a.doctor.lastName}` : undefined;
       const slotTime = a.slot ? `${a.slot.startTime} — ${a.slot.endTime}` : undefined;

@@ -31,6 +31,7 @@ export async function bookAppointment(data: {
   patientName: string;
   patientPhone: string;
   address?: string;
+  userId?: string;
 }) {
   const res = await fetch(`${API_URL}/api/book`, {
     method: "POST",
@@ -40,12 +41,13 @@ export async function bookAppointment(data: {
   return res.json();
 }
 
+// Returns { tibId, userId } — both needed: userId for appointment linking, tibId for confirmation message.
 export async function registerPatient(opts: {
   phone: string;
   firstName: string;
   telegramId: number;
   clinicId: string;
-}): Promise<string | null> {
+}): Promise<{ tibId: string | null; userId: string | null }> {
   try {
     const res = await fetch(`${API_URL}/api/user/register`, {
       method: "POST",
@@ -53,9 +55,12 @@ export async function registerPatient(opts: {
       body: JSON.stringify(opts),
     });
     const json = await res.json();
-    return json.success ? (json.data?.tibId ?? null) : null;
+    if (json.success) {
+      return { tibId: json.data?.tibId ?? null, userId: json.data?.userId ?? null };
+    }
+    return { tibId: null, userId: null };
   } catch {
-    return null;
+    return { tibId: null, userId: null };
   }
 }
 
