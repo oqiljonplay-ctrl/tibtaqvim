@@ -196,9 +196,9 @@ export default function WebApp() {
 
     resolveUser
       .then((user) => {
-        // Telegram user (DB'da bor yoki yangi yaratildi) → Dashboard
-        // telegramId yo'q (to'g'ridan brauzerda ochilgan) → Booking
-        if (user !== null) {
+        // Phone bor Telegram user → Dashboard (appointments ko'rish/bekor qilish mumkin)
+        // Phone yo'q yoki telegramId yo'q → Booking flow (phone kiritish kerak)
+        if (user !== null && user.hasPhone) {
           setAppMode("dashboard");
           if (tgId) fetchDashboardAppointments(tgId, clinicIdRef.current);
         } else {
