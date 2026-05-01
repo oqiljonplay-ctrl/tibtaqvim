@@ -17,15 +17,22 @@ export async function GET(req: NextRequest) {
 
     // Doctor faqat o'z qabullarini ko'radi
     let doctorId = searchParams.get("doctorId") || undefined;
+    let doctorIdIncludeNull = false;
     if (auth.role === "doctor") {
       const doc = await prisma.doctor.findFirst({ where: { userId: auth.userId } });
-      doctorId = doc?.id;
+      if (doc) {
+        doctorId = doc.id;
+        // Include unassigned (null-doctorId) queue appointments so the panel
+        // isn't empty when bookings were created without a specific doctor.
+        doctorIdIncludeNull = true;
+      }
     }
 
     const result = await getAppointments({
       clinicId,
       date: searchParams.get("date") || undefined,
       doctorId,
+      doctorIdIncludeNull,
       status: searchParams.get("status") || undefined,
       serviceId: searchParams.get("serviceId") || undefined,
       page: Number(searchParams.get("page")) || 1,

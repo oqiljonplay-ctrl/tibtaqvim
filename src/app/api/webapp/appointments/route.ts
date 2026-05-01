@@ -2,26 +2,37 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, error } from "@/lib/api-response";
 
+const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
+
 // GET /api/webapp/appointments?telegramId=...&clinicId=...
-// Authenticated via telegramId — no JWT needed (WebApp context)
+// JWT yo'q — telegramId orqali autentifikatsiya.
+// Phone bo'lmagan users uchun ham userId orqali qidiradi.
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const telegramId = searchParams.get("telegramId");
-  const clinicId = searchParams.get("clinicId");
+  const clinicId = searchParams.get("clinicId") || DEFAULT_CLINIC_ID;
 
   if (!telegramId) return error("telegramId majburiy");
-  if (!clinicId) return error("clinicId majburiy");
+  if (!clinicId) return error("clinicId topilmadi");
 
   try {
     const user = await prisma.user.findUnique({
       where: { telegramId },
-      select: { phone: true },
+      select: { id: true, phone: true },
     });
 
-    if (!user?.phone) return ok([]);
+    if (!user) return ok([]);
+
+    // Search by patientPhone (for old appointments) OR userId (for new linked ones)
+    const phoneFilter = user.phone ? { patientPhone: user.phone } : null;
+    const userIdFilter = { userId: user.id };
+
+    const where = phoneFilter
+      ? { clinicId, OR: [phoneFilter, userIdFilter] }
+      : { clinicId, ...userIdFilter };
 
     const appointments = await prisma.appointment.findMany({
-      where: { clinicId, patientPhone: user.phone },
+      where,
       orderBy: { date: "desc" },
       take: 30,
       select: {

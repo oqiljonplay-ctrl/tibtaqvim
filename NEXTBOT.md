@@ -18,8 +18,9 @@ Reception Panel → keldi/kelmadi belgilash
 Doctor Panel → bugungi bemorlar ro'yxati
 ```
 
-**Bot button URL formati:** `https://<domain>/webapp?clinicId=<id>&tgid=<chatId>`
-- `tgid` — Telegram SDK ishlamasa URL'dan fallback sifatida olinadi
+**Bot button URL formati:** `https://<domain>/webapp?clinicId=<id>`
+- Identity: FAQAT `window.Telegram.WebApp.initDataUnsafe.user.id` (SDK) — URL `tgid` param ishlatilmaydi
+- Telegram SDK yo'q bo'lsa (brauzerda to'g'ridan ochilgan) → booking flow (phone-based)
 
 **Hozirgi holat:** Production (Vercel webhook). `?pgbouncer=true` Supabase connection pooler uchun.
 

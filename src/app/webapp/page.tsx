@@ -77,12 +77,16 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function todayStr() {
+  return new Date().toLocaleDateString("sv-SE");
+}
+
 function isToday(iso: string) {
-  return new Date(iso).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+  return new Date(iso).toISOString().split("T")[0] === todayStr();
 }
 
 function isFuture(iso: string) {
-  return new Date(iso) >= new Date(new Date().toISOString().split("T")[0]);
+  return new Date(iso) >= new Date(todayStr() + "T00:00:00.000Z");
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -118,12 +122,8 @@ export default function WebApp() {
 
   const tgUserRef = useRef<TgUser | null>(null);
   const rebookServiceIdRef = useRef<string | null>(null);
-
-  const clinicId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("clinicId") ||
-        process.env.NEXT_PUBLIC_CLINIC_ID || ""
-      : "";
+  // Computed once on mount — avoids recompute on every render
+  const clinicIdRef = useRef<string>("");
 
   // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -137,9 +137,14 @@ export default function WebApp() {
       tg.setHeaderColor?.("#2563eb");
     }
 
-    // Primary: Telegram WebApp SDK; fallback: ?tgid= URL param (bot appends it)
+    // clinicId: URL param → NEXT_PUBLIC_CLINIC_ID (computed once)
     const urlParams = new URLSearchParams(window.location.search);
-    const tgId = getTelegramId(tg) || urlParams.get("tgid") || null;
+    clinicIdRef.current =
+      urlParams.get("clinicId") || process.env.NEXT_PUBLIC_CLINIC_ID || "";
+
+    // Identity: ONLY Telegram SDK — no URL tgid param (security)
+    // If SDK unavailable, user goes to booking flow with phone-based identity
+    const tgId = getTelegramId(tg);
     const tgFirstName = getTelegramFirstName(tg);
 
     setTelegramId(tgId);
@@ -169,7 +174,7 @@ export default function WebApp() {
               body: JSON.stringify({
                 telegramId: tgId,
                 firstName: tgFirstName || "Foydalanuvchi",
-                clinicId: clinicId || undefined,
+                clinicId: clinicIdRef.current || undefined,
               }),
             });
             const regJson = await regRes.json();
@@ -195,10 +200,10 @@ export default function WebApp() {
         // telegramId yo'q (to'g'ridan brauzerda ochilgan) → Booking
         if (user !== null) {
           setAppMode("dashboard");
-          if (tgId) fetchDashboardAppointments(tgId, clinicId);
+          if (tgId) fetchDashboardAppointments(tgId, clinicIdRef.current);
         } else {
           setAppMode("booking");
-          loadServices(new Date().toISOString().split("T")[0]);
+          loadServices(todayStr());
         }
       })
       .finally(() => setUserLoading(false));
@@ -207,10 +212,11 @@ export default function WebApp() {
   // ─── Dashboard functions ───────────────────────────────────────────────────
 
   async function fetchDashboardAppointments(tgId: string, cId: string) {
-    if (!cId) return;
+    if (!cId && !process.env.NEXT_PUBLIC_CLINIC_ID) return;
+    const effectiveCId = cId || process.env.NEXT_PUBLIC_CLINIC_ID || "";
     setDashLoading(true);
     try {
-      const res = await fetch(`/api/webapp/appointments?telegramId=${tgId}&clinicId=${cId}`);
+      const res = await fetch(`/api/webapp/appointments?telegramId=${tgId}&clinicId=${effectiveCId}`);
       const json = await res.json();
       if (json.success) setAppointments(json.data);
     } catch {}
@@ -251,7 +257,7 @@ export default function WebApp() {
     setBookingResult(null);
     setErrorMsg(null);
     setAppMode("booking");
-    loadServices(new Date().toISOString().split("T")[0], serviceId);
+    loadServices(todayStr(), serviceId);
   }
 
   function goToDashboard() {
@@ -262,7 +268,7 @@ export default function WebApp() {
     setSelectedSlot("");
     setBookingResult(null);
     setErrorMsg(null);
-    if (telegramId) fetchDashboardAppointments(telegramId, clinicId);
+    if (telegramId) fetchDashboardAppointments(telegramId, clinicIdRef.current);
   }
 
   // ─── Booking functions ─────────────────────────────────────────────────────
@@ -271,7 +277,7 @@ export default function WebApp() {
     setBookingLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(`/api/services?clinicId=${clinicId}&date=${date}`);
+      const res = await fetch(`/api/services?clinicId=${clinicIdRef.current}&date=${date}`);
       const json = await res.json();
       if (json.success) {
         setServices(json.data);
@@ -354,14 +360,14 @@ export default function WebApp() {
           phone: form.phone,
           firstName: form.name,
           ...(telegramId ? { telegramId } : {}),
-          ...(clinicId ? { clinicId } : {}),
+          ...(clinicIdRef.current ? { clinicId: clinicIdRef.current } : {}),
         }),
       });
       const regJson = await regRes.json();
       if (regJson.success) resolvedTibId = regJson.data?.tibId ?? resolvedTibId;
 
       const payload: Record<string, unknown> = {
-        clinicId,
+        clinicId: clinicIdRef.current,
         serviceId: selectedService.id,
         date: selectedDate,
         patientName: form.name,
@@ -583,7 +589,7 @@ export default function WebApp() {
               setAppMode("booking");
               setStep("services");
               setSelectedService(null);
-              loadServices(new Date().toISOString().split("T")[0]);
+              loadServices(todayStr());
             }}
             className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
           >

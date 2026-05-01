@@ -4,7 +4,7 @@ import { ok, error } from "@/lib/api-response";
 
 // POST /api/webapp/cancel
 // { appointmentId, telegramId }
-// Security: verifies patientPhone matches the Telegram user's phone
+// Security: patientPhone === user.phone YOKI appointment.userId === user.id
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -16,18 +16,23 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { telegramId: String(telegramId) },
-      select: { phone: true },
+      select: { id: true, phone: true },
     });
 
-    if (!user?.phone) return error("Foydalanuvchi topilmadi", 404);
+    if (!user) return error("Foydalanuvchi topilmadi", 404);
 
     const appointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      select: { id: true, status: true, patientPhone: true },
+      select: { id: true, status: true, patientPhone: true, userId: true },
     });
 
     if (!appointment) return error("Bron topilmadi", 404);
-    if (appointment.patientPhone !== user.phone) return error("Ruxsat yo'q", 403);
+
+    // Allow cancel if phone matches OR appointment is linked to this user
+    const ownsViaPhone = user.phone && appointment.patientPhone === user.phone;
+    const ownsViaUserId = appointment.userId === user.id;
+    if (!ownsViaPhone && !ownsViaUserId) return error("Ruxsat yo'q", 403);
+
     if (appointment.status !== "booked") {
       return error("Faqat kutilayotgan bronni bekor qilish mumkin");
     }

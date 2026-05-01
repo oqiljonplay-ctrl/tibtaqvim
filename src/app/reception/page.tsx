@@ -32,14 +32,22 @@ export default function ReceptionPage() {
   const [selectedDate, setSelectedDate] = useState("");
   const [search, setSearch] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Refs hold current filter values so setInterval callback is never stale
+  const selectedDateRef = useRef("");
+  const serviceFilterRef = useRef("all");
+  function changeDate(d: string) { selectedDateRef.current = d; setSelectedDate(d); }
+  function changeServiceFilter(s: string) { serviceFilterRef.current = s; setServiceFilter(s); }
   // Prevents duplicate fetch when setSelectedDate triggers [selectedDate] effect on init
   const skipNextDateFetch = useRef(false);
 
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("sv-SE");
+    selectedDateRef.current = today;
     skipNextDateFetch.current = true;
     setSelectedDate(today);
-    fetchAll(today);
+    // Load appointments immediately; services load in parallel without blocking
+    fetchAppointments(today);
+    fetchServices();
     timerRef.current = setInterval(() => fetchAppointments(), AUTO_REFRESH_MS);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
@@ -50,44 +58,36 @@ export default function ReceptionPage() {
     fetchAppointments();
   }, [selectedDate, serviceFilter]);
 
-  async function fetchAll(date: string) {
-    setLoading(true);
+  async function fetchServices() {
     try {
       const token = localStorage.getItem("auth_token") || "";
       const clinicId = localStorage.getItem("clinicId") || "";
-      const [apptRes, svcRes] = await Promise.all([
-        fetch(`/api/appointments?date=${date}${clinicId ? `&clinicId=${clinicId}` : ""}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
-      const [apptJson, svcJson] = await Promise.all([apptRes.json(), svcRes.json()]);
-      if (apptJson.success) setAppointments(apptJson.data.items ?? apptJson.data);
-      else setErrorMsg(apptJson.error?.message ?? apptJson.error ?? "Qabullar yuklanmadi");
-      if (svcJson.success) setServices(svcJson.data);
-      setLastRefresh(new Date().toLocaleTimeString("uz-UZ"));
-    } catch {
-      setErrorMsg("Tarmoq xatosi. Qayta urinib ko'ring.");
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) setServices(json.data);
+    } catch { /* non-critical, filter just stays empty */ }
   }
 
-  async function fetchAppointments() {
+  async function fetchAppointments(dateOverride?: string) {
     try {
       const token = localStorage.getItem("auth_token") || "";
       const clinicId = localStorage.getItem("clinicId") || "";
-      const params = new URLSearchParams({ date: selectedDate });
+      const date = dateOverride ?? selectedDateRef.current;
+      const svcFilter = serviceFilterRef.current;
+      if (!date) return;
+      const params = new URLSearchParams({ date });
       if (clinicId) params.set("clinicId", clinicId);
-      if (serviceFilter !== "all") params.set("serviceId", serviceFilter);
+      if (svcFilter !== "all") params.set("serviceId", svcFilter);
       const res = await fetch(`/api/appointments?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       if (json.success) { setAppointments(json.data.items ?? json.data); setLastRefresh(new Date().toLocaleTimeString("uz-UZ")); setErrorMsg(null); }
       else setErrorMsg(json.error?.message ?? json.error ?? "Qabullar yuklanmadi");
     } catch {
       setErrorMsg("Tarmoq xatosi.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -145,7 +145,7 @@ export default function ReceptionPage() {
             <span className="ml-2 text-blue-400">(har 30s avtomatik)</span>
           </p>
         </div>
-        <button onClick={fetchAppointments} className="btn-secondary text-sm flex items-center gap-1.5">
+        <button onClick={() => fetchAppointments()} className="btn-secondary text-sm flex items-center gap-1.5">
           ↻ Yangilash
         </button>
       </div>
@@ -163,12 +163,12 @@ export default function ReceptionPage() {
         <input
           type="date"
           value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
+          onChange={(e) => changeDate(e.target.value)}
           className="input w-auto text-sm"
         />
         <select
           value={serviceFilter}
-          onChange={(e) => setServiceFilter(e.target.value)}
+          onChange={(e) => changeServiceFilter(e.target.value)}
           className="input w-auto text-sm"
         >
           <option value="all">Barcha xizmatlar</option>

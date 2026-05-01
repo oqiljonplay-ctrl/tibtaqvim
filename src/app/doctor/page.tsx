@@ -23,11 +23,11 @@ export default function DoctorPage() {
   const [lastRefresh, setLastRefresh] = useState<string>("");
   const [dateLabel, setDateLabel] = useState<string>("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const todayRef = useRef(new Date().toISOString().split("T")[0]);
+  const todayRef = useRef(new Date().toLocaleDateString("sv-SE"));
 
   useEffect(() => {
     // Client-only: avoid SSR/hydration mismatch with date strings
-    todayRef.current = new Date().toISOString().split("T")[0];
+    todayRef.current = new Date().toLocaleDateString("sv-SE");
     setDateLabel(new Date().toLocaleDateString("uz-UZ", { weekday: "long", day: "numeric", month: "long" }));
     fetchAppointments();
     timerRef.current = setInterval(fetchAppointments, 30_000);

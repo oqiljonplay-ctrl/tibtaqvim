@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, error, notFound } from "@/lib/api-response";
+import { getDateRange } from "@/lib/utils/date";
 
 // GET /api/services?clinicId=xxx&type=doctor_queue&date=2024-01-01
 export async function GET(req: NextRequest) {
@@ -34,14 +35,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const date = new Date(dateParam);
+    const dateRange = getDateRange(dateParam);
 
     const enriched = await Promise.all(
       services.map(async (s) => {
         const todayCount = await prisma.appointment.count({
           where: {
             serviceId: s.id,
-            date,
+            date: dateRange,
             status: { not: "cancelled" },
           },
         });

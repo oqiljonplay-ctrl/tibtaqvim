@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { getDateRange } from "@/lib/utils/date";
 
 export async function updateAppointmentStatus(
   appointmentId: string,
@@ -35,20 +36,30 @@ export async function getAppointments(filters: {
   clinicId: string;
   date?: string;
   doctorId?: string;
+  doctorIdIncludeNull?: boolean;
   status?: string;
   serviceId?: string;
   page?: number;
   limit?: number;
 }) {
-  const { clinicId, date, doctorId, status, serviceId, page = 1, limit = 50 } = filters;
+  const { clinicId, date, doctorId, doctorIdIncludeNull, status, serviceId, page = 1, limit = 50 } = filters;
 
   const where: Record<string, unknown> = {
     clinicId,
-    ...(date ? { date: new Date(date) } : {}),
-    ...(doctorId ? { doctorId } : {}),
+    ...(date ? { date: getDateRange(date) } : {}),
     ...(status ? { status } : {}),
     ...(serviceId ? { serviceId } : {}),
   };
+
+  if (doctorId) {
+    // When doctorIdIncludeNull=true, include unassigned (null) appointments too.
+    // This covers clinics where queue bookings don't always have a doctorId set.
+    if (doctorIdIncludeNull) {
+      where.OR = [{ doctorId }, { doctorId: null }];
+    } else {
+      where.doctorId = doctorId;
+    }
+  }
 
   const [total, items] = await Promise.all([
     prisma.appointment.count({ where }),
