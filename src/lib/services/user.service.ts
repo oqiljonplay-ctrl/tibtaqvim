@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/utils/phone";
 import { assignTibId } from "@/lib/services/tib-id.service";
+import { logger } from "@/lib/logger";
 
 export interface ResolvedUser {
   id: string;
@@ -13,6 +14,7 @@ export interface ResolvedUser {
 // Universal user resolver — used in ALL places: bot, webapp, API routes.
 // Priority: telegramId → phone → create.
 // Safe against concurrent requests (P2002 retry).
+// tibId is ALWAYS assigned atomically on creation — user never saved with tibId=NULL.
 export async function getOrCreateUser(opts: {
   telegramId?: string | null;
   phone?: string | null;
@@ -39,19 +41,49 @@ export async function getOrCreateUser(opts: {
         user = (await _findExisting(tgId, normalized)) ?? user;
       }
     }
+
+    // Backfill: existing user somehow has no tibId — assign now
+    if (!user.tibId) {
+      const tibId = await assignTibId(user.id);
+      logger.info("tibId backfilled for existing user", { userId: user.id, tibId });
+      user = { ...user, tibId };
+    }
   } else {
+    // Create user + assign tibId in ONE transaction.
+    // If tibId assignment fails the whole tx rolls back — user is never saved without tibId.
     try {
-      user = await prisma.user.create({
-        data: {
-          phone: normalized,
-          firstName: firstName.trim() || "—",
-          telegramId: tgId,
-          clinicId: clinicId || null,
-          role: "patient",
-        },
+      user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            phone: normalized,
+            firstName: firstName.trim() || "—",
+            telegramId: tgId,
+            clinicId: clinicId || null,
+            role: "patient",
+          },
+        });
+
+        // Inline tibId generation inside the transaction (retry up to 5×)
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const count = await tx.user.count({ where: { tibId: { not: null } } });
+          const tibId = "tib" + String(count + 1).padStart(6, "0");
+          try {
+            const updated = await tx.user.update({
+              where: { id: newUser.id },
+              data: { tibId },
+            });
+            logger.info("User created with tibId", { userId: newUser.id, tibId });
+            return updated;
+          } catch (err: any) {
+            if (err?.code === "P2002" && attempt < 4) continue;
+            throw err;
+          }
+        }
+        throw new Error("tibId: max retries exceeded");
       });
     } catch (err: any) {
       if (err?.code === "P2002") {
+        // Concurrent creation — find the winner
         user = await _findExisting(tgId, normalized);
         if (!user) throw new Error("Concurrent user creation conflict");
       } else {
@@ -62,11 +94,10 @@ export async function getOrCreateUser(opts: {
 
   if (!user) throw new Error("User resolution failed");
 
-  const tibId = user.tibId ?? (await assignTibId(user.id));
   return {
     id: user.id,
     phone: user.phone,
-    tibId,
+    tibId: user.tibId,
     firstName: user.firstName,
     hasPhone: !!user.phone,
   };
