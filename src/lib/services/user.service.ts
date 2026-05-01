@@ -94,6 +94,16 @@ export async function getOrCreateUser(opts: {
 
   if (!user) throw new Error("User resolution failed");
 
+  // Link all unlinked appointments where patientPhone matches.
+  // Runs after every getOrCreateUser call — handles the race where
+  // linkUserToAppointment() ran before the user existed in DB.
+  if (user.phone) {
+    prisma.appointment.updateMany({
+      where: { patientPhone: user.phone, userId: null },
+      data: { userId: user.id },
+    }).catch(() => {});
+  }
+
   return {
     id: user.id,
     phone: user.phone,
