@@ -6,7 +6,8 @@ const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
 // NEXT_PUBLIC_WEBAPP_URL yo'q bo'lsa NEXT_PUBLIC_APP_URL/webapp dan foydalanamiz
 const WEBAPP_URL =
   process.env.NEXT_PUBLIC_WEBAPP_URL ||
-  (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/webapp` : "");
+  (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/webapp` : "") ||
+  "https://tibtaqvim.vercel.app/webapp";
 
 // clinicId + mode=dashboard — WebApp har doim dashboard bilan ochiladi
 function webAppUrl(chatId?: number): string {

@@ -11,7 +11,8 @@ import {
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
 const WEBAPP_URL =
   process.env.NEXT_PUBLIC_WEBAPP_URL ||
-  (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/webapp` : "");
+  (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/webapp` : "") ||
+  "https://tibtaqvim.vercel.app/webapp";
 
 export async function handleStart(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
