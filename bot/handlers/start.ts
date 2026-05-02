@@ -9,7 +9,9 @@ import {
 } from "../helpers/render";
 
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
-const WEBAPP_URL = process.env.NEXT_PUBLIC_WEBAPP_URL || "";
+const WEBAPP_URL =
+  process.env.NEXT_PUBLIC_WEBAPP_URL ||
+  (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/webapp` : "");
 
 export async function handleStart(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
@@ -19,24 +21,18 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
 
   // /start bosib kelgan har bir user DB'ga yoziladi (phone keyinroq qo'shiladi)
   // Maqsad: WebApp ochilganda by-telegram orqali topilsin, bir xil tibId bo'lsin
-  const [{ services, enableWebapp }, savedUser] = await Promise.all([
+  const [{ services }, savedUser] = await Promise.all([
     fetchServices(DEFAULT_CLINIC_ID, today),
     fetchUserByTelegramId(chatId),
     registerUserAtStart(chatId, tgFirstName),
   ]);
 
-  // Pastki persistent tugmani ko'rsatish yoki olib tashlash
-  if (enableWebapp && WEBAPP_URL) {
-    await bot.sendMessage(chatId, "👇 *Web orqali ham bron qilishingiz mumkin:*", {
+  // Profilim tugmasini har doim ko'rsatamiz
+  if (WEBAPP_URL) {
+    await bot.sendMessage(chatId, "👤 *Profilingizni ko'rish uchun:*", {
       parse_mode: "Markdown",
       reply_markup: mkWebAppReplyKeyboard(chatId) as any,
     });
-  } else {
-    // WebApp o'chirilgan — persistent tugmani olib tashlash
-    await bot.sendMessage(chatId, "🏥 *ClinicBot*", {
-      parse_mode: "Markdown",
-      reply_markup: mkRemoveKeyboard() as any,
-    }).catch(() => {});
   }
 
   if (!services.length) {
