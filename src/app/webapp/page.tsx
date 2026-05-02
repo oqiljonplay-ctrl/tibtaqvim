@@ -62,6 +62,23 @@ function getTelegramId(tg: any): string | null {
   return null;
 }
 
+// SDK yuklanishini kutadi — beforeInteractive nested layoutda ishlamasligi mumkin
+function waitForTelegramSDK(timeoutMs = 3000): Promise<any> {
+  return new Promise((resolve) => {
+    if (window.Telegram?.WebApp) return resolve(window.Telegram.WebApp);
+    const start = Date.now();
+    const interval = setInterval(() => {
+      if (window.Telegram?.WebApp) {
+        clearInterval(interval);
+        resolve(window.Telegram.WebApp);
+      } else if (Date.now() - start > timeoutMs) {
+        clearInterval(interval);
+        resolve(null);
+      }
+    }, 50);
+  });
+}
+
 function getTelegramFirstName(tg: any): string {
   if (tg?.initDataUnsafe?.user?.first_name) return tg.initDataUnsafe.user.first_name;
   if (tg?.initData) {
@@ -128,85 +145,84 @@ export default function WebApp() {
   // ─── Init ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    // Telegram SDK beforeInteractive orqali yuklangan bo'ladi
-    // ready() va expand() chaqirib WebApp'ni to'liq ishga tushuramiz
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      tg.setHeaderColor?.("#2563eb");
-    }
-
-    // clinicId: URL param → NEXT_PUBLIC_CLINIC_ID (computed once)
     const urlParams = new URLSearchParams(window.location.search);
     clinicIdRef.current =
       urlParams.get("clinicId") || process.env.NEXT_PUBLIC_CLINIC_ID || "";
 
-    // Identity: ONLY Telegram SDK — no URL tgid param (security)
-    // If SDK unavailable, user goes to booking flow with phone-based identity
-    const tgId = getTelegramId(tg);
-    const tgFirstName = getTelegramFirstName(tg);
-
-    setTelegramId(tgId);
     setHeaderDate(new Date().toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" }));
 
-    if (tgFirstName) {
-      setForm((f) => ({ ...f, name: f.name || tgFirstName }));
-    }
+    // SDK yuklanishini kutamiz (nested layoutda beforeInteractive kech ishlashi mumkin)
+    waitForTelegramSDK().then(async (tg) => {
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        tg.setHeaderColor?.("#2563eb");
+      }
 
-    const resolveUser = tgId
-      ? fetch(`/api/user/by-telegram?telegramId=${tgId}`)
-          .then((r) => r.json())
-          .then(async (json) => {
-            if (json.success && json.data) {
-              // Mavjud user — to'liq ma'lumot bilan qaytarish
-              const u: TgUser = json.data;
-              tgUserRef.current = u;
-              setTgUser(u);
-              setForm((f) => ({ ...f, name: f.name || u.firstName, phone: f.phone || u.phone || "" }));
-              return u;
-            }
-            // Yangi Telegram user — DB'ga yozib, dashboard ko'rsatish
-            // (bot ishlatmagan bo'lsa ham WebApp da dashboard chiqadi)
-            const regRes = await fetch("/api/user/register", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                telegramId: tgId,
-                firstName: tgFirstName || "Foydalanuvchi",
-                clinicId: clinicIdRef.current || undefined,
-              }),
-            });
-            const regJson = await regRes.json();
-            if (regJson.success) {
-              const u: TgUser = {
-                firstName: tgFirstName || "Foydalanuvchi",
-                phone: null,
-                tibId: regJson.data.tibId ?? null,
-                hasPhone: false,
-              };
-              tgUserRef.current = u;
-              setTgUser(u);
-              return u;
-            }
-            return null;
-          })
-          .catch(() => null)
-      : Promise.resolve(null);
+      // tgId: avval SDK, keyin URL param (bot tomonidan qo'shilgan fallback)
+      let tgId = getTelegramId(tg);
+      if (!tgId) {
+        const paramId = urlParams.get("tgid");
+        if (paramId) tgId = paramId;
+      }
 
-    resolveUser
-      .then((user) => {
-        // Telegram user (phone bor yoki yo'q) → Dashboard
-        // telegramId yo'q (brauzerda to'g'ridan ochilgan) → Booking
-        if (user !== null) {
+      const tgFirstName = getTelegramFirstName(tg);
+
+      setTelegramId(tgId);
+      if (tgFirstName) {
+        setForm((f) => ({ ...f, name: f.name || tgFirstName }));
+      }
+
+      if (!tgId) {
+        // Telegram tashqarisidan kirilgan — WebApp faqat Telegram orqali ishlaydi
+        setAppMode("booking");
+        setUserLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/user/by-telegram?telegramId=${tgId}`);
+        const json = await res.json();
+
+        if (json.success && json.data) {
+          const u: TgUser = json.data;
+          tgUserRef.current = u;
+          setTgUser(u);
+          setForm((f) => ({ ...f, name: f.name || u.firstName, phone: f.phone || u.phone || "" }));
           setAppMode("dashboard");
-          if (tgId) fetchDashboardAppointments(tgId, clinicIdRef.current);
+          fetchDashboardAppointments(tgId, clinicIdRef.current);
         } else {
-          setAppMode("booking");
-          loadServices(todayStr());
+          // Yangi Telegram user — ro'yxatdan o'tkazib dashboard ko'rsatish
+          const regRes = await fetch("/api/user/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              telegramId: tgId,
+              firstName: tgFirstName || "Foydalanuvchi",
+              clinicId: clinicIdRef.current || undefined,
+            }),
+          });
+          const regJson = await regRes.json();
+          if (regJson.success) {
+            const u: TgUser = {
+              firstName: tgFirstName || "Foydalanuvchi",
+              phone: null,
+              tibId: regJson.data.tibId ?? null,
+              hasPhone: false,
+            };
+            tgUserRef.current = u;
+            setTgUser(u);
+          }
+          setAppMode("dashboard");
+          fetchDashboardAppointments(tgId, clinicIdRef.current);
         }
-      })
-      .finally(() => setUserLoading(false));
+      } catch {
+        setAppMode("dashboard");
+        fetchDashboardAppointments(tgId!, clinicIdRef.current);
+      } finally {
+        setUserLoading(false);
+      }
+    });
   }, []);
 
   // ─── Dashboard functions ───────────────────────────────────────────────────
@@ -248,16 +264,9 @@ export default function WebApp() {
     }
   }
 
-  function startRebook(serviceId: string) {
-    rebookServiceIdRef.current = serviceId;
-    setStep("services");
-    setSelectedService(null);
-    setSelectedDate("");
-    setSelectedSlot("");
-    setBookingResult(null);
-    setErrorMsg(null);
-    setAppMode("booking");
-    loadServices(todayStr(), serviceId);
+  function startRebook(_serviceId: string) {
+    // Bronlash faqat bot chatda — WebApp yopiladi
+    window.Telegram?.WebApp?.close();
   }
 
   function goToDashboard() {
@@ -532,7 +541,7 @@ export default function WebApp() {
             <div className="mt-3 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
               <div className="text-3xl mb-2">📅</div>
               <p className="text-gray-500 text-sm font-medium">Bugun qabul yo'q</p>
-              <p className="text-gray-400 text-xs mt-1">Yangi bron qiling yoki kelajakdagi bronlarni ko'ring</p>
+              <p className="text-gray-400 text-xs mt-1">Bot orqali yangi bron qiling</p>
             </div>
           )}
 
@@ -577,23 +586,18 @@ export default function WebApp() {
             <div className="py-4 text-center">
               <div className="text-4xl mb-2">🏥</div>
               <p className="text-gray-500 text-sm">Hali bronlar yo'q</p>
-              <p className="text-gray-400 text-xs mt-1">Quyidagi tugmadan yangi bron qiling</p>
+              <p className="text-gray-400 text-xs mt-1">Bot orqali yangi bron qiling</p>
             </div>
           )}
         </div>
 
-        {/* Sticky bottom bar */}
+        {/* Sticky bottom bar — bronlash botga yo'naltiradi */}
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pb-5 pt-3 bg-gray-50 border-t border-gray-100">
           <button
-            onClick={() => {
-              setAppMode("booking");
-              setStep("services");
-              setSelectedService(null);
-              loadServices(todayStr());
-            }}
+            onClick={() => window.Telegram?.WebApp?.close()}
             className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
           >
-            ➕ Yangi bron qilish
+            ➕ Bron qilish (Botda)
           </button>
         </div>
       </div>
