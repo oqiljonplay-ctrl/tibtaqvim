@@ -232,8 +232,8 @@ export default function WebApp() {
         console.log("[WebApp] user:", user);
         console.log("[WebApp] user.phone:", user?.phone);
 
-        // STEP 4 — dashboard.md condition: if (user && user.phone) → dashboard else → booking
-        if (user && user.phone) {
+        // user mavjud bo'lsa → har doim dashboard
+        if (user) {
           setAppMode("dashboard");
           fetchDashboardAppointments(tgId, clinicIdRef.current);
         } else {
