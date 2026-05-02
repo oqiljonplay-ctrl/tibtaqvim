@@ -5,7 +5,6 @@ import {
   mkServiceKeyboard,
   mkWelcomeBackKeyboard,
   mkWebAppReplyKeyboard,
-  mkContactKeyboard,
 } from "../helpers/render";
 
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
@@ -61,21 +60,18 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  // Yangi user — majburiy kontakt ulashish
-  // Kontakt orqali phone + telegramId bir umrlik biriktiriladi va tibId beriladi
-  await bot.sendMessage(
+  // Yangi user — xizmatlarni ko'rsat (kontakt keyinroq ism kiritgandan so'ng so'raladi)
+  const sent = await bot.sendMessage(
     chatId,
-    `🏥 *ClinicBot ga xush kelibsiz!*\n\n📱 Davom etish uchun telefon raqamingizni ulashing.\n_Tugmani bosing_ 👇`,
-    {
-      parse_mode: "Markdown",
-      reply_markup: mkContactKeyboard() as any,
-    }
+    "🏥 *ClinicBot ga xush kelibsiz!*\n\nQaysi xizmatdan foydalanmoqchisiz?",
+    { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkServiceKeyboard(services) } }
   );
 
   userState.set(chatId, {
-    step: "share_contact",
+    step: "select_service",
     clinicId: DEFAULT_CLINIC_ID,
     _services: services,
     _createdAt: Date.now(),
+    messageId: sent.message_id,
   });
 }

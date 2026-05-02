@@ -9,7 +9,6 @@ import {
   mkDoctorKeyboard,
   mkSlotKeyboard,
   mkNameKeyboard,
-  mkPhoneKeyboard,
   mkAddressKeyboard,
   mkConfirmKeyboard,
   mkConfirmText,
@@ -237,28 +236,12 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
         mkNameKeyboard(state._nameBack || "select_date")
       );
+      // patientPhone saqlab qolamiz — qaytib kelgan user kontaktni qayta ulashmasin
       userState.set(chatId, {
         ...state,
         step: "enter_name",
         messageId: newMsgId,
         patientName: undefined,
-        patientPhone: undefined,
-        address: undefined,
-      });
-      return;
-    }
-
-    if (target === "enter_phone") {
-      const newMsgId = await editOrSend(
-        bot, chatId, msgId,
-        `👤 Ism: *${state.patientName}*\n\n📞 *Telefon raqamingizni kiriting:*\n\n_+998XXXXXXXXX formatida_ 👇`,
-        mkPhoneKeyboard()
-      );
-      userState.set(chatId, {
-        ...state,
-        step: "enter_phone",
-        messageId: newMsgId,
-        patientPhone: undefined,
         address: undefined,
       });
       return;

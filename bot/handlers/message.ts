@@ -5,12 +5,10 @@ import { normalizePhone } from "../../src/lib/utils/phone";
 import {
   editOrSend,
   mkNameKeyboard,
-  mkPhoneKeyboard,
   mkAddressKeyboard,
   mkConfirmKeyboard,
   mkConfirmText,
   mkContactKeyboard,
-  mkServiceKeyboard,
 } from "../helpers/render";
 
 export async function handleMessage(bot: TelegramBot, msg: Message) {
@@ -25,14 +23,14 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
 
   const msgId: number | undefined = state.messageId;
 
-  // ─── Kontakt ulashish ────────────────────────────────────────────────────────
+  // ─── Kontakt ulashish (ism kiritgandan keyin, yoki boshlang'ich) ──────────
   if (state.step === "share_contact") {
     if (msg.contact) {
       const rawPhone = msg.contact.phone_number || "";
       const phone = normalizePhone(rawPhone.startsWith("+") ? rawPhone : `+${rawPhone}`);
-      const firstName = msg.contact.first_name || msg.from?.first_name || "Foydalanuvchi";
+      // Ism state dan olish (mid-booking) yoki kontaktdan
+      const firstName = state.patientName || msg.contact.first_name || msg.from?.first_name || "Foydalanuvchi";
 
-      // User yaratish + tibId berish (direct DB, HTTP yo'q)
       const reg = await registerPatient({
         phone,
         firstName,
@@ -44,10 +42,34 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       // Reply keyboardni olib tashlash
       await bot.sendMessage(
         chatId,
-        `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 Sizning ID: *${tibId}*\n\n_Klinikaga kelganda ushbu ID ni ko'rsating_` : ""}`,
+        `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 ID: *${tibId}*` : ""}`,
         { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
       );
 
+      // Mid-booking context: patientName + booking data already in state
+      if (state.patientName && state.date) {
+        const updatedState = { ...state, patientPhone: phone, tibId };
+
+        if (state.serviceType === "home_service") {
+          const sent = await bot.sendMessage(
+            chatId,
+            `👤 Ism: *${firstName}*\n📞 Tel: *${phone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
+            { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkAddressKeyboard() } }
+          );
+          userState.set(chatId, { ...updatedState, step: "enter_address", messageId: sent.message_id });
+        } else {
+          const confirmState = { ...updatedState, step: "confirm" };
+          const sent = await bot.sendMessage(
+            chatId,
+            mkConfirmText(confirmState),
+            { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkConfirmKeyboard() } }
+          );
+          userState.set(chatId, { ...confirmState, messageId: sent.message_id });
+        }
+        return;
+      }
+
+      // Boshlang'ich flow: xizmat tanlash
       const services = state._services || [];
       if (!services.length) {
         await bot.sendMessage(chatId, "⚠️ Hozirda mavjud xizmatlar yo'q. /start");
@@ -55,7 +77,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
         return;
       }
 
-      // Xizmat tanlash
+      const { mkServiceKeyboard } = await import("../helpers/render");
       const sent = await bot.sendMessage(
         chatId,
         "🏥 Qaysi xizmatdan foydalanmoqchisiz?",
@@ -92,44 +114,42 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       );
       return;
     }
-    const newMsgId = await editOrSend(
-      bot, chatId, msgId,
-      `👤 Ism: *${text}*\n\n📞 *Telefon raqamingizni kiriting:*\n\n_+998XXXXXXXXX formatida_ 👇`,
-      mkPhoneKeyboard()
-    );
-    userState.set(chatId, { ...state, patientName: text, step: "enter_phone", messageId: newMsgId });
-    return;
-  }
 
-  // ─── Telefon ─────────────────────────────────────────────────────────────────
-  if (state.step === "enter_phone") {
-    const normalized = normalizePhone(text);
-    if (!/^\+998\d{9}$/.test(normalized)) {
-      await editOrSend(
-        bot, chatId, msgId,
-        `👤 Ism: *${state.patientName}*\n\n❌ Noto'g'ri raqam. Qaytadan kiriting:\n\n📞 *Telefon raqamingizni kiriting:*\n\n_+998XXXXXXXXX formatida_ 👇`,
-        mkPhoneKeyboard()
-      );
+    // Agar telefon raqam allaqachon saqlangan (qaytib kelgan user) — kontakt so'ramasdan o'tamiz
+    if (state.patientPhone) {
+      if (state.serviceType === "home_service") {
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          `👤 Ism: *${text}*\n📞 Tel: *${state.patientPhone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
+          mkAddressKeyboard()
+        );
+        userState.set(chatId, { ...state, patientName: text, step: "enter_address", messageId: newMsgId });
+      } else {
+        const updatedState = { ...state, patientName: text, step: "confirm" };
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          mkConfirmText(updatedState),
+          mkConfirmKeyboard()
+        );
+        userState.set(chatId, { ...updatedState, messageId: newMsgId });
+      }
       return;
     }
 
-    if (state.serviceType === "home_service") {
-      const newMsgId = await editOrSend(
-        bot, chatId, msgId,
-        `👤 Ism: *${state.patientName}*\n📞 Tel: *${normalized}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
-        mkAddressKeyboard()
-      );
-      userState.set(chatId, { ...state, patientPhone: normalized, step: "enter_address", messageId: newMsgId });
-      return;
-    }
-
-    const updatedState = { ...state, patientPhone: normalized, step: "confirm" };
+    // Yangi user — kontakt ulashish talab qilinadi
+    // Inline xabarni yangilaymiz (orqaga tugmasi bilan)
     const newMsgId = await editOrSend(
       bot, chatId, msgId,
-      mkConfirmText(updatedState),
-      mkConfirmKeyboard()
+      `👤 Ism: *${text}*\n\n📱 Davom etish uchun kontaktingizni ulashing:`,
+      [[{ text: "⬅️ Orqaga", callback_data: `back:${state._nameBack || "select_date"}` }]]
     );
-    userState.set(chatId, { ...updatedState, messageId: newMsgId });
+    // Reply keyboard — kontakt tugmasi
+    await bot.sendMessage(
+      chatId,
+      "👇 Kontaktni ulashish tugmasini bosing:",
+      { parse_mode: "Markdown", reply_markup: mkContactKeyboard() as any }
+    );
+    userState.set(chatId, { ...state, patientName: text, step: "share_contact", messageId: newMsgId });
     return;
   }
 
