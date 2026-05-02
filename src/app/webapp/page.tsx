@@ -165,17 +165,29 @@ export default function WebApp() {
         tg.setHeaderColor?.("#2563eb");
       }
 
-      // tgId faqat Telegram SDK dan — URL param ishlatilmaydi (xavfsizlik)
+      // STEP 1 — Telegram context log
+      console.log("[WebApp] initDataUnsafe:", tg?.initDataUnsafe);
+
       const tgId = getTelegramId(tg);
       const tgFirstName = getTelegramFirstName(tg);
+
+      // STEP 2 — telegramId log
+      console.log("[WebApp] telegramId:", tgId);
 
       setTelegramId(tgId);
       if (tgFirstName) {
         setForm((f) => ({ ...f, name: f.name || tgFirstName }));
       }
 
+      // Rebook uchun yagona URL exception
+      if (urlMode === "booking") {
+        setAppMode("booking");
+        loadServices(todayStr());
+        setUserLoading(false);
+        return;
+      }
+
       if (!tgId) {
-        // Telegram tashqarisidan kirilgan — booking modega o'tkazamiz
         setAppMode("booking");
         loadServices(todayStr());
         setUserLoading(false);
@@ -194,7 +206,6 @@ export default function WebApp() {
           setTgUser(user);
           setForm((f) => ({ ...f, name: f.name || user!.firstName, phone: f.phone || user!.phone || "" }));
         } else {
-          // Yangi Telegram user — ro'yxatdan o'tkazamiz
           const regRes = await fetch("/api/user/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -217,21 +228,22 @@ export default function WebApp() {
           }
         }
 
-        // Mode aniqlash: URL → hasPhone → default dashboard
-        if (urlMode === "booking") {
-          setAppMode("booking");
-          loadServices(todayStr());
-        } else if (urlMode === "dashboard" || user !== null) {
-          // mode=dashboard yoki user mavjud → har doim dashboard
+        // STEP 2 — user log
+        console.log("[WebApp] user:", user);
+        console.log("[WebApp] user.phone:", user?.phone);
+
+        // STEP 4 — dashboard.md condition: if (user && user.phone) → dashboard else → booking
+        if (user && user.phone) {
           setAppMode("dashboard");
           fetchDashboardAppointments(tgId, clinicIdRef.current);
         } else {
-          setAppMode("dashboard");
-          fetchDashboardAppointments(tgId, clinicIdRef.current);
+          setAppMode("booking");
+          loadServices(todayStr());
         }
-      } catch {
-        setAppMode("dashboard");
-        fetchDashboardAppointments(tgId!, clinicIdRef.current);
+      } catch (e) {
+        console.log("[WebApp] fetch error:", e);
+        setAppMode("booking");
+        loadServices(todayStr());
       } finally {
         setUserLoading(false);
       }
