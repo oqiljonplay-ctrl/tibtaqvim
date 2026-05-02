@@ -1,3 +1,9 @@
+// HTTP calls: only for booking and services (business logic lives in API routes)
+// Direct DB: all user operations — avoids self-referential HTTP timeout issues on Vercel
+import { getOrCreateUser } from "@/lib/services/user.service";
+import { prisma } from "@/lib/prisma";
+import { assignTibId } from "@/lib/services/tib-id.service";
+
 const API_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export async function fetchServices(
@@ -41,7 +47,8 @@ export async function bookAppointment(data: {
   return res.json();
 }
 
-// Returns { tibId, userId } — both needed: userId for appointment linking, tibId for confirmation message.
+// Direct DB — previously used HTTP which caused silent failures on Vercel.
+// getOrCreateUser assigns tibId atomically and links unlinked appointments.
 export async function registerPatient(opts: {
   phone: string;
   firstName: string;
@@ -49,16 +56,13 @@ export async function registerPatient(opts: {
   clinicId: string;
 }): Promise<{ tibId: string | null; userId: string | null }> {
   try {
-    const res = await fetch(`${API_URL}/api/user/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(opts),
+    const user = await getOrCreateUser({
+      phone: opts.phone,
+      firstName: opts.firstName,
+      telegramId: String(opts.telegramId),
+      clinicId: opts.clinicId,
     });
-    const json = await res.json();
-    if (json.success) {
-      return { tibId: json.data?.tibId ?? null, userId: json.data?.userId ?? null };
-    }
-    return { tibId: null, userId: null };
+    return { tibId: user.tibId, userId: user.id };
   } catch {
     return { tibId: null, userId: null };
   }
@@ -70,28 +74,44 @@ export async function fetchSlots(serviceId: string, date: string) {
   return json.success ? json.data : [];
 }
 
-// /start da chaqiriladi — phone yo'q, faqat telegramId + firstName
-// Maqsad: user DB'da yaratilsin, WebApp ochilganda topilsin
+// Direct DB — registers user at /start, returns tibId for display
 export async function registerUserAtStart(
   telegramId: number,
   firstName: string
-): Promise<void> {
+): Promise<{ tibId: string | null }> {
   try {
-    await fetch(`${API_URL}/api/user/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telegramId, firstName }),
+    const user = await getOrCreateUser({
+      telegramId: String(telegramId),
+      firstName,
     });
-  } catch {}
+    return { tibId: user.tibId };
+  } catch {
+    return { tibId: null };
+  }
 }
 
+// Direct DB — fast lookup by telegramId, auto-assigns tibId if missing
 export async function fetchUserByTelegramId(
   telegramId: number
-): Promise<{ firstName: string; phone: string | null; tibId?: string | null; hasPhone: boolean } | null> {
+): Promise<{ firstName: string; phone: string | null; tibId: string | null; hasPhone: boolean } | null> {
   try {
-    const res = await fetch(`${API_URL}/api/user/by-telegram?telegramId=${telegramId}`);
-    const json = await res.json();
-    return json.success ? json.data : null;
+    const user = await prisma.user.findUnique({
+      where: { telegramId: String(telegramId) },
+      select: { id: true, firstName: true, phone: true, tibId: true },
+    });
+    if (!user) return null;
+
+    let tibId = user.tibId;
+    if (!tibId) {
+      tibId = await assignTibId(user.id);
+    }
+
+    return {
+      firstName: user.firstName,
+      phone: user.phone,
+      tibId,
+      hasPhone: !!user.phone,
+    };
   } catch {
     return null;
   }

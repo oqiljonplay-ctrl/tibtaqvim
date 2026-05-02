@@ -20,13 +20,15 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
   const today = new Date().toISOString().split("T")[0];
   const tgFirstName = msg.from?.first_name || "Foydalanuvchi";
 
-  // /start bosib kelgan har bir user DB'ga yoziladi (phone keyinroq qo'shiladi)
-  // Maqsad: WebApp ochilganda by-telegram orqali topilsin, bir xil tibId bo'lsin
-  const [{ services }, savedUser] = await Promise.all([
+  // User DB'ga yoziladi va tibId beriladi — direct DB, HTTP yo'q
+  const [{ services }, savedUser, regResult] = await Promise.all([
     fetchServices(DEFAULT_CLINIC_ID, today),
     fetchUserByTelegramId(chatId),
     registerUserAtStart(chatId, tgFirstName),
   ]);
+
+  // tibId: savedUser dan yoki yangi ro'yxatdan
+  const tibId = savedUser?.tibId || regResult?.tibId;
 
   // Profilim tugmasini har doim ko'rsatamiz
   if (WEBAPP_URL) {
@@ -41,11 +43,12 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  // Welcome back faqat phone mavjud bo'lganda — phone yo'q bo'lsa yangi bron oqimi
+  // Welcome back faqat phone mavjud bo'lganda
   if (savedUser?.phone) {
+    const idLine = tibId ? `\n🆔 ID: *${tibId}*` : "";
     const sent = await bot.sendMessage(
       chatId,
-      `👋 *Qaytib keldingiz!*\n\n👤 Ism: *${savedUser.firstName}*\n📞 Tel: *${savedUser.phone}*\n\nUshbu ma'lumotlardan foydalanasizmi?`,
+      `👋 *Qaytib keldingiz!*\n\n👤 Ism: *${savedUser.firstName}*\n📞 Tel: *${savedUser.phone}*${idLine}\n\nUshbu ma'lumotlardan foydalanasizmi?`,
       { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkWelcomeBackKeyboard() } }
     );
     userState.set(chatId, {
@@ -60,9 +63,12 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
     return;
   }
 
+  // Yangi foydalanuvchi — ID ni xabar sifatida ko'rsatamiz
+  const idMsg = tibId ? `\n\n🆔 Sizning ID: *${tibId}*\n_Klinikaga kelganda ushbu ID ni ko'rsating_` : "";
+
   const sent = await bot.sendMessage(
     chatId,
-    `🏥 *ClinicBot ga xush kelibsiz!*\n\nQaysi xizmatdan foydalanmoqchisiz?`,
+    `🏥 *ClinicBot ga xush kelibsiz!*${idMsg}\n\nQaysi xizmatdan foydalanmoqchisiz?`,
     { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkServiceKeyboard(services) } }
   );
 
