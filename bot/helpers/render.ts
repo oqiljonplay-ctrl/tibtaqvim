@@ -64,7 +64,7 @@ export async function editOrSend(
 // Pastki persistent tugma uchun (reply keyboard)
 export function mkWebAppReplyKeyboard(chatId?: number) {
   return {
-    keyboard: [[{ text: "🌐 Onlayn bron (Web App)", web_app: { url: webAppUrl(chatId) } }]],
+    keyboard: [[{ text: "👤 Profilim", web_app: { url: webAppUrl(chatId) } }]],
     resize_keyboard: true,
     one_time_keyboard: false,
   };
@@ -78,7 +78,7 @@ export function mkServiceKeyboard(services: any[], showWebAppInline = false, cha
   const rows: InlineKeyboardButton[][] = [];
 
   if (showWebAppInline && WEBAPP_URL) {
-    rows.push([{ text: "📱 Onlayn bron (Web App)", web_app: { url: webAppUrl(chatId) } } as any]);
+    rows.push([{ text: "👤 Profilim", web_app: { url: webAppUrl(chatId) } } as any]);
   }
 
   for (const s of services) {
