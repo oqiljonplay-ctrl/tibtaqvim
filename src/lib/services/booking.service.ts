@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import type { Prisma } from "@prisma/client";
 import type { BookingInput } from "@/lib/validators/booking";
-import { getTibIdByPhone } from "@/lib/services/tib-id.service";
+import { getTibIdByPhone, assignTibId } from "@/lib/services/tib-id.service";
 import { buildConfirmationMessage, sendTelegramConfirmation } from "@/lib/services/confirmation.service";
 import { normalizePhone } from "@/lib/utils/phone";
 
@@ -15,7 +15,7 @@ type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
 }>;
 
 export type BookingResult =
-  | { success: true; data: AppointmentWithRelations }
+  | { success: true; data: AppointmentWithRelations; tibId: string | null }
   | { success: false; error: { code: string; message: string }; status: number };
 
 function bookingError(code: string, message: string, status: number): BookingResult {
@@ -76,7 +76,7 @@ async function bookDoctorQueue(input: BookingInput, service: { dailyLimit: numbe
     });
 
     logger.info("DoctorQueue booked", { appointmentId: appt.id, queueNumber: appt.queueNumber });
-    return { success: true, data: appt };
+    return { success: true, data: appt, tibId: null };
   } catch (err: any) {
     if (err?.code === "LIMIT_REACHED") return bookingError("LIMIT_REACHED", err.message, 409);
     if (err?.code === "DUPLICATE_BOOKING") return bookingError("DUPLICATE_BOOKING", err.message, 409);
@@ -137,7 +137,7 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
     });
 
     logger.info("Diagnostic booked", { appointmentId: appt.id, slotId: input.slotId });
-    return { success: true, data: appt };
+    return { success: true, data: appt, tibId: null };
   } catch (err: any) {
     if (err?.code === "LIMIT_REACHED") return bookingError("LIMIT_REACHED", err.message, 409);
     if (err?.code === "SLOT_INVALID") return bookingError("SLOT_INVALID", err.message, 400);
@@ -186,7 +186,7 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
     });
 
     logger.info("HomeService booked", { appointmentId: appt.id });
-    return { success: true, data: appt };
+    return { success: true, data: appt, tibId: null };
   } catch (err: any) {
     if (err?.code === "LIMIT_REACHED") return bookingError("LIMIT_REACHED", err.message, 409);
     throw err;
@@ -230,19 +230,39 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
     }
 
     if (result.success) {
-      // User mavjud bo'lsa appointmentga userId bog'lash (background, bron bloklanmaydi)
+      // Link appointment to user (background — bron bloklanmaydi)
       linkUserToAppointment(result.data.id, input.patientPhone).catch(() => {});
 
       // Webapp bronlar uchun Telegram notification (bot bronlarda bot o'zi yuboradi)
       if (input.source !== "bot") {
         notifyPatientAsync(result.data, input.patientPhone);
       }
+
+      // tibId: userId dan yoki phone dan topib, yo'q bo'lsa yangi beradi
+      const tibId = await resolveTibId(input);
+      return { success: true, data: result.data, tibId };
     }
 
     return result;
   } catch (err) {
     logger.error("Booking failed", { error: String(err), input });
     return bookingError("SERVER_ERROR", "Server xatosi", 500);
+  }
+}
+
+// tibId ni kafolatli qaytaradi: userId → phone → assign
+async function resolveTibId(input: BookingInput): Promise<string | null> {
+  try {
+    if (input.userId) {
+      const u = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true, tibId: true } });
+      if (u) return u.tibId ?? await assignTibId(u.id);
+    }
+    const phone = normalizePhone(input.patientPhone);
+    const u = await prisma.user.findFirst({ where: { phone }, select: { id: true, tibId: true } });
+    if (!u) return null;
+    return u.tibId ?? await assignTibId(u.id);
+  } catch {
+    return null;
   }
 }
 

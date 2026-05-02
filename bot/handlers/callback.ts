@@ -577,6 +577,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     if (result.success) {
       const a = result.data;
 
+      // tibId: registerPatient dan (primary) yoki booking response dan (fallback)
+      const finalTibId = tibId || (a as any).tibId || null;
+
       const doctorName = a.doctor ? `${a.doctor.firstName} ${a.doctor.lastName}` : undefined;
       const slotTime = a.slot ? `${a.slot.startTime} — ${a.slot.endTime}` : undefined;
 
@@ -590,9 +593,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         a.queueNumber ? `🔢 Navbat raqami: *${a.queueNumber}*` : "📋 Navbat: ro'yxatga qo'shildingiz",
         doctorName ? `👨‍⚕️ Shifokor: *${doctorName}*` : "",
         slotTime ? `🕐 Vaqt: *${slotTime}*` : "",
-        tibId ? `🆔 ID: *${tibId}*` : "",
+        finalTibId ? `🆔 ID: *${finalTibId}*` : "",
         "",
-        tibId ? "📍 Klinikaga kelganda ushbu kodni ko'rsating" : "Klinikaga o'z vaqtida keling! 🏥",
+        finalTibId ? "📍 Klinikaga kelganda ushbu ID ni ko'rsating" : "Klinikaga o'z vaqtida keling! 🏥",
       ].filter(Boolean).join("\n");
 
       if (msgId) {

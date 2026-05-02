@@ -5,7 +5,7 @@ import {
   mkServiceKeyboard,
   mkWelcomeBackKeyboard,
   mkWebAppReplyKeyboard,
-  mkRemoveKeyboard,
+  mkContactKeyboard,
 } from "../helpers/render";
 
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
@@ -20,17 +20,15 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
   const today = new Date().toISOString().split("T")[0];
   const tgFirstName = msg.from?.first_name || "Foydalanuvchi";
 
-  // User DB'ga yoziladi va tibId beriladi — direct DB, HTTP yo'q
   const [{ services }, savedUser, regResult] = await Promise.all([
     fetchServices(DEFAULT_CLINIC_ID, today),
     fetchUserByTelegramId(chatId),
     registerUserAtStart(chatId, tgFirstName),
   ]);
 
-  // tibId: savedUser dan yoki yangi ro'yxatdan
   const tibId = savedUser?.tibId || regResult?.tibId;
 
-  // Profilim tugmasini har doim ko'rsatamiz
+  // "Profilim" tugmasini har doim ko'rsatamiz
   if (WEBAPP_URL) {
     await bot.sendMessage(chatId, "👤 *Profilingizni ko'rish uchun:*", {
       parse_mode: "Markdown",
@@ -43,7 +41,7 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  // Welcome back faqat phone mavjud bo'lganda
+  // Qaytib kelgan user — phoneси bor
   if (savedUser?.phone) {
     const idLine = tibId ? `\n🆔 ID: *${tibId}*` : "";
     const sent = await bot.sendMessage(
@@ -63,19 +61,20 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  // Yangi foydalanuvchi — ID ni xabar sifatida ko'rsatamiz
-  const idMsg = tibId ? `\n\n🆔 Sizning ID: *${tibId}*\n_Klinikaga kelganda ushbu ID ni ko'rsating_` : "";
-
-  const sent = await bot.sendMessage(
+  // Yangi user — majburiy kontakt ulashish
+  // Kontakt orqali phone + telegramId bir umrlik biriktiriladi va tibId beriladi
+  await bot.sendMessage(
     chatId,
-    `🏥 *ClinicBot ga xush kelibsiz!*${idMsg}\n\nQaysi xizmatdan foydalanmoqchisiz?`,
-    { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkServiceKeyboard(services) } }
+    `🏥 *ClinicBot ga xush kelibsiz!*\n\n📱 Davom etish uchun telefon raqamingizni ulashing.\n_Tugmani bosing_ 👇`,
+    {
+      parse_mode: "Markdown",
+      reply_markup: mkContactKeyboard() as any,
+    }
   );
 
   userState.set(chatId, {
-    step: "select_service",
+    step: "share_contact",
     clinicId: DEFAULT_CLINIC_ID,
-    messageId: sent.message_id,
     _services: services,
     _createdAt: Date.now(),
   });

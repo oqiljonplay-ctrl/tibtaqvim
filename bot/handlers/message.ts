@@ -1,5 +1,6 @@
 import TelegramBot, { Message } from "node-telegram-bot-api";
 import { userState } from "../state";
+import { registerPatient } from "../api";
 import { normalizePhone } from "../../src/lib/utils/phone";
 import {
   editOrSend,
@@ -8,6 +9,8 @@ import {
   mkAddressKeyboard,
   mkConfirmKeyboard,
   mkConfirmText,
+  mkContactKeyboard,
+  mkServiceKeyboard,
 } from "../helpers/render";
 
 export async function handleMessage(bot: TelegramBot, msg: Message) {
@@ -22,7 +25,64 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
 
   const msgId: number | undefined = state.messageId;
 
-  // ─── Ism ────────────────────────────────────────────────────────────────
+  // ─── Kontakt ulashish ────────────────────────────────────────────────────────
+  if (state.step === "share_contact") {
+    if (msg.contact) {
+      const rawPhone = msg.contact.phone_number || "";
+      const phone = normalizePhone(rawPhone.startsWith("+") ? rawPhone : `+${rawPhone}`);
+      const firstName = msg.contact.first_name || msg.from?.first_name || "Foydalanuvchi";
+
+      // User yaratish + tibId berish (direct DB, HTTP yo'q)
+      const reg = await registerPatient({
+        phone,
+        firstName,
+        telegramId: chatId,
+        clinicId: state.clinicId,
+      });
+      const tibId = reg.tibId;
+
+      // Reply keyboardni olib tashlash
+      await bot.sendMessage(
+        chatId,
+        `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 Sizning ID: *${tibId}*\n\n_Klinikaga kelganda ushbu ID ni ko'rsating_` : ""}`,
+        { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
+      );
+
+      const services = state._services || [];
+      if (!services.length) {
+        await bot.sendMessage(chatId, "⚠️ Hozirda mavjud xizmatlar yo'q. /start");
+        userState.delete(chatId);
+        return;
+      }
+
+      // Xizmat tanlash
+      const sent = await bot.sendMessage(
+        chatId,
+        "🏥 Qaysi xizmatdan foydalanmoqchisiz?",
+        { reply_markup: { inline_keyboard: mkServiceKeyboard(services) } }
+      );
+      userState.set(chatId, {
+        ...state,
+        step: "select_service",
+        patientName: firstName,
+        patientPhone: phone,
+        tibId,
+        messageId: sent.message_id,
+        _createdAt: Date.now(),
+      });
+      return;
+    }
+
+    // Kontakt yuborilmadi — eslatma
+    await bot.sendMessage(
+      chatId,
+      "📱 Iltimos, *'Kontaktni ulashish'* tugmasini bosing:\n\n_Telegram raqamingiz avtomatik yuboriladi_",
+      { parse_mode: "Markdown", reply_markup: mkContactKeyboard() as any }
+    );
+    return;
+  }
+
+  // ─── Ism ────────────────────────────────────────────────────────────────────
   if (state.step === "enter_name") {
     if (text.length < 2) {
       await editOrSend(
@@ -41,7 +101,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  // ─── Telefon ─────────────────────────────────────────────────────────────
+  // ─── Telefon ─────────────────────────────────────────────────────────────────
   if (state.step === "enter_phone") {
     const normalized = normalizePhone(text);
     if (!/^\+998\d{9}$/.test(normalized)) {
@@ -73,7 +133,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  // ─── Manzil ──────────────────────────────────────────────────────────────
+  // ─── Manzil ──────────────────────────────────────────────────────────────────
   if (state.step === "enter_address") {
     if (text.length < 5) {
       await editOrSend(

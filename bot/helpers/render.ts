@@ -79,6 +79,15 @@ export function mkRemoveKeyboard() {
   return { remove_keyboard: true as const };
 }
 
+// Majburiy kontakt ulashish tugmasi (reply keyboard)
+export function mkContactKeyboard() {
+  return {
+    keyboard: [[{ text: "📱 Kontaktni ulashish", request_contact: true }]],
+    one_time_keyboard: true,
+    resize_keyboard: true,
+  };
+}
+
 export function mkServiceKeyboard(services: any[], showWebAppInline = false, chatId?: number): InlineKeyboardButton[][] {
   const rows: InlineKeyboardButton[][] = [];
 

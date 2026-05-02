@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
       return error(result.error, result.status);
     }
 
-    logger.info("POST /api/book success", { reqId, appointmentId: result.data.id });
-    return ok(result.data, 201);
+    logger.info("POST /api/book success", { reqId, appointmentId: result.data.id, tibId: result.tibId });
+    return ok({ ...result.data, tibId: result.tibId ?? null }, 201);
   } catch (err) {
     logger.error("POST /api/book error", { reqId, error: String(err) });
     return error("Server xatosi", 500);
