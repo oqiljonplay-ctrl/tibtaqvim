@@ -168,7 +168,12 @@ export default function WebApp() {
       // STEP 1 — Telegram context log
       console.log("[WebApp] initDataUnsafe:", tg?.initDataUnsafe);
 
-      const tgId = getTelegramId(tg);
+      // tgId: SDK → URL tgid param fallback (bot har doim yuboradi)
+      let tgId = getTelegramId(tg);
+      if (!tgId) {
+        const paramTgId = urlParams.get("tgid");
+        if (paramTgId) tgId = paramTgId;
+      }
       const tgFirstName = getTelegramFirstName(tg);
 
       // STEP 2 — telegramId log
@@ -179,7 +184,7 @@ export default function WebApp() {
         setForm((f) => ({ ...f, name: f.name || tgFirstName }));
       }
 
-      // Rebook uchun yagona URL exception
+      // Faqat rebook mode=booking → booking
       if (urlMode === "booking") {
         setAppMode("booking");
         loadServices(todayStr());
@@ -187,9 +192,17 @@ export default function WebApp() {
         return;
       }
 
-      if (!tgId) {
+      // tgId yo'q va mode=dashboard ham yo'q → booking
+      if (!tgId && urlMode !== "dashboard") {
         setAppMode("booking");
         loadServices(todayStr());
+        setUserLoading(false);
+        return;
+      }
+
+      // tgId yo'q lekin mode=dashboard → bo'sh dashboard ko'rsat
+      if (!tgId) {
+        setAppMode("dashboard");
         setUserLoading(false);
         return;
       }
