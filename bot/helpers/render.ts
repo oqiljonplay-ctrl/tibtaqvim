@@ -4,12 +4,13 @@ import { mkCalendarKeyboard, currentYearMonth } from "./calendar";
 const WEBAPP_URL = process.env.NEXT_PUBLIC_WEBAPP_URL || "";
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
 
-// clinicId + tgid ni URL ga qo'shadi — tgid SDK fallback sifatida ishlaydi
+// clinicId + mode=dashboard — WebApp har doim dashboard bilan ochiladi
 function webAppUrl(chatId?: number): string {
   if (!WEBAPP_URL) return "";
   const params = new URLSearchParams();
   if (DEFAULT_CLINIC_ID) params.set("clinicId", DEFAULT_CLINIC_ID);
   if (chatId) params.set("tgid", String(chatId));
+  params.set("mode", "dashboard");
   const qs = params.toString();
   return qs ? `${WEBAPP_URL}?${qs}` : WEBAPP_URL;
 }

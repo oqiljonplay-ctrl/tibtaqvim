@@ -149,9 +149,15 @@ export default function WebApp() {
     clinicIdRef.current =
       urlParams.get("clinicId") || process.env.NEXT_PUBLIC_CLINIC_ID || "";
 
+    // URL-dan mode o'qiymiz — "dashboard" | "booking" | null
+    const urlMode = urlParams.get("mode");
+
+    // Rebook uchun serviceId URL dan
+    const urlServiceId = urlParams.get("serviceId");
+    if (urlServiceId) rebookServiceIdRef.current = urlServiceId;
+
     setHeaderDate(new Date().toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" }));
 
-    // SDK yuklanishini kutamiz (nested layoutda beforeInteractive kech ishlashi mumkin)
     waitForTelegramSDK().then(async (tg) => {
       if (tg) {
         tg.ready();
@@ -159,13 +165,8 @@ export default function WebApp() {
         tg.setHeaderColor?.("#2563eb");
       }
 
-      // tgId: avval SDK, keyin URL param (bot tomonidan qo'shilgan fallback)
-      let tgId = getTelegramId(tg);
-      if (!tgId) {
-        const paramId = urlParams.get("tgid");
-        if (paramId) tgId = paramId;
-      }
-
+      // tgId faqat Telegram SDK dan — URL param ishlatilmaydi (xavfsizlik)
+      const tgId = getTelegramId(tg);
       const tgFirstName = getTelegramFirstName(tg);
 
       setTelegramId(tgId);
@@ -174,8 +175,9 @@ export default function WebApp() {
       }
 
       if (!tgId) {
-        // Telegram tashqarisidan kirilgan — WebApp faqat Telegram orqali ishlaydi
+        // Telegram tashqarisidan kirilgan — booking modega o'tkazamiz
         setAppMode("booking");
+        loadServices(todayStr());
         setUserLoading(false);
         return;
       }
@@ -184,15 +186,15 @@ export default function WebApp() {
         const res = await fetch(`/api/user/by-telegram?telegramId=${tgId}`);
         const json = await res.json();
 
+        let user: TgUser | null = null;
+
         if (json.success && json.data) {
-          const u: TgUser = json.data;
-          tgUserRef.current = u;
-          setTgUser(u);
-          setForm((f) => ({ ...f, name: f.name || u.firstName, phone: f.phone || u.phone || "" }));
-          setAppMode("dashboard");
-          fetchDashboardAppointments(tgId, clinicIdRef.current);
+          user = json.data as TgUser;
+          tgUserRef.current = user;
+          setTgUser(user);
+          setForm((f) => ({ ...f, name: f.name || user!.firstName, phone: f.phone || user!.phone || "" }));
         } else {
-          // Yangi Telegram user — ro'yxatdan o'tkazib dashboard ko'rsatish
+          // Yangi Telegram user — ro'yxatdan o'tkazamiz
           const regRes = await fetch("/api/user/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -204,15 +206,26 @@ export default function WebApp() {
           });
           const regJson = await regRes.json();
           if (regJson.success) {
-            const u: TgUser = {
+            user = {
               firstName: tgFirstName || "Foydalanuvchi",
               phone: null,
               tibId: regJson.data.tibId ?? null,
               hasPhone: false,
             };
-            tgUserRef.current = u;
-            setTgUser(u);
+            tgUserRef.current = user;
+            setTgUser(user);
           }
+        }
+
+        // Mode aniqlash: URL → hasPhone → default dashboard
+        if (urlMode === "booking") {
+          setAppMode("booking");
+          loadServices(todayStr());
+        } else if (urlMode === "dashboard" || user !== null) {
+          // mode=dashboard yoki user mavjud → har doim dashboard
+          setAppMode("dashboard");
+          fetchDashboardAppointments(tgId, clinicIdRef.current);
+        } else {
           setAppMode("dashboard");
           fetchDashboardAppointments(tgId, clinicIdRef.current);
         }
@@ -264,20 +277,16 @@ export default function WebApp() {
     }
   }
 
-  function startRebook(_serviceId: string) {
-    // Bronlash faqat bot chatda — WebApp yopiladi
-    window.Telegram?.WebApp?.close();
+  function startRebook(serviceId: string) {
+    // Bronlash URL navigation orqali — sahifa yangilanadi, mode=booking
+    const qs = new URLSearchParams({ clinicId: clinicIdRef.current, mode: "booking", serviceId });
+    window.location.href = `/webapp?${qs}`;
   }
 
   function goToDashboard() {
-    setAppMode("dashboard");
-    setStep("services");
-    setSelectedService(null);
-    setSelectedDate("");
-    setSelectedSlot("");
-    setBookingResult(null);
-    setErrorMsg(null);
-    if (telegramId) fetchDashboardAppointments(telegramId, clinicIdRef.current);
+    // Dashboard URL navigation orqali — refresh qilsa ham dashboard qoladi
+    const qs = new URLSearchParams({ clinicId: clinicIdRef.current, mode: "dashboard" });
+    window.location.href = `/webapp?${qs}`;
   }
 
   // ─── Booking functions ─────────────────────────────────────────────────────
@@ -591,13 +600,16 @@ export default function WebApp() {
           )}
         </div>
 
-        {/* Sticky bottom bar — bronlash botga yo'naltiradi */}
+        {/* Sticky bottom bar */}
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pb-5 pt-3 bg-gray-50 border-t border-gray-100">
           <button
-            onClick={() => window.Telegram?.WebApp?.close()}
+            onClick={() => {
+              const qs = new URLSearchParams({ clinicId: clinicIdRef.current, mode: "booking" });
+              window.location.href = `/webapp?${qs}`;
+            }}
             className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
           >
-            ➕ Bron qilish (Botda)
+            ➕ Yangi bron qilish
           </button>
         </div>
       </div>
