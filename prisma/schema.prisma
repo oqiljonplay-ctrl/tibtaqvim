@@ -295,3 +295,15 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+model BotState {
+  telegramId String   @id
+  step       String
+  data       Json     @default("{}")
+  expiresAt  DateTime @default(dbgenerated("(now() + interval '30 minutes')")) @db.Timestamp(6)
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([expiresAt])
+  @@map("bot_states")
+}

@@ -48,7 +48,7 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
       `👋 *Qaytib keldingiz!*\n\n👤 Ism: *${savedUser.firstName}*\n📞 Tel: *${savedUser.phone}*${idLine}\n\nUshbu ma'lumotlardan foydalanasizmi?`,
       { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkWelcomeBackKeyboard() } }
     );
-    userState.set(chatId, {
+    await userState.set(chatId, {
       step: "welcome_back",
       clinicId: DEFAULT_CLINIC_ID,
       messageId: sent.message_id,
@@ -67,7 +67,7 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
     { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkServiceKeyboard(services) } }
   );
 
-  userState.set(chatId, {
+  await userState.set(chatId, {
     step: "select_service",
     clinicId: DEFAULT_CLINIC_ID,
     _services: services,

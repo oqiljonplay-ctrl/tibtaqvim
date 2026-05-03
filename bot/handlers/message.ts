@@ -14,7 +14,7 @@ import {
 export async function handleMessage(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
   const text = msg.text?.trim() || "";
-  const state = userState.get(chatId);
+  const state = await userState.get(chatId);
 
   if (!state || !state.step) {
     await bot.sendMessage(chatId, "Boshlash uchun /start ni bosing");
@@ -56,7 +56,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
             `👤 Ism: *${firstName}*\n📞 Tel: *${phone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
             { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkAddressKeyboard() } }
           );
-          userState.set(chatId, { ...updatedState, step: "enter_address", messageId: sent.message_id });
+          await userState.set(chatId,{ ...updatedState, step: "enter_address", messageId: sent.message_id });
         } else {
           const confirmState = { ...updatedState, step: "confirm" };
           const sent = await bot.sendMessage(
@@ -64,7 +64,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
             mkConfirmText(confirmState),
             { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkConfirmKeyboard() } }
           );
-          userState.set(chatId, { ...confirmState, messageId: sent.message_id });
+          await userState.set(chatId,{ ...confirmState, messageId: sent.message_id });
         }
         return;
       }
@@ -73,7 +73,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       const services = state._services || [];
       if (!services.length) {
         await bot.sendMessage(chatId, "⚠️ Hozirda mavjud xizmatlar yo'q. /start");
-        userState.delete(chatId);
+        await userState.delete(chatId);
         return;
       }
 
@@ -83,7 +83,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
         "🏥 Qaysi xizmatdan foydalanmoqchisiz?",
         { reply_markup: { inline_keyboard: mkServiceKeyboard(services) } }
       );
-      userState.set(chatId, {
+      await userState.set(chatId, {
         ...state,
         step: "select_service",
         patientName: firstName,
@@ -123,7 +123,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
           `👤 Ism: *${text}*\n📞 Tel: *${state.patientPhone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
           mkAddressKeyboard()
         );
-        userState.set(chatId, { ...state, patientName: text, step: "enter_address", messageId: newMsgId });
+        await userState.set(chatId,{ ...state, patientName: text, step: "enter_address", messageId: newMsgId });
       } else {
         const updatedState = { ...state, patientName: text, step: "confirm" };
         const newMsgId = await editOrSend(
@@ -131,7 +131,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
           mkConfirmText(updatedState),
           mkConfirmKeyboard()
         );
-        userState.set(chatId, { ...updatedState, messageId: newMsgId });
+        await userState.set(chatId,{ ...updatedState, messageId: newMsgId });
       }
       return;
     }
@@ -149,7 +149,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       "👇 Kontaktni ulashish tugmasini bosing:",
       { parse_mode: "Markdown", reply_markup: mkContactKeyboard() as any }
     );
-    userState.set(chatId, { ...state, patientName: text, step: "share_contact", messageId: newMsgId });
+    await userState.set(chatId, { ...state, patientName: text, step: "share_contact", messageId: newMsgId });
     return;
   }
 
@@ -169,7 +169,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       mkConfirmText(updatedState),
       mkConfirmKeyboard()
     );
-    userState.set(chatId, { ...updatedState, messageId: newMsgId });
+    await userState.set(chatId, { ...updatedState, messageId: newMsgId });
     return;
   }
 }

@@ -1,12 +1,15 @@
-export const userState: Map<number, any> = new Map();
+// DB-backed userState — in-memory Map o'rniga PostgreSQL
+// Barcha handlerda userState.get/set/delete chaqiruvlariga await qo'shildi
 
-const STATE_TTL_MS = 30 * 60 * 1000;
+import { getState, setState, deleteState, maybeCleanup } from "./state/dbState";
 
-export function cleanExpiredState(): void {
-  const now = Date.now();
-  for (const [chatId, state] of userState.entries()) {
-    if (state._createdAt && now - state._createdAt > STATE_TTL_MS) {
-      userState.delete(chatId);
-    }
-  }
-}
+export const userState = {
+  get: (chatId: number) => getState(chatId),
+  set: (chatId: number, state: any) => setState(chatId, state),
+  delete: (chatId: number) => deleteState(chatId),
+};
+
+export { maybeCleanup };
+
+// Eski cleanExpiredState — DB expiresAt boshqaradi
+export function cleanExpiredState(): void {}

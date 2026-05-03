@@ -22,7 +22,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   }
 
   let data = query.data || "";
-  const state = userState.get(chatId) || {};
+  const state = await userState.get(chatId) || {};
 
   const msgId: number | undefined = query.message?.message_id ?? state.messageId;
 
@@ -65,7 +65,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   // ─── TTL check ────────────────────────────────────────────────────────────
   if (data !== "confirm" && data !== "cancel" && state._createdAt) {
     if (Date.now() - state._createdAt > 30 * 60 * 1000) {
-      userState.delete(chatId);
+      await userState.delete(chatId);
       await bot.sendMessage(chatId, "⏰ Sessiya muddati tugadi. Qaytadan boshlang:\n\n/start");
       return;
     }
@@ -103,7 +103,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       "🏥 *ClinicBot ga xush kelibsiz!*\n\nQaysi xizmatdan foydalanmoqchisiz?",
       mkServiceKeyboard(services)
     );
-    userState.set(chatId, {
+    await userState.set(chatId,{
       step: "select_service",
       clinicId,
       messageId: newMsgId,
@@ -135,7 +135,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         "🏥 *ClinicBot ga xush kelibsiz!*\n\nQaysi xizmatdan foydalanmoqchisiz?",
         mkServiceKeyboard(services)
       );
-      userState.set(chatId, {
+      await userState.set(chatId,{
         ...state,
         step: "select_service",
         messageId: newMsgId,
@@ -160,7 +160,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         "📅 Qaysi kunga yozilmoqchisiz?",
         mkDateKeyboard()
       );
-      userState.set(chatId, {
+      await userState.set(chatId,{
         ...state,
         step: "select_date",
         messageId: newMsgId,
@@ -182,7 +182,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           "👨‍⚕️ Shifokorni tanlang:",
           mkDoctorKeyboard(_doctors)
         );
-        userState.set(chatId, {
+        await userState.set(chatId,{
           ...state,
           step: "select_doctor_or_slot",
           messageId: newMsgId,
@@ -198,7 +198,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           "🕐 Bo'sh vaqtni tanlang:",
           mkSlotKeyboard(_slots)
         );
-        userState.set(chatId, {
+        await userState.set(chatId,{
           ...state,
           step: "select_doctor_or_slot",
           messageId: newMsgId,
@@ -215,7 +215,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           "📅 Qaysi kunga yozilmoqchisiz?",
           mkDateKeyboard()
         );
-        userState.set(chatId, {
+        await userState.set(chatId,{
           ...state,
           step: "select_date",
           messageId: newMsgId,
@@ -237,7 +237,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         mkNameKeyboard(state._nameBack || "select_date")
       );
       // patientPhone saqlab qolamiz — qaytib kelgan user kontaktni qayta ulashmasin
-      userState.set(chatId, {
+      await userState.set(chatId,{
         ...state,
         step: "enter_name",
         messageId: newMsgId,
@@ -266,7 +266,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       "📅 Qaysi kunga yozilmoqchisiz?",
       mkDateKeyboard()
     );
-    userState.set(chatId, {
+    await userState.set(chatId,{
       ...state,
       clinicId,
       serviceId,
@@ -297,7 +297,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           "👨‍⚕️ Shifokorni tanlang:",
           mkDoctorKeyboard(doctors)
         );
-        userState.set(chatId, {
+        await userState.set(chatId,{
           ...state,
           date: selectedDate,
           step: "select_doctor_or_slot",
@@ -317,14 +317,14 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           mkConfirmText(confirmState),
           mkConfirmKeyboard()
         );
-        userState.set(chatId, { ...confirmState, messageId: newMsgId });
+        await userState.set(chatId,{ ...confirmState, messageId: newMsgId });
       } else {
         const newMsgId = await editOrSend(
           bot, chatId, msgId,
           "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
           mkNameKeyboard("select_date")
         );
-        userState.set(chatId, {
+        await userState.set(chatId,{
           ...state,
           date: selectedDate,
           step: "enter_name",
@@ -344,7 +344,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           `👤 Ism: *${state.patientName}*\n📞 Tel: *${state.patientPhone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
           mkAddressKeyboard()
         );
-        userState.set(chatId, {
+        await userState.set(chatId,{
           ...state,
           date: selectedDate,
           step: "enter_address",
@@ -356,7 +356,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
           mkNameKeyboard("select_date")
         );
-        userState.set(chatId, {
+        await userState.set(chatId,{
           ...state,
           date: selectedDate,
           step: "enter_name",
@@ -388,14 +388,14 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           mkConfirmText(confirmState),
           mkConfirmKeyboard()
         );
-        userState.set(chatId, { ...confirmState, messageId: newMsgId });
+        await userState.set(chatId,{ ...confirmState, messageId: newMsgId });
       } else {
         const newMsgId = await editOrSend(
           bot, chatId, msgId,
           "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
           mkNameKeyboard("select_date")
         );
-        userState.set(chatId, {
+        await userState.set(chatId,{
           ...state,
           date: selectedDate,
           step: "enter_name",
@@ -417,7 +417,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         "🕐 Bo'sh vaqtni tanlang:",
         mkSlotKeyboard(available)
       );
-      userState.set(chatId, {
+      await userState.set(chatId,{
         ...state,
         date: selectedDate,
         step: "select_doctor_or_slot",
@@ -431,7 +431,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         "😔 *Bu kunda bo'sh vaqt mavjud emas.*\n\nBoshqa kunni tanlang:",
         mkDateKeyboard()
       );
-      userState.set(chatId, {
+      await userState.set(chatId,{
         ...state,
         step: "select_date",
         messageId: newMsgId,
@@ -459,14 +459,14 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         mkConfirmText(confirmState),
         mkConfirmKeyboard()
       );
-      userState.set(chatId, { ...confirmState, messageId: newMsgId });
+      await userState.set(chatId,{ ...confirmState, messageId: newMsgId });
     } else {
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
         "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
         mkNameKeyboard("select_doctor_or_slot")
       );
-      userState.set(chatId, {
+      await userState.set(chatId,{
         ...state,
         doctorId: resolvedDoctorId,
         step: "enter_name",
@@ -493,14 +493,14 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         mkConfirmText(confirmState),
         mkConfirmKeyboard()
       );
-      userState.set(chatId, { ...confirmState, messageId: newMsgId });
+      await userState.set(chatId,{ ...confirmState, messageId: newMsgId });
     } else {
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
         "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
         mkNameKeyboard("select_doctor_or_slot")
       );
-      userState.set(chatId, {
+      await userState.set(chatId,{
         ...state,
         slotId,
         step: "enter_name",
@@ -515,19 +515,19 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   if (data === "confirm") {
     if (state.step !== "confirm") {
       await bot.sendMessage(chatId, "❌ Eskirgan havola. Qaytadan boshlang:\n\n/start");
-      userState.delete(chatId);
+      await userState.delete(chatId);
       return;
     }
     const { clinicId, serviceId, doctorId, slotId, date, patientName, patientPhone, address } = state;
     if (!clinicId || !serviceId || !date || !patientName || !patientPhone) {
       await bot.sendMessage(chatId, "❌ Ma'lumotlar to'liq emas. /start ni bosing.");
-      userState.delete(chatId);
+      await userState.delete(chatId);
       return;
     }
 
     // BUG FIX: mark in-progress BEFORE async call to prevent double-booking.
     // State is deleted AFTER bookAppointment returns (success or error).
-    userState.set(chatId, { ...state, step: "booking_in_progress" });
+    await userState.set(chatId,{ ...state, step: "booking_in_progress" });
 
     if (msgId) {
       try {
@@ -555,7 +555,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     });
 
     // Delete state after booking completes (not before)
-    userState.delete(chatId);
+    await userState.delete(chatId);
 
     if (result.success) {
       const a = result.data;
@@ -619,7 +619,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
 
   // ─── cancel ───────────────────────────────────────────────────────────────
   if (data === "cancel") {
-    userState.delete(chatId);
+    await userState.delete(chatId);
     const cancelText = "❌ *Bekor qilindi.*\n\nQaytadan boshlash: /start";
     if (msgId) {
       try {
@@ -639,7 +639,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
 
   // ─── unknown / stale ──────────────────────────────────────────────────────
   await bot.sendMessage(chatId, "⚠️ Eskirgan havola. Qaytadan boshlang:\n\n/start");
-  userState.delete(chatId);
+  await userState.delete(chatId);
 }
 
 // ─── Private ──────────────────────────────────────────────────────────────────
