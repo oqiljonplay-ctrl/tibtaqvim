@@ -116,7 +116,7 @@ export function mkServiceKeyboard(services: any[], showWebAppInline = false, cha
 export function mkWelcomeBackKeyboard(): InlineKeyboardButton[][] {
   return [[
     { text: "✅ Ha, davom etish", callback_data: "use_saved" },
-    { text: "✏️ O'zgartirish", callback_data: "change_info" },
+    { text: "👨‍👩‍👧 Qaramog'imda", callback_data: "change_info" },
   ]];
 }
 
