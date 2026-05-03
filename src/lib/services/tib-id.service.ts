@@ -2,10 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { normalizePhone } from "@/lib/utils/phone";
 
-function formatTibId(n: number): string {
-  return "tib" + String(n).padStart(6, "0");
-}
-
 // ─── In-memory cache (TTL: 2 daqiqa) ─────────────────────────────────────────
 const CACHE_TTL = 2 * 60 * 1000;
 interface CacheEntry { tibId: string; expiry: number }
@@ -24,7 +20,7 @@ function setCache(key: string, tibId: string): void {
 
 // ─── Assignment ───────────────────────────────────────────────────────────────
 
-// Concurrent-safe: unique constraint retry
+// DB sequence orqali atomic tibId olish — race condition yo'q
 export async function assignTibId(userId: string): Promise<string | null> {
   const existing = await prisma.user.findUnique({
     where: { id: userId },
@@ -32,20 +28,21 @@ export async function assignTibId(userId: string): Promise<string | null> {
   });
   if (existing?.tibId) return existing.tibId;
 
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      const count = await prisma.user.count({ where: { tibId: { not: null } } });
-      const tibId = formatTibId(count + 1);
-      await prisma.user.update({ where: { id: userId }, data: { tibId } });
-      logger.info("tibId assigned", { userId, tibId });
-      return tibId;
-    } catch (err: any) {
-      if (err?.code === "P2002" && attempt < 4) continue;
-      logger.error("assignTibId failed", { userId, error: String(err) });
-      return null;
-    }
+  try {
+    // next_tib_id() — PostgreSQL sequence, har chaqiruvda unikal qiymat
+    const rows = await prisma.$queryRaw<[{ next_tib_id: string }]>`
+      SELECT next_tib_id()
+    `;
+    const tibId = rows[0]?.next_tib_id;
+    if (!tibId) throw new Error("next_tib_id() returned null");
+
+    await prisma.user.update({ where: { id: userId }, data: { tibId } });
+    logger.info("tibId assigned", { userId, tibId });
+    return tibId;
+  } catch (err: any) {
+    logger.error("assignTibId failed", { userId, error: String(err) });
+    return null;
   }
-  return null;
 }
 
 // ─── Lookups (with cache) ──────────────────────────────────────────────────────
