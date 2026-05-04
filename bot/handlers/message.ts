@@ -22,32 +22,142 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
 
   // ─── Joylashuv (Location) ─────────────────────────────────────────────────
   if (msg.location) {
-    if (!state || state.step !== "awaiting_location") return;
+    if (!state || state.step !== "awaiting_location") {
+      await bot.sendMessage(
+        chatId,
+        "📍 Joylashuv qabul qilindi, lekin aktiv bron topilmadi.\n\nAgar uyda bemor ko'rish uchun joylashuv yuborayotgan bo'lsangiz, avval bron qiling.",
+        { reply_markup: mkWebAppReplyKeyboard(chatId) as any }
+      );
+      return;
+    }
     const appointmentId = state.appointmentId as string | undefined;
     if (!appointmentId) {
-      await bot.sendMessage(chatId, "❌ Appointment topilmadi. Iltimos, /start bosing.");
+      await bot.sendMessage(chatId, "❌ Bron topilmadi. /start bosing.");
       await userState.delete(chatId);
       return;
     }
-    await prisma.appointment.update({
-      where: { id: appointmentId },
-      data: {
-        locationLat: msg.location.latitude,
-        locationLng: msg.location.longitude,
-        locationLivePeriod: (msg.location as any).live_period ?? null,
-        locationSharedAt: new Date(),
-      },
-    });
-    const livePeriod = (msg.location as any).live_period as number | undefined;
-    const durationText = livePeriod
-      ? `\n⏱️ Davomiyligi: ${Math.round(livePeriod / 60)} daqiqa`
-      : "";
-    await bot.sendMessage(
-      chatId,
-      `✅ *Joylashuv qabul qilindi*\n\n📍 Doktor sizning manzilingizga yetib boradi.${durationText}\n\nKlinika tez orada siz bilan bog'lanadi.`,
-      { parse_mode: "Markdown", reply_markup: mkWebAppReplyKeyboard(chatId) as any }
-    );
-    await userState.delete(chatId);
+    try {
+      await prisma.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          locationLat: msg.location.latitude,
+          locationLng: msg.location.longitude,
+          locationLivePeriod: (msg.location as any).live_period ?? null,
+          locationSharedAt: new Date(),
+        },
+      });
+      const livePeriod = (msg.location as any).live_period as number | undefined;
+      const durationText = livePeriod
+        ? `\n⏱️ Davomiyligi: ${Math.round(livePeriod / 60)} daqiqa`
+        : "";
+      await bot.sendMessage(
+        chatId,
+        `✅ *Joylashuv qabul qilindi!*\n\n📍 Doktor sizning manzilingizga yetib boradi.${durationText}\n\nKlinika tez orada siz bilan bog'lanadi.`,
+        { parse_mode: "Markdown", reply_markup: mkWebAppReplyKeyboard(chatId) as any }
+      );
+      await userState.delete(chatId);
+    } catch (err) {
+      console.error("[location] DB write failed:", err);
+      await bot.sendMessage(
+        chatId,
+        "❌ Joylashuvni saqlashda xatolik. Iltimos qayta urining yoki klinikaga qo'ng'iroq qiling."
+      );
+    }
+    return;
+  }
+
+  // ─── awaiting_location holati — matn handlerlari ──────────────────────────
+  if (state?.step === "awaiting_location") {
+    // GPS yordam
+    if (text === "❓ GPS yordam") {
+      await bot.sendMessage(
+        chatId,
+        "📱 *GPS qanday yoqiladi?*\n\n" +
+        "*Android uchun:*\n" +
+        "1️⃣ Telefoningizning yuqori menyusini tushiring\n" +
+        "2️⃣ \"📍\" (joylashuv) belgisini bosing — yashilga aylansin\n" +
+        "3️⃣ Yoki: Sozlamalar → \"Joylashuv\" yoki \"Location\"\n" +
+        "4️⃣ Yoqing\n" +
+        "5️⃣ Botga qayting va \"📍 Joylashuvni yuborish\"ni bosing\n\n" +
+        "*iPhone uchun:*\n" +
+        "1️⃣ Sozlamalar → Maxfiylik va xavfsizlik\n" +
+        "2️⃣ Joylashuv xizmatlari → Yoqing\n" +
+        "3️⃣ Telegram bo'limini toping → \"Foydalanish paytida\"\n" +
+        "4️⃣ Botga qayting va qayta urining\n\n" +
+        "_Agar muammo davom etsa, klinikaga telefon orqali bog'laning._",
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            keyboard: [
+              [{ text: "📍 Joylashuvni yuborish", request_location: true }],
+              [{ text: "🔄 Qayta urinib ko'rish" }, { text: "⏭️ Keyinroq yuboraman" }],
+            ],
+            resize_keyboard: true,
+          } as any,
+        }
+      );
+      return;
+    }
+
+    // Qayta urinib ko'rish
+    if (text === "🔄 Qayta urinib ko'rish") {
+      const newCount = ((state.attemptCount as number) || 1) + 1;
+      await userState.set(chatId, {
+        ...state,
+        requestedAt: Date.now(),
+        attemptCount: newCount,
+      });
+      await bot.sendMessage(
+        chatId,
+        `📍 *${newCount}-urinish*\n\nTelefoningizda GPS yoqilganligini tasdiqlab, quyidagi tugmani bosing:`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            keyboard: [
+              [{ text: "📍 Joylashuvni yuborish", request_location: true }],
+              [{ text: "⏭️ Keyinroq yuboraman" }],
+            ],
+            resize_keyboard: true,
+          } as any,
+        }
+      );
+      return;
+    }
+
+    // Keyinroq yuboraman
+    if (text === "⏭️ Keyinroq yuboraman") {
+      await bot.sendMessage(
+        chatId,
+        "✅ Yaxshi.\n\nBron qilindi, lekin joylashuv yuborilmadi.\nKlinika xodimi siz bilan telefon orqali bog'lanadi.",
+        { reply_markup: mkWebAppReplyKeyboard(chatId) as any }
+      );
+      await userState.delete(chatId);
+      return;
+    }
+
+    // Boshqa matn — stateless timeout tekshirish
+    const requestedAt = state.requestedAt as number | undefined;
+    if (requestedAt) {
+      const elapsedSec = Math.round((Date.now() - requestedAt) / 1000);
+      if (elapsedSec > 60) {
+        await bot.sendMessage(
+          chatId,
+          `⏱️ *${elapsedSec} sekund oldin joylashuv so'ragandik, lekin kelmadi.*\n\n` +
+          "GPS yoqilganligini tekshiring va qayta urining:",
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              keyboard: [
+                [{ text: "📍 Joylashuvni yuborish", request_location: true }],
+                [{ text: "❓ GPS yordam" }, { text: "⏭️ Keyinroq yuboraman" }],
+              ],
+              resize_keyboard: true,
+            } as any,
+          }
+        );
+        return;
+      }
+    }
     return;
   }
 
@@ -317,14 +427,4 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  // ─── Keyinroq yuboraman ───────────────────────────────────────────────────
-  if (text === "⏭️ Keyinroq yuboraman") {
-    await bot.sendMessage(
-      chatId,
-      "Yaxshi. Joylashuvni keyinroq yuborishingiz mumkin.\n\nKlinika xodimi siz bilan telefon orqali bog'lanadi.",
-      { reply_markup: mkWebAppReplyKeyboard(chatId) as any }
-    );
-    await userState.delete(chatId);
-    return;
-  }
 }

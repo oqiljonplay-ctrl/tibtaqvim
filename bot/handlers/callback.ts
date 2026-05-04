@@ -752,10 +752,17 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         await userState.set(chatId, {
           step: "awaiting_location",
           appointmentId: result.data.id,
+          requestedAt: Date.now(),
+          attemptCount: 1,
         });
         await bot.sendMessage(
           chatId,
-          "📍 *Joylashuvingizni ulashing*\n\nDoktor sizning uyingizga borishi uchun *jonli joylashuvni* (Live Location) yuboring.\n\n👉 Skrepka (📎) → *Joylashuv* → *Live location* → kamida *1 soat*\n\nYoki oddiy joylashuv ham yuborishingiz mumkin.",
+          "📍 *Joylashuvingizni yuboring*\n\n" +
+          "Doktor sizga yetib borishi uchun joylashuvingiz kerak.\n\n" +
+          "⚠️ *MUHIM:* Avval telefoningizda GPS (joylashuv) yoqilganligini tekshiring!\n\n" +
+          "📱 *Android:* Sozlamalar → Joylashuv → Yoqing\n" +
+          "📱 *iPhone:* Sozlamalar → Maxfiylik → Joylashuv xizmatlari → Yoqing\n\n" +
+          "Tayyor bo'lganingizda quyidagi tugmani bosing:",
           { parse_mode: "Markdown", reply_markup: mkLocationKeyboard() as any }
         );
       }
