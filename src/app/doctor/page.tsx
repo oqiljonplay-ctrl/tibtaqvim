@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import LocationButtons from "@/components/LocationButtons";
 
 interface Appointment {
   id: string; patientName: string; patientPhone: string;
   queueNumber: number | null; status: string; address: string | null;
+  locationLat?: number | null; locationLng?: number | null;
   service: { name: string; type: string };
   slot: { startTime: string; endTime: string } | null;
   user: { tibId: string | null } | null;
@@ -169,6 +171,11 @@ function AppointmentCard({
           <div className="text-xs text-gray-400 mt-0.5">{a.service.name}</div>
           {a.slot && <div className="text-xs text-blue-500">🕐 {a.slot.startTime} — {a.slot.endTime}</div>}
           {a.address && <div className="text-xs text-orange-500">📍 {a.address}</div>}
+          {a.service.type === "home_service" && (
+            <div className="mt-2">
+              <LocationButtons locationLat={a.locationLat} locationLng={a.locationLng} address={a.address} />
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">

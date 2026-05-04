@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import LocationButtons from "@/components/LocationButtons";
 
 interface Appointment {
   id: string; patientName: string; patientPhone: string;
   queueNumber: number | null; status: string; address: string | null;
+  locationLat?: number | null; locationLng?: number | null;
   createdAt: string;
   service: { name: string; type: string };
   doctor: { firstName: string; lastName: string } | null;
@@ -235,6 +237,11 @@ export default function ReceptionPage() {
                       <div className="font-medium text-gray-900">{a.patientName}</div>
                       <div className="text-xs text-gray-400">{a.patientPhone}</div>
                       {a.address && <div className="text-xs text-orange-500 mt-0.5">📍 {a.address}</div>}
+                      {a.service.type === "home_service" && (
+                        <div className="mt-2">
+                          <LocationButtons locationLat={a.locationLat} locationLng={a.locationLng} address={a.address} />
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 hidden md:table-cell">
                       {a.user?.tibId
