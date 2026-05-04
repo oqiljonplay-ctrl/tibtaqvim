@@ -1,7 +1,7 @@
 import TelegramBot, { Message } from "node-telegram-bot-api";
 import { userState } from "../state";
-import { registerPatient, fetchServices, fetchUserByTelegramId } from "../api";
-import { normalizePhone } from "../../src/lib/utils/phone";
+import { fetchServices, fetchUserByTelegramId } from "../api";
+import { normalizePhone, isValidUzbekPhone } from "../helpers/phone";
 import { prisma } from "@/lib/prisma";
 import {
   editOrSend,
@@ -95,24 +95,97 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
   if (state.step === "share_contact") {
     if (msg.contact) {
       const rawPhone = msg.contact.phone_number || "";
-      const phone = normalizePhone(rawPhone.startsWith("+") ? rawPhone : `+${rawPhone}`);
-      // Ism state dan olish (mid-booking) yoki kontaktdan
+      const phone = normalizePhone(rawPhone);
       const firstName = state.patientName || msg.contact.first_name || msg.from?.first_name || "Foydalanuvchi";
+      const lastName = msg.contact?.last_name || msg.from?.last_name || null;
+      const tgId = String(chatId);
+      const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
 
-      const reg = await registerPatient({
-        phone,
-        firstName,
-        telegramId: chatId,
-        clinicId: state.clinicId,
-      });
-      const tibId = reg.tibId;
+      // Phone validatsiyasi
+      if (!phone || !isValidUzbekPhone(phone)) {
+        await bot.sendMessage(
+          chatId,
+          "❌ Telefon raqami noto'g'ri formatda.\n\nIltimos, O'zbekiston raqamingizni yuboring (+998XXXXXXXXX).",
+          { reply_markup: mkContactKeyboard() as any }
+        );
+        return;
+      }
 
-      // Reply keyboardni olib tashlash
-      await bot.sendMessage(
-        chatId,
-        `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 ID: *${tibId}*` : ""}`,
-        { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
-      );
+      let tibId: string | null = null;
+      let relinkNotified = false;
+
+      // ─── 1-tekshiruv: Telegram ID bilan user bormi? ───────────────────────
+      const userByTgId = await prisma.user.findUnique({ where: { telegramId: tgId } });
+
+      if (userByTgId) {
+        if (userByTgId.phone !== phone) {
+          const conflict = await prisma.user.findUnique({ where: { phone } });
+          if (conflict && conflict.id !== userByTgId.id) {
+            await bot.sendMessage(
+              chatId,
+              "❌ Bu telefon raqami boshqa profilga bog'langan.\n\nIltimos, klinikaga murojaat qiling."
+            );
+            return;
+          }
+          await prisma.user.update({
+            where: { id: userByTgId.id },
+            data: { phone, firstName, lastName: lastName ?? undefined },
+          });
+        }
+        tibId = userByTgId.tibId;
+      } else {
+        // ─── 2-tekshiruv: Bu telefon bilan eski user bormi? ─────────────────
+        const userByPhone = await prisma.user.findUnique({ where: { phone } });
+
+        if (userByPhone) {
+          // Eski profil — yangi Telegram'ga bog'lash
+          await prisma.telegramIdHistory.create({
+            data: {
+              userId: userByPhone.id,
+              tibId: userByPhone.tibId || "",
+              oldTelegramId: userByPhone.telegramId,
+              newTelegramId: tgId,
+              reason: "auto-relink-via-phone",
+            },
+          });
+          await prisma.user.update({
+            where: { id: userByPhone.id },
+            data: {
+              telegramId: tgId,
+              firstName: firstName || userByPhone.firstName,
+              lastName: lastName ?? undefined,
+            },
+          });
+          tibId = userByPhone.tibId;
+          relinkNotified = true;
+          await bot.sendMessage(
+            chatId,
+            `✅ *Xush kelibsiz!*\n\n🔄 Avvalgi profilingiz topildi va yangi Telegram'ga ulandi.\n\n🆔 ID: *${userByPhone.tibId}*\n📞 Tel: ${phone}\n👤 Ism: ${firstName}\n\nBarcha avvalgi bronlaringiz va ma'lumotlaringiz saqlanib qolgan.`,
+            { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
+          );
+        } else {
+          // ─── 3: Yangi user yaratish ──────────────────────────────────────
+          const newUser = await prisma.user.create({
+            data: {
+              telegramId: tgId,
+              phone,
+              firstName,
+              lastName: lastName ?? undefined,
+              role: "patient",
+              clinicId: clinicId || undefined,
+            },
+          });
+          tibId = newUser.tibId;
+        }
+      }
+
+      if (!relinkNotified) {
+        await bot.sendMessage(
+          chatId,
+          `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 ID: *${tibId}*` : ""}`,
+          { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
+        );
+      }
 
       // Mid-booking context: patientName + booking data already in state
       if (state.patientName && state.date) {
@@ -124,7 +197,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
             `👤 Ism: *${firstName}*\n📞 Tel: *${phone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
             { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkAddressKeyboard() } }
           );
-          await userState.set(chatId,{ ...updatedState, step: "enter_address", messageId: sent.message_id });
+          await userState.set(chatId, { ...updatedState, step: "enter_address", messageId: sent.message_id });
         } else {
           const confirmState = { ...updatedState, step: "confirm" };
           const sent = await bot.sendMessage(
@@ -132,7 +205,7 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
             mkConfirmText(confirmState),
             { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkConfirmKeyboard() } }
           );
-          await userState.set(chatId,{ ...confirmState, messageId: sent.message_id });
+          await userState.set(chatId, { ...confirmState, messageId: sent.message_id });
         }
         return;
       }

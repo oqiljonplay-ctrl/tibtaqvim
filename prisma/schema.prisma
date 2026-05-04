@@ -152,7 +152,7 @@ model User {
   clinicId     String?
   telegramId   String?  @unique
   tibId        String?  @unique
-  phone        String?
+  phone        String?  @unique
   firstName    String
   lastName     String?
   role         UserRole @default(patient)
@@ -161,10 +161,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  clinic       Clinic?       @relation(fields: [clinicId], references: [id])
-  doctor       Doctor?
-  staff        Staff?
-  appointments Appointment[]
+  clinic             Clinic?             @relation(fields: [clinicId], references: [id])
+  doctor             Doctor?
+  staff              Staff?
+  appointments       Appointment[]
+  telegramIdHistory  TelegramIdHistory[]
 
   @@index([clinicId])
   @@index([telegramId])
@@ -298,6 +299,22 @@ model AuditLog {
   @@index([actorId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model TelegramIdHistory {
+  id            Int      @id @default(autoincrement())
+  userId        String
+  tibId         String
+  oldTelegramId String?
+  newTelegramId String
+  reason        String?
+  changedAt     DateTime @default(now()) @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tibId])
+  @@map("telegram_id_history")
 }
 
 model BotState {
