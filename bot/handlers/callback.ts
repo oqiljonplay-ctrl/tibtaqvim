@@ -1,6 +1,8 @@
 import TelegramBot, { CallbackQuery } from "node-telegram-bot-api";
 import { fetchDoctors, fetchSlots, bookAppointment, registerPatient, fetchServices, fetchUserByTelegramId } from "../api";
 import { userState } from "../state";
+import { prisma } from "@/lib/prisma";
+import { archivePhone, isArchivedPhone } from "../helpers/phone";
 import {
   editOrSend,
   mkServiceKeyboard,
@@ -70,6 +72,155 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       await bot.sendMessage(chatId, "⏰ Sessiya muddati tugadi. Qaytadan boshlang:\n\n/start");
       return;
     }
+  }
+
+  // ─── relink_yes — eski profil tiklash ────────────────────────────────────
+  if (data === "relink_yes") {
+    if (!state || state.step !== "awaiting_relink_decision") {
+      await bot.answerCallbackQuery(query.id, { text: "Sessiya muddati o'tdi. /start bosing." });
+      return;
+    }
+
+    const { existingUserId, existingTibId, pendingFirstName, pendingLastName } = state;
+    const tgId = String(chatId);
+
+    const existingUser = await prisma.user.findUnique({ where: { id: existingUserId } });
+    if (!existingUser) {
+      await bot.answerCallbackQuery(query.id, { text: "Profil topilmadi" });
+      await userState.delete(chatId);
+      return;
+    }
+
+    await prisma.telegramIdHistory.create({
+      data: {
+        userId: existingUserId,
+        tibId: existingTibId || "",
+        oldTelegramId: existingUser.telegramId,
+        newTelegramId: tgId,
+        reason: "user-confirmed-relink",
+      },
+    });
+
+    await prisma.user.update({
+      where: { id: existingUserId },
+      data: {
+        telegramId: tgId,
+        firstName: pendingFirstName || existingUser.firstName,
+        lastName: pendingLastName || existingUser.lastName || undefined,
+      },
+    });
+
+    const successText = `✅ *Eski profilingiz tiklandi!*\n\n🆔 ID: *${existingTibId}*\n📞 ${existingUser.phone}\n\nBarcha avvalgi bronlaringiz va ma'lumotlaringiz saqlanib qolgan.`;
+
+    if (msgId) {
+      try {
+        await (bot as any).editMessageText(successText, {
+          chat_id: chatId, message_id: msgId, parse_mode: "Markdown",
+        });
+      } catch {
+        await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+      }
+    } else {
+      await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+    }
+
+    await userState.delete(chatId);
+
+    // Xizmatlarni ko'rsatish
+    const defaultClinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
+    let services = state._services;
+    if (!services?.length) {
+      const fetched = await fetchServices(defaultClinicId, today);
+      services = fetched.services;
+    }
+    if (services?.length) {
+      const sent = await bot.sendMessage(chatId, "🏥 Qaysi xizmatdan foydalanmoqchisiz?", {
+        reply_markup: { inline_keyboard: mkServiceKeyboard(services) },
+      });
+      await userState.set(chatId, {
+        step: "select_service",
+        clinicId: defaultClinicId,
+        _services: services,
+        messageId: sent.message_id,
+        _createdAt: Date.now(),
+        patientName: pendingFirstName,
+        patientPhone: state.pendingPhone,
+      });
+    }
+    return;
+  }
+
+  // ─── relink_no — yangi profil yaratish ───────────────────────────────────
+  if (data === "relink_no") {
+    if (!state || state.step !== "awaiting_relink_decision") {
+      await bot.answerCallbackQuery(query.id, { text: "Sessiya muddati o'tdi. /start bosing." });
+      return;
+    }
+
+    const { existingUserId, pendingPhone, pendingFirstName, pendingLastName } = state;
+    const tgId = String(chatId);
+
+    // Eski user telefonini arxivlaymiz
+    const existingUser = await prisma.user.findUnique({ where: { id: existingUserId } });
+    if (existingUser?.phone && !isArchivedPhone(existingUser.phone)) {
+      await prisma.user.update({
+        where: { id: existingUserId },
+        data: { phone: archivePhone(existingUser.phone) },
+      });
+    }
+
+    // Yangi user yaratamiz
+    const defaultClinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
+    const newUser = await prisma.user.create({
+      data: {
+        telegramId: tgId,
+        phone: pendingPhone,
+        firstName: pendingFirstName || "Foydalanuvchi",
+        lastName: pendingLastName ?? undefined,
+        role: "patient",
+        clinicId: defaultClinicId || undefined,
+      },
+    });
+
+    const successText = `✅ *Yangi profil yaratildi!*\n\n🆔 ID: *${newUser.tibId}*\n📞 ${pendingPhone}\n\nKlinikaga kelganda ushbu ID ni ko'rsating.`;
+
+    if (msgId) {
+      try {
+        await (bot as any).editMessageText(successText, {
+          chat_id: chatId, message_id: msgId, parse_mode: "Markdown",
+        });
+      } catch {
+        await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+      }
+    } else {
+      await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+    }
+
+    await userState.delete(chatId);
+
+    // Xizmatlarni ko'rsatish
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
+    let services = state._services;
+    if (!services?.length) {
+      const fetched = await fetchServices(defaultClinicId, today);
+      services = fetched.services;
+    }
+    if (services?.length) {
+      const sent = await bot.sendMessage(chatId, "🏥 Qaysi xizmatdan foydalanmoqchisiz?", {
+        reply_markup: { inline_keyboard: mkServiceKeyboard(services) },
+      });
+      await userState.set(chatId, {
+        step: "select_service",
+        clinicId: defaultClinicId,
+        _services: services,
+        messageId: sent.message_id,
+        _createdAt: Date.now(),
+        patientName: pendingFirstName,
+        patientPhone: pendingPhone,
+      });
+    }
+    return;
   }
 
   // ─── use_saved / change_info — welcome back flow ─────────────────────────

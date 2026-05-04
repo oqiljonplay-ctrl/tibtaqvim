@@ -37,3 +37,14 @@ export function isValidUzbekPhone(phone: string): boolean {
   const normalized = normalizePhone(phone);
   return normalized !== null && /^\+998\d{9}$/.test(normalized);
 }
+
+const ARCHIVED_PREFIX = "[archived]";
+
+export function archivePhone(phone: string): string {
+  const timestamp = new Date().toISOString().split(".")[0];
+  return `${ARCHIVED_PREFIX}_${timestamp}_${phone}`;
+}
+
+export function isArchivedPhone(phone: string | null): boolean {
+  return phone !== null && phone.startsWith(ARCHIVED_PREFIX);
+}

@@ -112,7 +112,6 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       }
 
       let tibId: string | null = null;
-      let relinkNotified = false;
 
       // ─── 1-tekshiruv: Telegram ID bilan user bormi? ───────────────────────
       const userByTgId = await prisma.user.findUnique({ where: { telegramId: tgId } });
@@ -138,31 +137,37 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
         const userByPhone = await prisma.user.findUnique({ where: { phone } });
 
         if (userByPhone) {
-          // Eski profil — yangi Telegram'ga bog'lash
-          await prisma.telegramIdHistory.create({
-            data: {
-              userId: userByPhone.id,
-              tibId: userByPhone.tibId || "",
-              oldTelegramId: userByPhone.telegramId,
-              newTelegramId: tgId,
-              reason: "auto-relink-via-phone",
-            },
+          // Bu telefon boshqa profilga tegishli — foydalanuvchidan so'raymiz
+          const maskedName = userByPhone.firstName
+            ? userByPhone.firstName.charAt(0) + "***" + (userByPhone.firstName.slice(-1) || "")
+            : "***";
+
+          await userState.set(chatId, {
+            step: "awaiting_relink_decision",
+            pendingPhone: phone,
+            pendingFirstName: firstName,
+            pendingLastName: lastName,
+            existingUserId: userByPhone.id,
+            existingTibId: userByPhone.tibId,
+            clinicId,
+            _services: state._services,
+            _createdAt: Date.now(),
           });
-          await prisma.user.update({
-            where: { id: userByPhone.id },
-            data: {
-              telegramId: tgId,
-              firstName: firstName || userByPhone.firstName,
-              lastName: lastName ?? undefined,
-            },
-          });
-          tibId = userByPhone.tibId;
-          relinkNotified = true;
+
           await bot.sendMessage(
             chatId,
-            `✅ *Xush kelibsiz!*\n\n🔄 Avvalgi profilingiz topildi va yangi Telegram'ga ulandi.\n\n🆔 ID: *${userByPhone.tibId}*\n📞 Tel: ${phone}\n👤 Ism: ${firstName}\n\nBarcha avvalgi bronlaringiz va ma'lumotlaringiz saqlanib qolgan.`,
-            { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
+            `🔍 *Bu telefon raqami avval ro'yxatdan o'tgan*\n\n📞 ${phone}\n👤 Egasi: ${maskedName}\n\nBu sizning eski profilingizmi?\n\nAgar HA bo'lsa — eski ID va bron tarixingiz tiklanadi.\nAgar YO'Q bo'lsa — yangi profil yaratiladi.`,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [[
+                  { text: "✅ Ha, mening profilim", callback_data: "relink_yes" },
+                  { text: "🆕 Yo'q, yangi boshlayman", callback_data: "relink_no" },
+                ]],
+              },
+            }
           );
+          return;
         } else {
           // ─── 3: Yangi user yaratish ──────────────────────────────────────
           const newUser = await prisma.user.create({
@@ -179,13 +184,11 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
         }
       }
 
-      if (!relinkNotified) {
-        await bot.sendMessage(
-          chatId,
-          `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 ID: *${tibId}*` : ""}`,
-          { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
-        );
-      }
+      await bot.sendMessage(
+        chatId,
+        `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 ID: *${tibId}*` : ""}`,
+        { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
+      );
 
       // Mid-booking context: patientName + booking data already in state
       if (state.patientName && state.date) {
