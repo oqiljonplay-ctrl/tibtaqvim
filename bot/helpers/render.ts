@@ -69,9 +69,24 @@ export async function editOrSend(
 // Pastki persistent tugma uchun (reply keyboard)
 export function mkWebAppReplyKeyboard(chatId?: number) {
   return {
-    keyboard: [[{ text: "👤 Profilim", web_app: { url: webAppUrl(chatId) } }]],
+    keyboard: [[
+      { text: "👤 Profilim", web_app: { url: webAppUrl(chatId) } },
+      { text: "🏠 Uyda bemor ko'rish" },
+    ]],
     resize_keyboard: true,
     one_time_keyboard: false,
+  };
+}
+
+// Joylashuv so'rash keyboard
+export function mkLocationKeyboard() {
+  return {
+    keyboard: [
+      [{ text: "📍 Joylashuvni yuborish", request_location: true }],
+      [{ text: "⏭️ Keyinroq yuboraman" }],
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: true,
   };
 }
 

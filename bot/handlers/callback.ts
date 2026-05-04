@@ -12,6 +12,7 @@ import {
   mkAddressKeyboard,
   mkConfirmKeyboard,
   mkConfirmText,
+  mkLocationKeyboard,
 } from "../helpers/render";
 
 export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
@@ -593,6 +594,19 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         }
       } else {
         await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+      }
+
+      // Uyda bemor ko'rish — joylashuv so'rash
+      if (state.serviceType === "home_service" && result.data?.id) {
+        await userState.set(chatId, {
+          step: "awaiting_location",
+          appointmentId: result.data.id,
+        });
+        await bot.sendMessage(
+          chatId,
+          "📍 *Joylashuvingizni ulashing*\n\nDoktor sizning uyingizga borishi uchun *jonli joylashuvni* (Live Location) yuboring.\n\n👉 Skrepka (📎) → *Joylashuv* → *Live location* → kamida *1 soat*\n\nYoki oddiy joylashuv ham yuborishingiz mumkin.",
+          { parse_mode: "Markdown", reply_markup: mkLocationKeyboard() as any }
+        );
       }
     } else {
       const errMsg = typeof result.error === "object"

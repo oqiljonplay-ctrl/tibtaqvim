@@ -1,7 +1,8 @@
 import TelegramBot, { Message } from "node-telegram-bot-api";
 import { userState } from "../state";
-import { registerPatient } from "../api";
+import { registerPatient, fetchServices, fetchUserByTelegramId } from "../api";
 import { normalizePhone } from "../../src/lib/utils/phone";
+import { prisma } from "@/lib/prisma";
 import {
   editOrSend,
   mkNameKeyboard,
@@ -9,12 +10,79 @@ import {
   mkConfirmKeyboard,
   mkConfirmText,
   mkContactKeyboard,
+  mkDateKeyboard,
+  mkLocationKeyboard,
+  mkWebAppReplyKeyboard,
 } from "../helpers/render";
 
 export async function handleMessage(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
   const text = msg.text?.trim() || "";
   const state = await userState.get(chatId);
+
+  // ─── Joylashuv (Location) ─────────────────────────────────────────────────
+  if (msg.location) {
+    if (!state || state.step !== "awaiting_location") return;
+    const appointmentId = state.appointmentId as string | undefined;
+    if (!appointmentId) {
+      await bot.sendMessage(chatId, "❌ Appointment topilmadi. Iltimos, /start bosing.");
+      await userState.delete(chatId);
+      return;
+    }
+    await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        locationLat: msg.location.latitude,
+        locationLng: msg.location.longitude,
+        locationLivePeriod: (msg.location as any).live_period ?? null,
+        locationSharedAt: new Date(),
+      },
+    });
+    const livePeriod = (msg.location as any).live_period as number | undefined;
+    const durationText = livePeriod
+      ? `\n⏱️ Davomiyligi: ${Math.round(livePeriod / 60)} daqiqa`
+      : "";
+    await bot.sendMessage(
+      chatId,
+      `✅ *Joylashuv qabul qilindi*\n\n📍 Doktor sizning manzilingizga yetib boradi.${durationText}\n\nKlinika tez orada siz bilan bog'lanadi.`,
+      { parse_mode: "Markdown", reply_markup: mkWebAppReplyKeyboard(chatId) as any }
+    );
+    await userState.delete(chatId);
+    return;
+  }
+
+  // ─── 🏠 Uyda bemor ko'rish ───────────────────────────────────────────────
+  if (text === "🏠 Uyda bemor ko'rish") {
+    const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
+    const { services } = await fetchServices(DEFAULT_CLINIC_ID, today);
+    const homeService = services.find((s: any) => s.type === "home_service");
+    if (!homeService || homeService.isAvailable === false) {
+      await bot.sendMessage(chatId, "❌ Bu xizmat hozir mavjud emas");
+      return;
+    }
+    const savedUser = await fetchUserByTelegramId(chatId);
+    const sent = await bot.sendMessage(chatId, "📅 Qaysi kunga yozilmoqchisiz?", {
+      parse_mode: "Markdown",
+      reply_markup: { inline_keyboard: mkDateKeyboard() },
+    });
+    await userState.set(chatId, {
+      step: "select_date",
+      clinicId: DEFAULT_CLINIC_ID,
+      serviceId: homeService.id,
+      serviceType: homeService.type,
+      servicePrice: homeService.price ?? null,
+      serviceRequiresSlot: homeService.requiresSlot ?? false,
+      serviceRequiresAddress: homeService.requiresAddress ?? false,
+      messageId: sent.message_id,
+      _createdAt: Date.now(),
+      _services: services,
+      ...(savedUser?.firstName && savedUser?.phone
+        ? { patientName: savedUser.firstName, patientPhone: savedUser.phone }
+        : {}),
+    });
+    return;
+  }
 
   if (!state || !state.step) {
     await bot.sendMessage(chatId, "Boshlash uchun /start ni bosing");
@@ -170,6 +238,17 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       mkConfirmKeyboard()
     );
     await userState.set(chatId, { ...updatedState, messageId: newMsgId });
+    return;
+  }
+
+  // ─── Keyinroq yuboraman ───────────────────────────────────────────────────
+  if (text === "⏭️ Keyinroq yuboraman") {
+    await bot.sendMessage(
+      chatId,
+      "Yaxshi. Joylashuvni keyinroq yuborishingiz mumkin.\n\nKlinika xodimi siz bilan telefon orqali bog'lanadi.",
+      { reply_markup: mkWebAppReplyKeyboard(chatId) as any }
+    );
+    await userState.delete(chatId);
     return;
   }
 }
