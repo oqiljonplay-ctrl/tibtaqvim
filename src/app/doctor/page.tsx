@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import LocationButtons from "@/components/LocationButtons";
 import LiveLocationPanel from "@/components/LiveLocationPanel";
+import StatsButton from "@/components/StatsButton";
 
 interface Appointment {
   id: string; patientName: string; patientPhone: string;
@@ -109,6 +110,7 @@ export default function DoctorPage() {
             <div className="text-xs text-gray-400">Keldi</div>
           </div>
           <button onClick={fetchAppointments} className="btn-secondary text-sm">↻</button>
+          <StatsButton />
         </div>
       </div>
 
