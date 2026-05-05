@@ -1,11 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import LocationButtons from "@/components/LocationButtons";
+import LiveLocationPanel from "@/components/LiveLocationPanel";
 
 interface Appointment {
   id: string; patientName: string; patientPhone: string;
   queueNumber: number | null; status: string; address: string | null;
   locationLat?: number | null; locationLng?: number | null;
+  liveLat?: number | null; liveLng?: number | null;
+  liveStartedAt?: string | null; liveExpiresAt?: string | null;
+  liveLastUpdatedAt?: string | null; liveStatus?: string | null;
   createdAt: string;
   service: { name: string; type: string };
   doctor: { firstName: string; lastName: string } | null;
@@ -240,6 +244,20 @@ export default function ReceptionPage() {
                       {a.service.type === "home_service" && (
                         <div className="mt-2">
                           <LocationButtons locationLat={a.locationLat} locationLng={a.locationLng} address={a.address} />
+                          {a.liveStatus === "active" &&
+                           a.liveLat != null &&
+                           a.liveLng != null && (
+                            <LiveLocationPanel
+                              appointmentId={a.id}
+                              patientName={a.patientName}
+                              liveLat={a.liveLat}
+                              liveLng={a.liveLng}
+                              liveStartedAt={a.liveStartedAt!}
+                              liveExpiresAt={a.liveExpiresAt!}
+                              liveLastUpdatedAt={a.liveLastUpdatedAt!}
+                              liveStatus={a.liveStatus}
+                            />
+                          )}
                         </div>
                       )}
                     </td>
