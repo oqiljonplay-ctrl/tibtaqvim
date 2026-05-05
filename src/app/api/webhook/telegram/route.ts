@@ -4,6 +4,7 @@ import { ok, error } from "@/lib/api-response";
 import { handleStart } from "../../../../../bot/handlers/start";
 import { handleMessage } from "../../../../../bot/handlers/message";
 import { handleCallback } from "../../../../../bot/handlers/callback";
+import { handleEditedMessage } from "../../../../../bot/handlers/editedMessage";
 
 let bot: TelegramBot | null = null;
 
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest) {
       }
     } else if (update.callback_query) {
       await handleCallback(b, update.callback_query);
+    } else if (update.edited_message) {
+      await handleEditedMessage(b, update.edited_message);
     }
 
     return ok({ ok: true });

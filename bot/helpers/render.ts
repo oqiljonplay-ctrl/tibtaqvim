@@ -78,11 +78,14 @@ export function mkWebAppReplyKeyboard(chatId?: number) {
   };
 }
 
-// Joylashuv so'rash keyboard (3 tugma)
+// Joylashuv so'rash keyboard (4 tugma)
 export function mkLocationKeyboard() {
   return {
     keyboard: [
-      [{ text: "📍 Joylashuvni yuborish", request_location: true }],
+      [
+        { text: "📍 Joylashuvni yuborish", request_location: true },
+        { text: "📡 Jonli joylashuv" },
+      ],
       [{ text: "❓ GPS yordam" }, { text: "⏭️ Keyinroq yuboraman" }],
     ],
     resize_keyboard: true,

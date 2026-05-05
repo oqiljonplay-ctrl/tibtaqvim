@@ -36,26 +36,72 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       await userState.delete(chatId);
       return;
     }
+    const livePeriod = (msg.location as any).live_period as number | undefined;
+    const isLive = !!livePeriod;
     try {
-      await prisma.appointment.update({
-        where: { id: appointmentId },
-        data: {
-          locationLat: msg.location.latitude,
-          locationLng: msg.location.longitude,
-          locationLivePeriod: (msg.location as any).live_period ?? null,
-          locationSharedAt: new Date(),
-        },
-      });
-      const livePeriod = (msg.location as any).live_period as number | undefined;
-      const durationText = livePeriod
-        ? `\n⏱️ Davomiyligi: ${Math.round(livePeriod / 60)} daqiqa`
-        : "";
-      await bot.sendMessage(
-        chatId,
-        `✅ *Joylashuv qabul qilindi!*\n\n📍 Doktor sizning manzilingizga yetib boradi.${durationText}\n\nKlinika tez orada siz bilan bog'lanadi.`,
-        { parse_mode: "Markdown", reply_markup: mkWebAppReplyKeyboard(chatId) as any }
-      );
-      await userState.delete(chatId);
+      if (isLive) {
+        // ─── 📡 Live location
+        const startedAt = new Date();
+        const expiresAt = new Date(startedAt.getTime() + livePeriod! * 1000);
+        await prisma.appointment.update({
+          where: { id: appointmentId },
+          data: {
+            liveLat: msg.location.latitude,
+            liveLng: msg.location.longitude,
+            liveStartedAt: startedAt,
+            liveExpiresAt: expiresAt,
+            liveLastUpdatedAt: startedAt,
+            liveMessageId: BigInt(msg.message_id),
+            liveStatus: "active",
+            locationLat: msg.location.latitude,
+            locationLng: msg.location.longitude,
+            locationLivePeriod: livePeriod,
+            locationSharedAt: startedAt,
+          },
+        });
+        const hours = Math.round(livePeriod! / 3600);
+        const expiresTime = expiresAt.toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
+        await bot.sendMessage(
+          chatId,
+          `✅ *Jonli joylashuv qabul qilindi!*\n\n` +
+          `📡 ${hours} soat davomida real vaqtda yangilanadi\n` +
+          `🚗 Doktor sizning harakatingizni kuzatadi\n` +
+          `⏰ ${expiresTime}gacha aktiv\n\n` +
+          `Klinika tez orada siz bilan bog'lanadi.`,
+          { parse_mode: "Markdown", reply_markup: mkWebAppReplyKeyboard(chatId) as any }
+        );
+        await userState.delete(chatId);
+      } else {
+        // ─── 📍 Oddiy location — state tozalanmaydi (user live ham yuborishi mumkin)
+        await prisma.appointment.update({
+          where: { id: appointmentId },
+          data: {
+            locationLat: msg.location.latitude,
+            locationLng: msg.location.longitude,
+            locationLivePeriod: null,
+            locationSharedAt: new Date(),
+          },
+        });
+        await bot.sendMessage(
+          chatId,
+          "✅ *Joylashuv qabul qilindi!*\n\n" +
+          "📍 Doktor sizning manzilingizga yetib boradi.\n\n" +
+          "Klinika tez orada siz bilan bog'lanadi.\n\n" +
+          "_Aniqroq topish uchun 📡 Jonli joylashuv ham yuborishingiz mumkin._",
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              keyboard: [
+                [{ text: "📡 Jonli joylashuv ham yuborish" }],
+                [{ text: "✅ Tugatish" }],
+              ],
+              resize_keyboard: true,
+              one_time_keyboard: true,
+            } as any,
+          }
+        );
+        // ⚠️ state saqlanadi — user live ham yuborishi mumkin
+      }
     } catch (err) {
       console.error("[location] DB write failed:", err);
       await bot.sendMessage(
@@ -132,6 +178,47 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
         { reply_markup: mkWebAppReplyKeyboard(chatId) as any }
       );
       await userState.delete(chatId);
+      return;
+    }
+
+    // Jonli joylashuv — ko'rsatma
+    if (text === "📡 Jonli joylashuv" || text === "📡 Jonli joylashuv ham yuborish") {
+      await bot.sendMessage(
+        chatId,
+        "📡 *Jonli joylashuv qanday yuboriladi?*\n\n" +
+        "Telegram bu funksiyani _ichki menyusi_ orqali beradi:\n\n" +
+        "1️⃣ Pastdagi *📎 (skrepka)* tugmasini bosing\n" +
+        "2️⃣ *📍 Joylashuv* (Location)ni tanlang\n" +
+        "3️⃣ Pastda *📡 Jonli joylashuvimni ulashish* yashil tugmasini bosing\n" +
+        "4️⃣ Davomiyligi: *8 soatni* tanlang\n" +
+        "5️⃣ Tasdiqlang ✅\n\n" +
+        "_Eslatma: oddiy joylashuv ham yuborgan bo'lsangiz, ikkalasi ham saqlanadi._\n" +
+        "_Doktor yetib borguncha sizning harakatingizni real vaqtda kuzatadi._",
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            keyboard: [
+              [
+                { text: "📍 Joylashuvni yuborish", request_location: true },
+                { text: "📡 Jonli joylashuv" },
+              ],
+              [{ text: "✅ Tugatish" }],
+            ],
+            resize_keyboard: true,
+          } as any,
+        }
+      );
+      return;
+    }
+
+    // Tugatish — state tozalash
+    if (text === "✅ Tugatish") {
+      await userState.delete(chatId);
+      await bot.sendMessage(
+        chatId,
+        "✅ Tayyor! Klinika tez orada siz bilan bog'lanadi.",
+        { reply_markup: mkWebAppReplyKeyboard(chatId) as any }
+      );
       return;
     }
 

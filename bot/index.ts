@@ -3,6 +3,7 @@ import TelegramBot from "node-telegram-bot-api";
 import { handleStart } from "./handlers/start";
 import { handleCallback } from "./handlers/callback";
 import { handleMessage } from "./handlers/message";
+import { handleEditedMessage } from "./handlers/editedMessage";
 import { cleanExpiredState } from "./state";
 
 const required = ["TELEGRAM_BOT_TOKEN", "DEFAULT_CLINIC_ID", "NEXT_PUBLIC_APP_URL"] as const;
@@ -37,6 +38,14 @@ bot.on("callback_query", async (query) => {
   } catch (err) {
     console.error("[Bot] callback handler error:", err);
     await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi. Qayta urinib ko'ring." });
+  }
+});
+
+bot.on("edited_message", async (msg) => {
+  try {
+    await handleEditedMessage(bot, msg);
+  } catch (err) {
+    console.error("[Bot] edited_message handler error:", err);
   }
 });
 
