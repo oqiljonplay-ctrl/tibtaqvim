@@ -91,6 +91,14 @@ export default function HomePage() {
             <h2 className="font-semibold text-gray-900">Qabulxona</h2>
             <p className="text-sm text-gray-500 mt-1">Navbat va kelish boshqaruvi</p>
           </Link>
+
+          {["super_admin", "clinic_admin", "doctor"].includes(currentRole ?? "") && (
+            <Link href="/stats" className="card hover:shadow-md transition-shadow cursor-pointer text-center bg-gradient-to-br from-blue-50 to-purple-50 border-blue-100">
+              <div className="text-3xl mb-3">📊</div>
+              <h2 className="font-semibold text-gray-900">Statistika</h2>
+              <p className="text-sm text-gray-500 mt-1">KPI va tahlil dashboard</p>
+            </Link>
+          )}
         </div>
 
         <div className="mt-8 text-sm text-gray-400">

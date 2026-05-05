@@ -8,6 +8,7 @@ const ROLE_PATHS: Record<string, string[]> = {
   "/admin": ["super_admin", "clinic_admin"],
   "/doctor": ["doctor", "clinic_admin", "super_admin"],
   "/reception": ["receptionist", "clinic_admin", "super_admin"],
+  "/stats": ["super_admin", "clinic_admin", "doctor"],
 };
 
 const ROLE_HOME: Record<string, string> = {
