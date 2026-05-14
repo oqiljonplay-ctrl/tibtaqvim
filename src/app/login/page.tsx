@@ -47,7 +47,7 @@ function LoginForm() {
       if (user.clinicId) localStorage.setItem("clinicId", user.clinicId);
 
       const redirect = returnUrl || roleRedirects[user.role] || "/";
-      router.push(redirect);
+      window.location.href = redirect;
     } catch {
       setError("Server bilan bog'lanishda xatolik");
     } finally {
