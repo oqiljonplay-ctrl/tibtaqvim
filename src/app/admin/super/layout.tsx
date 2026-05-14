@@ -20,7 +20,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
   async function logout() {
     localStorage.clear();
-    document.cookie = "auth_token=; path=/; max-age=0";
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     await fetch("/api/admin/super/auth", { method: "DELETE" });
     router.push("/admin/super/auth");
   }

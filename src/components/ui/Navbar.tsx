@@ -17,12 +17,12 @@ export default function Navbar({ items, title }: { items: NavItem[]; title: stri
     setUserName(localStorage.getItem("user_name") || "");
   }, []);
 
-  function logout() {
+  async function logout() {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user_role");
     localStorage.removeItem("user_name");
     localStorage.removeItem("clinicId");
-    document.cookie = "auth_token=; path=/; max-age=0";
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     router.push("/login");
   }
 

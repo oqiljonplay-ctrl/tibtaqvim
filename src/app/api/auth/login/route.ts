@@ -1,7 +1,7 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { comparePassword, signToken } from "@/lib/auth";
-import { ok, error, unauthorized } from "@/lib/api-response";
+import { error, unauthorized } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
 import { normalizePhone } from "@/lib/utils/phone";
 
@@ -46,7 +46,18 @@ export async function POST(req: NextRequest) {
       role: user.role,
     });
 
-    return ok({ token, user: { id: user.id, role: user.role, clinicId: user.clinicId, firstName: user.firstName } });
+    const response = NextResponse.json({
+      success: true,
+      data: { token, user: { id: user.id, role: user.role, clinicId: user.clinicId, firstName: user.firstName } },
+    });
+    response.cookies.set("auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24,
+      path: "/",
+    });
+    return response;
   } catch {
     return error("Server error", 500);
   }

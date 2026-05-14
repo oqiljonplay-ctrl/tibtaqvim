@@ -25,6 +25,7 @@ function LoginForm() {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
@@ -44,8 +45,6 @@ function LoginForm() {
       localStorage.setItem("user_role", user.role);
       localStorage.setItem("user_name", user.firstName);
       if (user.clinicId) localStorage.setItem("clinicId", user.clinicId);
-
-      document.cookie = `auth_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}`;
 
       const redirect = returnUrl || roleRedirects[user.role] || "/";
       router.push(redirect);
