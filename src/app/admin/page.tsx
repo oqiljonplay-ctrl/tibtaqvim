@@ -48,10 +48,7 @@ export default function AdminDashboard() {
   async function fetchStats(cid: string) {
     setLoading(true);
     try {
-      const token = localStorage.getItem("auth_token") || "";
-      const res = await fetch(`/api/admin/stats${cid ? `?clinicId=${cid}` : ""}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/stats${cid ? `?clinicId=${cid}` : ""}`);
       const json = await res.json();
       if (json.success) setStats(json.data);
     } finally {

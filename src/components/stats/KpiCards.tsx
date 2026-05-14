@@ -42,11 +42,7 @@ export default function KpiCards() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token") || "";
-    fetch("/api/stats", {
-      cache: "no-store",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    fetch("/api/stats", { cache: "no-store" })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();

@@ -66,11 +66,8 @@ export default function ReceptionPage() {
 
   async function fetchServices() {
     try {
-      const token = localStorage.getItem("auth_token") || "";
       const clinicId = localStorage.getItem("clinicId") || "";
-      const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`);
       const json = await res.json();
       if (json.success) setServices(json.data);
     } catch { /* non-critical, filter just stays empty */ }
@@ -78,7 +75,6 @@ export default function ReceptionPage() {
 
   async function fetchAppointments(dateOverride?: string) {
     try {
-      const token = localStorage.getItem("auth_token") || "";
       const clinicId = localStorage.getItem("clinicId") || "";
       const date = dateOverride ?? selectedDateRef.current;
       const svcFilter = serviceFilterRef.current;
@@ -86,7 +82,7 @@ export default function ReceptionPage() {
       const params = new URLSearchParams({ date });
       if (clinicId) params.set("clinicId", clinicId);
       if (svcFilter !== "all") params.set("serviceId", svcFilter);
-      const res = await fetch(`/api/appointments?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/appointments?${params}`);
       const json = await res.json();
       if (json.success) { setAppointments(json.data.items ?? json.data); setLastRefresh(new Date().toLocaleTimeString("uz-UZ")); setErrorMsg(null); }
       else setErrorMsg(json.error?.message ?? json.error ?? "Qabullar yuklanmadi");
@@ -101,10 +97,9 @@ export default function ReceptionPage() {
     const prev = appointments.find((a) => a.id === id)?.status;
     setAppointments((list) => list.map((a) => a.id === id ? { ...a, status } : a));
     try {
-      const token = localStorage.getItem("auth_token") || "";
       const res = await fetch("/api/arrived", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appointmentId: id, status }),
       });
       if (!res.ok) {

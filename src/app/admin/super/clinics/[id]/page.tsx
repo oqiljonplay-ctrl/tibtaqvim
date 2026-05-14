@@ -115,10 +115,6 @@ export default function ClinicBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
 
-  function token() {
-    return localStorage.getItem("auth_token") || "";
-  }
-
   function showToast(msg: string, type: "ok" | "err" = "ok") {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -126,13 +122,12 @@ export default function ClinicBuilderPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const headers = { Authorization: `Bearer ${token()}` };
     const [cRes, sRes, mRes, fRes, aRes] = await Promise.all([
-      fetch(`/api/admin/super/clinics/${id}`, { headers }),
-      fetch(`/api/admin/super/clinics/${id}/settings`, { headers }),
-      fetch(`/api/admin/super/clinics/${id}/modules`, { headers }),
-      fetch(`/api/admin/super/clinics/${id}/features`, { headers }),
-      fetch(`/api/admin/super/audit?clinicId=${id}&take=20`, { headers }),
+      fetch(`/api/admin/super/clinics/${id}`),
+      fetch(`/api/admin/super/clinics/${id}/settings`),
+      fetch(`/api/admin/super/clinics/${id}/modules`),
+      fetch(`/api/admin/super/clinics/${id}/features`),
+      fetch(`/api/admin/super/audit?clinicId=${id}&take=20`),
     ]);
     const [cJ, sJ, mJ, fJ, aJ] = await Promise.all([
       cRes.json(), sRes.json(), mRes.json(), fRes.json(), aRes.json(),
@@ -154,7 +149,7 @@ export default function ClinicBuilderPage() {
     setSaving(true);
     const res = await fetch(`/api/admin/super/clinics/${id}/settings`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
     });
     const j = await res.json();
@@ -168,7 +163,7 @@ export default function ClinicBuilderPage() {
     setSaving(true);
     const res = await fetch(`/api/admin/super/clinics/${id}/modules`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(modules),
     });
     const j = await res.json();
@@ -182,7 +177,7 @@ export default function ClinicBuilderPage() {
     setSaving(true);
     const res = await fetch(`/api/admin/super/clinics/${id}/features`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(features.map((f) => ({ key: f.key, enabled: f.enabled }))),
     });
     const j = await res.json();

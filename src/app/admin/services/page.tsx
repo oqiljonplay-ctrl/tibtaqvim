@@ -32,11 +32,8 @@ export default function AdminServicesPage() {
 
   async function fetchServices() {
     setLoading(true);
-    const token = localStorage.getItem("auth_token") || "";
     const clinicId = localStorage.getItem("clinicId") || "";
-    const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`);
     const json = await res.json();
     if (json.success) setServices(json.data);
     setLoading(false);
@@ -44,7 +41,6 @@ export default function AdminServicesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const token = localStorage.getItem("auth_token") || "";
     const payload = {
       ...form,
       price: parseFloat(form.price),
@@ -56,7 +52,7 @@ export default function AdminServicesPage() {
 
     const res = await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     if (res.ok) {
@@ -78,10 +74,9 @@ export default function AdminServicesPage() {
   }
 
   async function updateLimit(id: string, limit: string) {
-    const token = localStorage.getItem("auth_token") || "";
     await fetch(`/api/admin/services/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dailyLimit: limit ? parseInt(limit) : null }),
     });
     fetchServices();

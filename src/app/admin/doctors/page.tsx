@@ -21,11 +21,8 @@ export default function AdminDoctorsPage() {
 
   async function fetchDoctors() {
     setLoading(true);
-    const token = localStorage.getItem("auth_token") || "";
     const clinicId = localStorage.getItem("clinicId") || "";
-    const res = await fetch(`/api/admin/doctors${clinicId ? `?clinicId=${clinicId}` : ""}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(`/api/admin/doctors${clinicId ? `?clinicId=${clinicId}` : ""}`);
     const json = await res.json();
     if (json.success) setDoctors(json.data);
     setLoading(false);
@@ -33,10 +30,9 @@ export default function AdminDoctorsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const token = localStorage.getItem("auth_token") || "";
     const res = await fetch("/api/admin/doctors", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     if (res.ok) {

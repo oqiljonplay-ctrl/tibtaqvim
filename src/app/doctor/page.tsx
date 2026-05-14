@@ -44,13 +44,10 @@ export default function DoctorPage() {
 
   async function fetchAppointments() {
     try {
-      const token = localStorage.getItem("auth_token") || "";
       const clinicId = localStorage.getItem("clinicId") || "";
       const params = new URLSearchParams({ date: todayRef.current });
       if (clinicId) params.set("clinicId", clinicId);
-      const res = await fetch(`/api/appointments?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/appointments?${params}`);
       const json = await res.json();
       if (json.success) {
         setAppointments(json.data.items ?? json.data);
@@ -70,10 +67,9 @@ export default function DoctorPage() {
     const prev = appointments.find((a) => a.id === id)?.status;
     setAppointments((list) => list.map((a) => a.id === id ? { ...a, status } : a));
     try {
-      const token = localStorage.getItem("auth_token") || "";
       const res = await fetch("/api/arrived", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appointmentId: id, status }),
       });
       if (!res.ok) {

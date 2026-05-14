@@ -34,15 +34,9 @@ export default function ClinicListPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
-  function token() {
-    return localStorage.getItem("auth_token") || "";
-  }
-
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/admin/super/clinics", {
-      headers: { Authorization: `Bearer ${token()}` },
-    });
+    const res = await fetch("/api/admin/super/clinics");
     const j = await res.json();
     if (j.success) setClinics(j.data);
     setLoading(false);
@@ -59,7 +53,7 @@ export default function ClinicListPage() {
     try {
       const res = await fetch("/api/admin/super/clinics", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       const j = await res.json();
@@ -75,7 +69,7 @@ export default function ClinicListPage() {
   async function toggleActive(id: string, clinic: Clinic) {
     await fetch(`/api/admin/super/clinics/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: clinic.name, isActive: !clinic.isActive }),
     });
     load();
@@ -85,7 +79,6 @@ export default function ClinicListPage() {
     if (!confirm(`"${name}" klinikasini o'chirishni tasdiqlaysizmi? (qaytarib bo'lmaydi)`)) return;
     await fetch(`/api/admin/super/clinics/${id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token()}` },
     });
     load();
   }

@@ -24,8 +24,7 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token") || "";
-    fetch("/api/admin/super/audit?take=100", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("/api/admin/super/audit?take=100")
       .then((r) => r.json())
       .then((j) => { if (j.success) setLogs(j.data); })
       .finally(() => setLoading(false));

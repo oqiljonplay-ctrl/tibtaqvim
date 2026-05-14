@@ -67,8 +67,7 @@ export default function SuperDashboard() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token") || "";
-    fetch("/api/admin/super/stats", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("/api/admin/super/stats")
       .then((r) => r.json())
       .then((j) => {
         if (j.success) setStats(j.data);
