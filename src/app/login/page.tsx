@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 const roleRedirects: Record<string, string> = {
   super_admin: "/admin",
@@ -10,7 +10,6 @@ const roleRedirects: Record<string, string> = {
 };
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl");
   const [form, setForm] = useState({ phone: "", password: "" });
@@ -40,8 +39,7 @@ function LoginForm() {
         return;
       }
 
-      const { token, user } = json.data;
-      localStorage.setItem("auth_token", token);
+      const { user } = json.data;
       localStorage.setItem("user_role", user.role);
       localStorage.setItem("user_name", user.firstName);
       if (user.clinicId) localStorage.setItem("clinicId", user.clinicId);

@@ -34,7 +34,8 @@ export async function comparePassword(password: string, hash: string): Promise<b
 export function getTokenFromRequest(req: NextRequest): string | null {
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.slice(7);
+    const bearer = authHeader.slice(7);
+    if (bearer) return bearer;
   }
   const cookie = req.cookies.get("auth_token");
   return cookie?.value ?? null;
