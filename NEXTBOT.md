@@ -414,6 +414,28 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-05-15 — Queue Mode System Phase 1 (live/online/slot-disabled)
+
+**Maqsad:** Har service-doctor bog'lanishi uchun 3 xil navbat rejimi. `live` = kassadan jonli navbat, `online` = onlayn raqam, `slot` = disabled (bosqich 2).
+
+**O'zgartirilgan fayllar:**
+- `prisma/schema.prisma` — `QueueMode` enum; `Service.defaultQueueMode`; `ServiceDoctor.queueMode`; `Appointment.queueMode + paymentStatus`
+- `src/lib/services/booking.service.ts` — `processBooking` queueMode aniqlab `bookDoctorQueue`ga uzatadi; `live`→queueNumber=null,paymentStatus=pending; `online`→joriy xulq-atvor; `slot`→400
+- `src/lib/services/confirmation.service.ts` — `queueMode` param: live→kassadan navbat oling; online→navbat# ko'rsatiladi
+- `src/app/api/admin/doctors/route.ts` & `[id]/route.ts` — GET `queueMode` qaytaradi; PATCH `serviceQueueModes` qabul qiladi
+- `src/app/api/services/route.ts` — `defaultQueueMode` va per-doctor `queueMode` qaytaradi
+- `src/app/api/webapp/appointments/route.ts` — `queueMode`, `paymentStatus` select'ga qo'shildi
+- `src/app/admin/doctors/page.tsx` — `QueueModeSelector` (live/online radio, slot=disabled) + "Rejimlarni saqlash" tugmasi
+- `bot/handlers/callback.ts` — confirm handler: `live`→"kassadan jonli navbat"; `online`→navbat raqami
+- `src/app/webapp/page.tsx` — appointment badge (amber=live, blue=online#); date step'da mode info blok
+
+**Muhim qoidalar:**
+- `QueueMode` enum DB'da allaqachon bor edi (oldingi sessiyadan); migration drift bor — `prisma db push` o'rniga Supabase MCP `apply_migration` ishlatildi
+- Mavjud bronlar `queueMode=online` (default) oldi — hech narsa buzilmadi
+- `processBooking()` transaction tuzilishi o'zgarmadi — faqat `queueMode` parametr qo'shildi
+
+---
+
 ### 2026-04-30 — SaaSid.md kritik bug fixlar (requiresSlot, race condition, UTC date)
 
 **O'zgartirilgan fayllar:**
