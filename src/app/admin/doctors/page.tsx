@@ -1,5 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
+import { DoctorCard } from "@/components/DoctorCard";
+
+interface ServiceItem {
+  id: string;
+  name: string;
+  price: number;
+  type: string;
+}
 
 interface Doctor {
   id: string;
@@ -7,17 +15,28 @@ interface Doctor {
   lastName: string;
   specialty: string;
   phone: string | null;
+  photoUrl: string | null;
   branch: { name: string } | null;
   isActive: boolean;
+  services: ServiceItem[];
 }
+
+const emptyForm = {
+  firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "",
+};
 
 export default function AdminDoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ firstName: "", lastName: "", specialty: "", phone: "" });
+  const [form, setForm] = useState(emptyForm);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
 
-  useEffect(() => { fetchDoctors(); }, []);
+  useEffect(() => {
+    fetchDoctors();
+    fetchServices();
+  }, []);
 
   async function fetchDoctors() {
     setLoading(true);
@@ -28,30 +47,55 @@ export default function AdminDoctorsPage() {
     setLoading(false);
   }
 
+  async function fetchServices() {
+    const clinicId = localStorage.getItem("clinicId") || "";
+    const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`);
+    const json = await res.json();
+    if (json.success) setServices(json.data);
+  }
+
+  function toggleService(id: string, checked: boolean) {
+    setSelectedServiceIds((prev) =>
+      checked ? [...prev, id] : prev.filter((x) => x !== id)
+    );
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const res = await fetch("/api/admin/doctors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        photoUrl: form.photoUrl || null,
+        phone: form.phone || null,
+        serviceIds: selectedServiceIds,
+      }),
     });
     if (res.ok) {
       setShowForm(false);
-      setForm({ firstName: "", lastName: "", specialty: "", phone: "" });
+      setForm(emptyForm);
+      setSelectedServiceIds([]);
       fetchDoctors();
     }
+  }
+
+  function openForm() {
+    setForm(emptyForm);
+    setSelectedServiceIds([]);
+    setShowForm(true);
   }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Shifokorlar</h1>
-        <button onClick={() => setShowForm(true)} className="btn-primary">+ Yangi shifokor</button>
+        <button onClick={openForm} className="btn-primary">+ Yangi shifokor</button>
       </div>
 
       {showForm && (
         <div className="card mb-6">
-          <h2 className="text-lg font-semibold mb-4">Yangi shifokor qo'shish</h2>
+          <h2 className="text-lg font-semibold mb-4">Yangi shifokor qo&apos;shish</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ism *</label>
@@ -69,8 +113,45 @@ export default function AdminDoctorsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
               <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+998 90 000 00 00" />
             </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Foto URL (ixtiyoriy)</label>
+              <input
+                className="input"
+                type="url"
+                value={form.photoUrl}
+                onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
+                placeholder="https://example.com/photo.jpg"
+              />
+              {form.photoUrl && (
+                <img
+                  src={form.photoUrl}
+                  alt="preview"
+                  className="w-16 h-16 rounded-full object-cover mt-2 border"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                />
+              )}
+            </div>
+
+            {services.length > 0 && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Qatnashadigan xizmatlar</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                  {services.map((svc) => (
+                    <label key={svc.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedServiceIds.includes(svc.id)}
+                        onChange={(e) => toggleService(svc.id, e.target.checked)}
+                      />
+                      <span className="truncate">{svc.name} — {Number(svc.price).toLocaleString()} so&apos;m</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="md:col-span-2 flex gap-3">
-              <button type="submit" className="btn-primary">Qo'shish</button>
+              <button type="submit" className="btn-primary">Qo&apos;shish</button>
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Bekor</button>
             </div>
           </form>
@@ -83,17 +164,21 @@ export default function AdminDoctorsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {doctors.map((d) => (
             <div key={d.id} className="card">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg flex-shrink-0">
-                  {d.firstName[0]}{d.lastName[0]}
+              <DoctorCard doctor={d} size="md" />
+              {d.phone && <p className="text-xs text-gray-400 mt-2 ml-15">{d.phone}</p>}
+              {d.branch && <p className="text-xs text-gray-400">{d.branch.name}</p>}
+              {d.services.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs text-gray-500 mb-1">Xizmatlar:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {d.services.map((svc) => (
+                      <span key={svc.id} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                        {svc.name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <div className="font-semibold text-gray-900">{d.firstName} {d.lastName}</div>
-                  <div className="text-sm text-blue-600">{d.specialty}</div>
-                  {d.phone && <div className="text-xs text-gray-400 mt-1">{d.phone}</div>}
-                  {d.branch && <div className="text-xs text-gray-400">{d.branch.name}</div>}
-                </div>
-              </div>
+              )}
             </div>
           ))}
         </div>

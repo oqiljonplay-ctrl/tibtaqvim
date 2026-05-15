@@ -1,5 +1,5 @@
 import TelegramBot, { CallbackQuery } from "node-telegram-bot-api";
-import { fetchDoctors, fetchSlots, bookAppointment, registerPatient, fetchServices, fetchUserByTelegramId } from "../api";
+import { fetchSlots, bookAppointment, registerPatient, fetchServices, fetchUserByTelegramId } from "../api";
 import { userState } from "../state";
 import { prisma } from "@/lib/prisma";
 import { archivePhone, isArchivedPhone } from "../helpers/phone";
@@ -307,22 +307,48 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     }
 
     if (target === "select_date") {
+      // Back uchun: doctor bor edi → doctor bosqichiga qayt, yo'q → servicega qayt
+      const backStep = state._doctors?.length > 0 ? "select_doctor" : "select_service";
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
         "📅 Qaysi kunga yozilmoqchisiz?",
-        mkDateKeyboard()
+        mkDateKeyboard(backStep)
       );
-      await userState.set(chatId,{
+      await userState.set(chatId, {
         ...state,
         step: "select_date",
         messageId: newMsgId,
         date: undefined,
-        doctorId: undefined,
         slotId: undefined,
         patientName: undefined,
         patientPhone: undefined,
         address: undefined,
       });
+      return;
+    }
+
+    if (target === "select_doctor") {
+      const doctors = state._doctors;
+      if (doctors?.length) {
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          "👨‍⚕️ Shifokorni tanlang:",
+          mkDoctorKeyboard(doctors, "select_service")
+        );
+        await userState.set(chatId, {
+          ...state,
+          step: "select_doctor",
+          messageId: newMsgId,
+          doctorId: undefined,
+          date: undefined,
+          slotId: undefined,
+          patientName: undefined,
+          patientPhone: undefined,
+          address: undefined,
+        });
+      } else {
+        await bot.sendMessage(chatId, "Qaytadan boshlang: /start");
+      }
       return;
     }
 
@@ -413,24 +439,57 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const [, serviceId, serviceType] = data.split(":");
     const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
     const service = state._services?.find((s: any) => s.id === serviceId);
-    const newMsgId = await editOrSend(
-      bot, chatId, msgId,
-      "📅 Qaysi kunga yozilmoqchisiz?",
-      mkDateKeyboard()
-    );
-    await userState.set(chatId,{
+
+    // Service-specific doctorlarni M2M dan olish
+    const serviceWithDoctors = await prisma.service.findUnique({
+      where: { id: serviceId },
+      include: {
+        doctors: {
+          where: { doctor: { isActive: true } },
+          include: { doctor: true },
+        },
+      },
+    });
+    const serviceDoctors = serviceWithDoctors?.doctors.map((sd: any) => sd.doctor) ?? [];
+
+    const baseState = {
       ...state,
       clinicId,
       serviceId,
       serviceType,
       servicePrice: service?.price ?? null,
-      // BUG FIX: store service flags so date handler can gate slot/address steps
       serviceRequiresSlot: service?.requiresSlot ?? false,
       serviceRequiresAddress: service?.requiresAddress ?? false,
-      step: "select_date",
-      messageId: newMsgId,
       _createdAt: Date.now(),
-    });
+    };
+
+    if (serviceDoctors.length > 0) {
+      // Shifokor tanlash bosqichi — sana tanlashdan OLDIN
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        `👨‍⚕️ *${serviceWithDoctors?.name ?? "Xizmat"}* uchun shifokorni tanlang:`,
+        mkDoctorKeyboard(serviceDoctors, "select_service")
+      );
+      await userState.set(chatId, {
+        ...baseState,
+        step: "select_doctor",
+        messageId: newMsgId,
+        _doctors: serviceDoctors,
+      });
+    } else {
+      // Shifokor yo'q — to'g'ridan sana tanlash
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        "📅 Qaysi kunga yozilmoqchisiz?",
+        mkDateKeyboard("select_service")
+      );
+      await userState.set(chatId, {
+        ...baseState,
+        step: "select_date",
+        messageId: newMsgId,
+        _doctors: [],
+      });
+    }
     return;
   }
 
@@ -438,55 +497,6 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   if (data.startsWith("date:")) {
     const selectedDate = data.split(":")[1];
     const { serviceId, serviceType } = state;
-    const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
-
-    // ── doctor_queue ──
-    if (serviceType === "doctor_queue") {
-      const doctors = await fetchDoctors(clinicId);
-      if (doctors.length) {
-        const newMsgId = await editOrSend(
-          bot, chatId, msgId,
-          "👨‍⚕️ Shifokorni tanlang:",
-          mkDoctorKeyboard(doctors)
-        );
-        await userState.set(chatId,{
-          ...state,
-          date: selectedDate,
-          step: "select_doctor_or_slot",
-          messageId: newMsgId,
-          _doctors: doctors,
-        });
-      } else if (state.patientName && state.patientPhone) {
-        const confirmState = {
-          ...state,
-          date: selectedDate,
-          step: "confirm",
-          _nameBack: "select_date",
-          _doctors: [],
-        };
-        const newMsgId = await editOrSend(
-          bot, chatId, msgId,
-          mkConfirmText(confirmState),
-          mkConfirmKeyboard()
-        );
-        await userState.set(chatId,{ ...confirmState, messageId: newMsgId });
-      } else {
-        const newMsgId = await editOrSend(
-          bot, chatId, msgId,
-          "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
-          mkNameKeyboard("select_date")
-        );
-        await userState.set(chatId,{
-          ...state,
-          date: selectedDate,
-          step: "enter_name",
-          messageId: newMsgId,
-          _nameBack: "select_date",
-          _doctors: [],
-        });
-      }
-      return;
-    }
 
     // ── home_service ──
     if (serviceType === "home_service") {
@@ -594,38 +604,23 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     return;
   }
 
-  // ─── doc: — doctor selected ───────────────────────────────────────────────
+  // ─── doc: — doctor selected → sana tanlashga o'tish ─────────────────────
   if (data.startsWith("doc:")) {
     const doctorId = data.split(":")[1];
     const resolvedDoctorId = doctorId === "none" ? null : doctorId;
 
-    if (state.patientName && state.patientPhone) {
-      const confirmState = {
-        ...state,
-        doctorId: resolvedDoctorId,
-        step: "confirm",
-        _nameBack: "select_doctor_or_slot",
-      };
-      const newMsgId = await editOrSend(
-        bot, chatId, msgId,
-        mkConfirmText(confirmState),
-        mkConfirmKeyboard()
-      );
-      await userState.set(chatId,{ ...confirmState, messageId: newMsgId });
-    } else {
-      const newMsgId = await editOrSend(
-        bot, chatId, msgId,
-        "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
-        mkNameKeyboard("select_doctor_or_slot")
-      );
-      await userState.set(chatId,{
-        ...state,
-        doctorId: resolvedDoctorId,
-        step: "enter_name",
-        messageId: newMsgId,
-        _nameBack: "select_doctor_or_slot",
-      });
-    }
+    // Yangi flow: doctor tanlangach → sana tanlash (confirm/name emas)
+    const newMsgId = await editOrSend(
+      bot, chatId, msgId,
+      "📅 Qaysi kunga yozilmoqchisiz?",
+      mkDateKeyboard("select_doctor")
+    );
+    await userState.set(chatId, {
+      ...state,
+      doctorId: resolvedDoctorId,
+      step: "select_date",
+      messageId: newMsgId,
+    });
     return;
   }
 

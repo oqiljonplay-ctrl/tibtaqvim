@@ -12,10 +12,14 @@ declare global {
 type AppMode = "loading" | "dashboard" | "booking";
 type BookingStep = "services" | "date" | "slots" | "form" | "confirm" | "done";
 
+interface ServiceDoctor {
+  id: string; firstName: string; lastName: string; specialty: string; photoUrl: string | null;
+}
 interface Service {
   id: string; name: string; type: string; price: number;
-  requiresSlot: boolean; requiresAddress: boolean;
+  requiresSlot: boolean; requiresAddress: boolean; requiresPrePayment: boolean;
   dailyLimit: number | null; todayCount: number; isAvailable: boolean;
+  doctors: ServiceDoctor[];
 }
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
 interface TgUser { firstName: string; phone: string | null; tibId: string | null; hasPhone: boolean }
@@ -713,14 +717,33 @@ export default function WebApp() {
                         </div>
                       </div>
                       <div className="text-right shrink-0 ml-2">
-                        <div className="text-sm font-bold text-blue-600">{s.price.toLocaleString()} so'm</div>
+                        <div className="text-sm font-bold text-blue-600">{s.price.toLocaleString()} so&apos;m</div>
+                        {s.requiresPrePayment && (
+                          <div className="text-xs mt-0.5 text-orange-600">Oldindan to&apos;lov</div>
+                        )}
                         {s.dailyLimit && (
                           <div className={`text-xs mt-0.5 ${s.isAvailable ? "text-green-600" : "text-red-500"}`}>
-                            {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To'ldi"}
+                            {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To&apos;ldi"}
                           </div>
                         )}
                       </div>
                     </div>
+                    {s.doctors && s.doctors.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
+                        {s.doctors.map((doc) => (
+                          <div key={doc.id} className="flex items-center gap-1.5">
+                            {doc.photoUrl ? (
+                              <img src={doc.photoUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span className="text-blue-600 text-xs font-bold leading-none">{doc.firstName[0]}</span>
+                              </div>
+                            )}
+                            <span className="text-xs text-gray-500">{doc.specialty} — {doc.lastName} {doc.firstName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>

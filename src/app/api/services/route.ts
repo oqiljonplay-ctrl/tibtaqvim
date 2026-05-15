@@ -22,15 +22,33 @@ export async function GET(req: NextRequest) {
         isActive: true,
         ...(type ? { type: type as any } : {}),
       },
+      include: {
+        doctors: {
+          where: { doctor: { isActive: true } },
+          include: {
+            doctor: {
+              select: { id: true, firstName: true, lastName: true, specialty: true, photoUrl: true },
+            },
+          },
+        },
+      },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
 
     const settings = await prisma.clinicSettings.findUnique({ where: { clinicId } });
     const enableWebapp = settings?.enableWebapp ?? true;
 
+    const formatService = (s: (typeof services)[0], extra: Record<string, unknown> = {}) => ({
+      ...s,
+      price: Number(s.price),
+      prePaymentAmount: s.prePaymentAmount ? Number(s.prePaymentAmount) : null,
+      doctors: s.doctors.map((sd) => sd.doctor),
+      ...extra,
+    });
+
     if (!dateParam) {
       return new Response(
-        JSON.stringify({ success: true, data: services, enableWebapp }),
+        JSON.stringify({ success: true, data: services.map((s) => formatService(s)), enableWebapp }),
         { headers: { "Content-Type": "application/json" } }
       );
     }
@@ -47,12 +65,10 @@ export async function GET(req: NextRequest) {
           },
         });
 
-        return {
-          ...s,
-          price: Number(s.price),
+        return formatService(s, {
           todayCount,
           isAvailable: s.dailyLimit === null || todayCount < s.dailyLimit,
-        };
+        });
       })
     );
 

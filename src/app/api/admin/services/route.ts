@@ -14,10 +14,24 @@ export async function GET(req: NextRequest) {
 
     const services = await prisma.service.findMany({
       where: { ...(clinicId ? { clinicId } : {}), isActive: true },
+      include: {
+        doctors: {
+          include: {
+            doctor: {
+              select: { id: true, firstName: true, lastName: true, specialty: true, photoUrl: true, isActive: true },
+            },
+          },
+        },
+      },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
 
-    return ok(services.map((s) => ({ ...s, price: Number(s.price) })));
+    return ok(services.map((s) => ({
+      ...s,
+      price: Number(s.price),
+      prePaymentAmount: s.prePaymentAmount ? Number(s.prePaymentAmount) : null,
+      doctors: s.doctors.map((sd) => sd.doctor),
+    })));
   } catch {
     return error("Server error", 500);
   }
@@ -30,7 +44,10 @@ export async function POST(req: NextRequest) {
     if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
 
     const body = await req.json();
-    const { name, type, price, requiresSlot, requiresAddress, dailyLimit, description, sortOrder } = body;
+    const {
+      name, type, price, requiresSlot, requiresAddress, dailyLimit,
+      description, sortOrder, requiresPrePayment, prePaymentAmount, doctorIds,
+    } = body;
 
     if (!name || !type || price === undefined) {
       return error("name, type, price are required");
@@ -47,13 +64,32 @@ export async function POST(req: NextRequest) {
         price,
         requiresSlot: requiresSlot ?? false,
         requiresAddress: requiresAddress ?? false,
+        requiresPrePayment: requiresPrePayment ?? false,
+        prePaymentAmount: prePaymentAmount ?? null,
         dailyLimit: dailyLimit ?? null,
         description: description ?? null,
         sortOrder: sortOrder ?? 0,
+        ...(Array.isArray(doctorIds) && doctorIds.length > 0
+          ? { doctors: { create: doctorIds.map((doctorId: string) => ({ doctorId })) } }
+          : {}),
+      },
+      include: {
+        doctors: {
+          include: {
+            doctor: {
+              select: { id: true, firstName: true, lastName: true, specialty: true, photoUrl: true, isActive: true },
+            },
+          },
+        },
       },
     });
 
-    return created({ ...service, price: Number(service.price) });
+    return created({
+      ...service,
+      price: Number(service.price),
+      prePaymentAmount: service.prePaymentAmount ? Number(service.prePaymentAmount) : null,
+      doctors: service.doctors.map((sd) => sd.doctor),
+    });
   } catch {
     return error("Server error", 500);
   }

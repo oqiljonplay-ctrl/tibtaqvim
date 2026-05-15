@@ -138,26 +138,26 @@ export function mkWelcomeBackKeyboard(): InlineKeyboardButton[][] {
   ]];
 }
 
-export function mkDateKeyboard(): InlineKeyboardButton[][] {
+export function mkDateKeyboard(backStep = "select_service"): InlineKeyboardButton[][] {
   const { year, month } = currentYearMonth();
-  return mkDateKeyboardForMonth(year, month);
+  return mkDateKeyboardForMonth(year, month, backStep);
 }
 
-export function mkDateKeyboardForMonth(year: number, month: number): InlineKeyboardButton[][] {
+export function mkDateKeyboardForMonth(year: number, month: number, backStep = "select_service"): InlineKeyboardButton[][] {
   return [
     ...mkCalendarKeyboard(year, month),
-    [back("select_service")],
+    [back(backStep)],
   ];
 }
 
-export function mkDoctorKeyboard(doctors: any[]): InlineKeyboardButton[][] {
+export function mkDoctorKeyboard(doctors: any[], backStep = "select_service"): InlineKeyboardButton[][] {
   return [
     ...doctors.map((d: any) => [{
-      text: `👨‍⚕️ ${d.firstName} ${d.lastName} — ${d.specialty}`,
+      text: `👨‍⚕️ ${d.specialty} — ${d.lastName} ${d.firstName}`,
       callback_data: `doc:${d.id}`,
     }]),
-    [{ text: "➡️ Shifokorsiez davom etish", callback_data: "doc:none" }],
-    [back("select_date")],
+    [{ text: "➡️ Shifokorsiz davom etish", callback_data: "doc:none" }],
+    [back(backStep)],
   ];
 }
 

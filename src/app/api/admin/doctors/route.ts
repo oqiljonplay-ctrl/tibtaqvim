@@ -14,11 +14,24 @@ export async function GET(req: NextRequest) {
 
     const doctors = await prisma.doctor.findMany({
       where: { ...(clinicId ? { clinicId } : {}), isActive: true },
-      include: { branch: { select: { name: true } } },
+      include: {
+        branch: { select: { name: true } },
+        services: {
+          include: {
+            service: { select: { id: true, name: true, type: true, price: true } },
+          },
+        },
+      },
       orderBy: { lastName: "asc" },
     });
 
-    return ok(doctors);
+    return ok(doctors.map((d) => ({
+      ...d,
+      services: d.services.map((sd) => ({
+        ...sd.service,
+        price: Number(sd.service.price),
+      })),
+    })));
   } catch {
     return error("Server error", 500);
   }
@@ -31,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
 
     const body = await req.json();
-    const { firstName, lastName, specialty, phone, branchId, photoUrl } = body;
+    const { firstName, lastName, specialty, phone, branchId, photoUrl, serviceIds } = body;
 
     if (!firstName || !lastName || !specialty) {
       return error("firstName, lastName, specialty are required");
@@ -41,10 +54,35 @@ export async function POST(req: NextRequest) {
     if (!clinicId) return error("clinicId required");
 
     const doctor = await prisma.doctor.create({
-      data: { clinicId, firstName, lastName, specialty, phone, branchId: branchId ?? null, photoUrl: photoUrl ?? null },
+      data: {
+        clinicId,
+        firstName,
+        lastName,
+        specialty,
+        phone: phone ?? null,
+        branchId: branchId ?? null,
+        photoUrl: photoUrl ?? null,
+        ...(Array.isArray(serviceIds) && serviceIds.length > 0
+          ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }
+          : {}),
+      },
+      include: {
+        branch: { select: { name: true } },
+        services: {
+          include: {
+            service: { select: { id: true, name: true, type: true, price: true } },
+          },
+        },
+      },
     });
 
-    return created(doctor);
+    return created({
+      ...doctor,
+      services: doctor.services.map((sd) => ({
+        ...sd.service,
+        price: Number(sd.service.price),
+      })),
+    });
   } catch {
     return error("Server error", 500);
   }
