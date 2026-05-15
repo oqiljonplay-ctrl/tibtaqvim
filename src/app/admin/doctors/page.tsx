@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { DoctorCard } from "@/components/DoctorCard";
 
 interface ServiceItem {
@@ -26,12 +27,15 @@ const emptyForm = {
 };
 
 export default function AdminDoctorsPage() {
+  const router = useRouter();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchDoctors();
@@ -84,6 +88,27 @@ export default function AdminDoctorsPage() {
     setForm(emptyForm);
     setSelectedServiceIds([]);
     setShowForm(true);
+  }
+
+  async function handleDelete(doctorId: string) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/doctors/${doctorId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDoctors((prev) => prev.filter((d) => d.id !== doctorId));
+      } else {
+        alert(json.error?.message || "O'chirishda xatolik");
+      }
+    } catch {
+      alert("Server bilan bog'lanishda xatolik");
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteId(null);
+    }
   }
 
   return (
@@ -161,9 +186,28 @@ export default function AdminDoctorsPage() {
       {loading ? (
         <div className="text-gray-400 text-sm text-center py-12">Yuklanmoqda...</div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {doctors.map((d) => (
-            <div key={d.id} className="card">
+            <div key={d.id} className="card relative">
+              {/* Tahrirlash / O'chirish tugmalari */}
+              <div className="absolute top-3 right-3 flex gap-1">
+                <button
+                  onClick={() => router.push(`/admin/doctors/${d.id}/edit`)}
+                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                  title="Tahrirlash"
+                >
+                  ✏️
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteId(d.id)}
+                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                  title="O'chirish"
+                >
+                  🗑️
+                </button>
+              </div>
+
               <DoctorCard doctor={d} size="md" />
               {d.phone && <p className="text-xs text-gray-400 mt-2 ml-15">{d.phone}</p>}
               {d.branch && <p className="text-xs text-gray-400">{d.branch.name}</p>}
@@ -182,6 +226,39 @@ export default function AdminDoctorsPage() {
             </div>
           ))}
         </div>
+
+        {/* O'chirish tasdiqlash modali */}
+        {confirmDeleteId && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+              <h3 className="font-semibold text-lg mb-2">Shifokorni o'chirish</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                {(() => {
+                  const d = doctors.find((x) => x.id === confirmDeleteId);
+                  return d ? `${d.lastName} ${d.firstName}` : "";
+                })()}
+                &nbsp;ni o&apos;chirmoqchimisiz? Bu amal aktiv holatdan chiqaradi.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  disabled={deleting}
+                  className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  onClick={() => handleDelete(confirmDeleteId)}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleting ? "O'chirilmoqda..." : "Ha, o'chirish"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

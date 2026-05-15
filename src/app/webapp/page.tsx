@@ -822,19 +822,18 @@ export default function WebApp() {
             </h2>
 
             <div className="space-y-4">
-              {!nameIsKnown && (
-                <div>
+              <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Ism Familya *</label>
                   <input
                     className="input"
                     required
                     minLength={2}
+                    maxLength={40}
                     value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                     placeholder="Alisher Karimov"
                   />
                 </div>
-              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefon *</label>
                 <input
