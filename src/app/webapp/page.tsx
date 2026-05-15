@@ -733,10 +733,10 @@ export default function WebApp() {
                         {s.doctors.map((doc) => (
                           <div key={doc.id} className="flex items-center gap-2">
                             {doc.photoUrl ? (
-                              <img src={doc.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                              <img src={doc.photoUrl} alt="" className="w-24 h-24 rounded-full object-cover flex-shrink-0" />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                <span className="text-blue-600 text-sm font-bold leading-none">{doc.firstName[0]}</span>
+                              <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <span className="text-blue-600 text-2xl font-bold leading-none">{doc.firstName[0]}</span>
                               </div>
                             )}
                             <span className="text-xs text-gray-500">{doc.specialty} — {doc.lastName} {doc.firstName}</span>
