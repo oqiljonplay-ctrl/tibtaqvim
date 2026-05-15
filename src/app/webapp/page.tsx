@@ -23,6 +23,14 @@ interface Service {
 }
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
 interface TgUser { firstName: string; phone: string | null; tibId: string | null; hasPhone: boolean }
+interface AppointmentDoctor {
+  id: string;
+  firstName: string;
+  lastName: string;
+  specialty: string;
+  photoUrl: string | null;
+}
+
 interface AppointmentItem {
   id: string;
   date: string;
@@ -32,6 +40,7 @@ interface AppointmentItem {
   serviceId: string;
   service: { name: string; type: string };
   slot?: { startTime: string; endTime: string } | null;
+  doctor?: AppointmentDoctor | null;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -518,47 +527,78 @@ export default function WebApp() {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📍 Bugungi qabul</p>
               {todayAppts.map((a) => (
                 <div key={a.id} className="bg-white rounded-2xl shadow-sm border-2 border-blue-100 p-4 mb-3">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-2xl">{typeEmojis[a.service.type] ?? "🏥"}</span>
-                      <div>
-                        <p className="font-semibold text-gray-900 text-sm leading-tight">{a.service.name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{formatDate(a.date)}</p>
-                      </div>
+                  {/* Yuqori: emoji + nom + sana */}
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span className="text-2xl shrink-0">{typeEmojis[a.service.type] ?? "🏥"}</span>
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm leading-tight">{a.service.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(a.date)}</p>
                     </div>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${statusStyle[a.status]}`}>
-                      {statusLabels[a.status]}
-                    </span>
                   </div>
 
+                  {/* Navbat raqami — markazda */}
                   {a.queueNumber && (
-                    <div className="bg-blue-50 rounded-xl px-4 py-3 text-center mb-3">
+                    <div className="bg-blue-50 rounded-xl px-4 py-3 text-center mb-4">
                       <p className="text-xs text-blue-500 mb-0.5">Navbat raqami</p>
                       <p className="text-3xl font-bold text-blue-600">#{a.queueNumber}</p>
                     </div>
                   )}
                   {a.slot && (
-                    <p className="text-xs text-gray-500 text-center mb-3">
+                    <p className="text-xs text-gray-500 text-center mb-4">
                       🕐 {a.slot.startTime} — {a.slot.endTime}
                     </p>
                   )}
 
-                  <div className="flex gap-2">
-                    {a.status === "booked" && (
+                  {/* Pastki: doctor foto chapda + status & tugmalar o'ngda tag-matag */}
+                  <div className="flex items-start gap-4">
+                    {/* Chap: shifokor foto 96px */}
+                    <div className="shrink-0">
+                      {a.doctor?.photoUrl ? (
+                        <img
+                          src={a.doctor.photoUrl}
+                          alt=""
+                          className="w-24 h-24 rounded-xl object-cover border border-gray-200"
+                        />
+                      ) : a.doctor ? (
+                        <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+                          <span className="text-white text-2xl font-semibold">
+                            {a.doctor.firstName[0]}{a.doctor.lastName[0]}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="w-24 h-24 rounded-xl bg-gray-100 flex items-center justify-center">
+                          <span className="text-3xl">{typeEmojis[a.service.type] ?? "🏥"}</span>
+                        </div>
+                      )}
+                      {a.doctor && (
+                        <div className="mt-1.5 w-24 text-center">
+                          <p className="text-xs text-gray-700 font-medium leading-tight truncate">{a.doctor.specialty}</p>
+                          <p className="text-xs text-gray-500 leading-tight truncate">{a.doctor.lastName} {a.doctor.firstName}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* O'ng: status + tugmalar (tag-matag) */}
+                    <div className="flex-1 flex flex-col gap-2">
+                      <span className={`px-3 py-2 rounded-lg text-xs font-medium text-center ${statusStyle[a.status]}`}>
+                        {statusLabels[a.status]}
+                      </span>
                       <button
-                        onClick={() => cancelAppointment(a.id)}
-                        disabled={cancellingId === a.id}
-                        className="flex-1 py-2 rounded-xl text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+                        onClick={() => startRebook(a.serviceId)}
+                        className="w-full py-2.5 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all"
                       >
-                        {cancellingId === a.id ? "..." : "❌ Bekor qilish"}
+                        🔁 Qayta bron
                       </button>
-                    )}
-                    <button
-                      onClick={() => startRebook(a.serviceId)}
-                      className="flex-1 py-2 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all"
-                    >
-                      🔁 Qayta bron
-                    </button>
+                      {a.status === "booked" && (
+                        <button
+                          onClick={() => cancelAppointment(a.id)}
+                          disabled={cancellingId === a.id}
+                          className="w-full py-2.5 rounded-xl text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+                        >
+                          {cancellingId === a.id ? "..." : "❌ Bekor qilish"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1011,44 +1051,76 @@ function AppointmentCard({
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2.5">
-          <span className="text-xl">{typeEmojis[appt.service.type] ?? "🏥"}</span>
-          <div>
-            <p className="font-semibold text-gray-900 text-sm">{appt.service.name}</p>
-            <p className="text-xs text-gray-400">{formatDate(appt.date)}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {appt.queueNumber && (
-            <span className="text-sm font-bold text-blue-600">#{appt.queueNumber}</span>
-          )}
-          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusStyle[appt.status]}`}>
-            {statusLabels[appt.status]}
-          </span>
+      {/* Yuqori: emoji + nom + sana */}
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className="text-xl shrink-0">{typeEmojis[appt.service.type] ?? "🏥"}</span>
+        <div>
+          <p className="font-semibold text-gray-900 text-sm">{appt.service.name}</p>
+          <p className="text-xs text-gray-400">{formatDate(appt.date)}</p>
         </div>
       </div>
 
+      {/* Navbat raqami — markazda */}
+      {appt.queueNumber && (
+        <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-center mb-4">
+          <p className="text-xs text-blue-500 mb-0.5">Navbat raqami</p>
+          <p className="text-3xl font-bold text-blue-600">#{appt.queueNumber}</p>
+        </div>
+      )}
       {appt.slot && (
-        <p className="text-xs text-gray-500 mb-3">🕐 {appt.slot.startTime} — {appt.slot.endTime}</p>
+        <p className="text-xs text-gray-500 text-center mb-4">🕐 {appt.slot.startTime} — {appt.slot.endTime}</p>
       )}
 
-      <div className="flex gap-2">
-        {appt.status === "booked" && (
+      {/* Pastki: doctor foto chapda + status & tugmalar o'ngda tag-matag */}
+      <div className="flex items-start gap-4">
+        {/* Chap: shifokor foto 96px */}
+        <div className="shrink-0">
+          {appt.doctor?.photoUrl ? (
+            <img
+              src={appt.doctor.photoUrl}
+              alt=""
+              className="w-24 h-24 rounded-xl object-cover border border-gray-200"
+            />
+          ) : appt.doctor ? (
+            <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+              <span className="text-white text-2xl font-semibold">
+                {appt.doctor.firstName[0]}{appt.doctor.lastName[0]}
+              </span>
+            </div>
+          ) : (
+            <div className="w-24 h-24 rounded-xl bg-gray-100 flex items-center justify-center">
+              <span className="text-3xl">{typeEmojis[appt.service.type] ?? "🏥"}</span>
+            </div>
+          )}
+          {appt.doctor && (
+            <div className="mt-1.5 w-24 text-center">
+              <p className="text-xs text-gray-700 font-medium leading-tight truncate">{appt.doctor.specialty}</p>
+              <p className="text-xs text-gray-500 leading-tight truncate">{appt.doctor.lastName} {appt.doctor.firstName}</p>
+            </div>
+          )}
+        </div>
+
+        {/* O'ng: status + tugmalar (tag-matag) */}
+        <div className="flex-1 flex flex-col gap-2">
+          <span className={`px-3 py-2 rounded-lg text-xs font-medium text-center ${statusStyle[appt.status]}`}>
+            {statusLabels[appt.status]}
+          </span>
           <button
-            onClick={() => onCancel(appt.id)}
-            disabled={cancellingId === appt.id}
-            className="flex-1 py-2 rounded-xl text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+            onClick={() => onRebook(appt.serviceId)}
+            className="w-full py-2.5 rounded-xl text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all"
           >
-            {cancellingId === appt.id ? "..." : "❌ Bekor qilish"}
+            🔁 Qayta bron
           </button>
-        )}
-        <button
-          onClick={() => onRebook(appt.serviceId)}
-          className="flex-1 py-2 rounded-xl text-xs font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 active:scale-95 transition-all"
-        >
-          🔁 Qayta bron
-        </button>
+          {appt.status === "booked" && (
+            <button
+              onClick={() => onCancel(appt.id)}
+              disabled={cancellingId === appt.id}
+              className="w-full py-2.5 rounded-xl text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {cancellingId === appt.id ? "..." : "❌ Bekor qilish"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

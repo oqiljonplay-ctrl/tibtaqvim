@@ -44,6 +44,12 @@ export async function GET(req: NextRequest) {
         serviceId: true,
         service: { select: { name: true, type: true } },
         slot: { select: { startTime: true, endTime: true } },
+        doctor: {
+          select: {
+            id: true, firstName: true, lastName: true,
+            specialty: true, photoUrl: true,
+          },
+        },
       },
     });
 
