@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
 
 export interface JwtPayload {
   userId: string;
