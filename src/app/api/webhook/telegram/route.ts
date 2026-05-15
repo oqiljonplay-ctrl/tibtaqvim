@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import TelegramBot from "node-telegram-bot-api";
 import { ok, error } from "@/lib/api-response";
 import { handleStart } from "../../../../../bot/handlers/start";
@@ -16,6 +16,22 @@ function getBot() {
 }
 
 export async function POST(req: NextRequest) {
+  const secret = req.headers.get("x-telegram-bot-api-secret-token");
+  const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+  if (!expected) {
+    console.error("[webhook] TELEGRAM_WEBHOOK_SECRET env not configured");
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
+  if (secret !== expected) {
+    console.warn("[webhook] Invalid secret token", {
+      hasSecret: !!secret,
+      ip: req.headers.get("x-forwarded-for") || "unknown",
+    });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const update = await req.json();
     const b = getBot();
