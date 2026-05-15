@@ -3,11 +3,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DoctorCard } from "@/components/DoctorCard";
 
+type QueueMode = "live" | "online" | "slot";
+
 interface ServiceItem {
   id: string;
   name: string;
   price: number;
   type: string;
+  queueMode: QueueMode;
 }
 
 interface Doctor {
@@ -25,6 +28,125 @@ interface Doctor {
 const emptyForm = {
   firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "",
 };
+
+function QueueModeSelector({
+  serviceId,
+  serviceName,
+  currentMode,
+  onChange,
+}: {
+  serviceId: string;
+  serviceName: string;
+  currentMode: QueueMode;
+  onChange: (mode: QueueMode) => void;
+}) {
+  return (
+    <div className="border rounded-lg p-3 bg-gray-50">
+      <p className="text-sm font-medium text-gray-700 mb-2">{serviceName}</p>
+      <div className="space-y-1.5">
+        <label className="flex items-center justify-between p-2 bg-white rounded cursor-pointer hover:bg-blue-50 transition">
+          <div>
+            <span className="text-sm font-medium">💵 Kunlik ro&apos;yxatga kirish</span>
+            <p className="text-xs text-gray-500 mt-0.5">Kassa orqali jonli navbat oladi</p>
+          </div>
+          <input
+            type="radio"
+            name={`queueMode-${serviceId}`}
+            checked={currentMode === "live"}
+            onChange={() => onChange("live")}
+            className="w-4 h-4 text-blue-600"
+          />
+        </label>
+        <label className="flex items-center justify-between p-2 bg-white rounded cursor-pointer hover:bg-blue-50 transition">
+          <div>
+            <span className="text-sm font-medium">🎫 Masofaviy jonli navbat</span>
+            <p className="text-xs text-gray-500 mt-0.5">Online navbat raqami beriladi</p>
+          </div>
+          <input
+            type="radio"
+            name={`queueMode-${serviceId}`}
+            checked={currentMode === "online"}
+            onChange={() => onChange("online")}
+            className="w-4 h-4 text-blue-600"
+          />
+        </label>
+        <label className="flex items-center justify-between p-2 bg-gray-100 rounded opacity-60 cursor-not-allowed">
+          <div>
+            <span className="text-sm font-medium">🕐 Aniq vaqt sloti</span>
+            <p className="text-xs text-gray-500 mt-0.5">Tez orada qo&apos;shiladi</p>
+          </div>
+          <input type="radio" disabled className="w-4 h-4" />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function DoctorQueueModes({ doctor, onSaved }: { doctor: Doctor; onSaved: () => void }) {
+  const [modes, setModes] = useState<Record<string, QueueMode>>(
+    Object.fromEntries(doctor.services.map((s) => [s.id, s.queueMode]))
+  );
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const serviceQueueModes = Object.entries(modes).map(([serviceId, queueMode]) => ({
+        serviceId,
+        queueMode,
+      }));
+      const res = await fetch(`/api/admin/doctors/${doctor.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serviceQueueModes }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.error?.message || "Saqlashda xatolik");
+        return;
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      onSaved();
+    } catch {
+      alert("Server xatosi");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (doctor.services.length === 0) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <p className="text-xs font-semibold text-gray-600 mb-2">📋 Navbat rejimlari</p>
+      <div className="space-y-2">
+        {doctor.services.map((svc) => (
+          <QueueModeSelector
+            key={svc.id}
+            serviceId={svc.id}
+            serviceName={`${svc.name} — ${Number(svc.price).toLocaleString()} so'm`}
+            currentMode={modes[svc.id] ?? "online"}
+            onChange={(mode) => setModes((prev) => ({ ...prev, [svc.id]: mode }))}
+          />
+        ))}
+      </div>
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className={`mt-2 w-full py-1.5 rounded-lg text-sm font-medium transition ${
+          saved
+            ? "bg-green-600 text-white"
+            : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+        }`}
+      >
+        {saving ? "Saqlanmoqda..." : saved ? "✓ Saqlandi" : "Rejimlarni saqlash"}
+      </button>
+    </div>
+  );
+}
 
 export default function AdminDoctorsPage() {
   const router = useRouter();
@@ -45,7 +167,9 @@ export default function AdminDoctorsPage() {
   async function fetchDoctors() {
     setLoading(true);
     const clinicId = localStorage.getItem("clinicId") || "";
-    const res = await fetch(`/api/admin/doctors${clinicId ? `?clinicId=${clinicId}` : ""}`);
+    const res = await fetch(`/api/admin/doctors${clinicId ? `?clinicId=${clinicId}` : ""}`, {
+      credentials: "include",
+    });
     const json = await res.json();
     if (json.success) setDoctors(json.data);
     setLoading(false);
@@ -53,7 +177,9 @@ export default function AdminDoctorsPage() {
 
   async function fetchServices() {
     const clinicId = localStorage.getItem("clinicId") || "";
-    const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`);
+    const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, {
+      credentials: "include",
+    });
     const json = await res.json();
     if (json.success) setServices(json.data);
   }
@@ -68,6 +194,7 @@ export default function AdminDoctorsPage() {
     e.preventDefault();
     const res = await fetch("/api/admin/doctors", {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
@@ -82,12 +209,6 @@ export default function AdminDoctorsPage() {
       setSelectedServiceIds([]);
       fetchDoctors();
     }
-  }
-
-  function openForm() {
-    setForm(emptyForm);
-    setSelectedServiceIds([]);
-    setShowForm(true);
   }
 
   async function handleDelete(doctorId: string) {
@@ -115,7 +236,12 @@ export default function AdminDoctorsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Shifokorlar</h1>
-        <button onClick={openForm} className="btn-primary">+ Yangi shifokor</button>
+        <button
+          onClick={() => { setForm(emptyForm); setSelectedServiceIds([]); setShowForm(true); }}
+          className="btn-primary"
+        >
+          + Yangi shifokor
+        </button>
       </div>
 
       {showForm && (
@@ -156,7 +282,6 @@ export default function AdminDoctorsPage() {
                 />
               )}
             </div>
-
             {services.length > 0 && (
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Qatnashadigan xizmatlar</label>
@@ -174,7 +299,6 @@ export default function AdminDoctorsPage() {
                 </div>
               </div>
             )}
-
             <div className="md:col-span-2 flex gap-3">
               <button type="submit" className="btn-primary">Qo&apos;shish</button>
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Bekor</button>
@@ -187,77 +311,65 @@ export default function AdminDoctorsPage() {
         <div className="text-gray-400 text-sm text-center py-12">Yuklanmoqda...</div>
       ) : (
         <>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {doctors.map((d) => (
-            <div key={d.id} className="card relative">
-              {/* Tahrirlash / O'chirish tugmalari */}
-              <div className="absolute top-3 right-3 flex gap-1">
-                <button
-                  onClick={() => router.push(`/admin/doctors/${d.id}/edit`)}
-                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-                  title="Tahrirlash"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => setConfirmDeleteId(d.id)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-                  title="O'chirish"
-                >
-                  🗑️
-                </button>
-              </div>
-
-              <DoctorCard doctor={d} size="md" />
-              {d.phone && <p className="text-xs text-gray-400 mt-2 ml-15">{d.phone}</p>}
-              {d.branch && <p className="text-xs text-gray-400">{d.branch.name}</p>}
-              {d.services.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <p className="text-xs text-gray-500 mb-1">Xizmatlar:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {d.services.map((svc) => (
-                      <span key={svc.id} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                        {svc.name}
-                      </span>
-                    ))}
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {doctors.map((d) => (
+              <div key={d.id} className="card relative">
+                <div className="absolute top-3 right-3 flex gap-1">
+                  <button
+                    onClick={() => router.push(`/admin/doctors/${d.id}/edit`)}
+                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                    title="Tahrirlash"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(d.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                    title="O'chirish"
+                  >
+                    🗑️
+                  </button>
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
 
-        {/* O'chirish tasdiqlash modali */}
-        {confirmDeleteId && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
-              <h3 className="font-semibold text-lg mb-2">Shifokorni o'chirish</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                {(() => {
-                  const d = doctors.find((x) => x.id === confirmDeleteId);
-                  return d ? `${d.lastName} ${d.firstName}` : "";
-                })()}
-                &nbsp;ni o&apos;chirmoqchimisiz? Bu amal aktiv holatdan chiqaradi.
-              </p>
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => setConfirmDeleteId(null)}
-                  disabled={deleting}
-                  className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  onClick={() => handleDelete(confirmDeleteId)}
-                  disabled={deleting}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
-                >
-                  {deleting ? "O'chirilmoqda..." : "Ha, o'chirish"}
-                </button>
+                <DoctorCard doctor={d} size="md" />
+                {d.phone && <p className="text-xs text-gray-400 mt-2 ml-15">{d.phone}</p>}
+                {d.branch && <p className="text-xs text-gray-400">{d.branch.name}</p>}
+
+                <DoctorQueueModes doctor={d} onSaved={fetchDoctors} />
+              </div>
+            ))}
+          </div>
+
+          {confirmDeleteId && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+                <h3 className="font-semibold text-lg mb-2">Shifokorni o&apos;chirish</h3>
+                <p className="text-gray-600 text-sm mb-4">
+                  {(() => {
+                    const d = doctors.find((x) => x.id === confirmDeleteId);
+                    return d ? `${d.lastName} ${d.firstName}` : "";
+                  })()}
+                  &nbsp;ni o&apos;chirmoqchimisiz? Bu amal aktiv holatdan chiqaradi.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setConfirmDeleteId(null)}
+                    disabled={deleting}
+                    className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Bekor qilish
+                  </button>
+                  <button
+                    onClick={() => handleDelete(confirmDeleteId)}
+                    disabled={deleting}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {deleting ? "O'chirilmoqda..." : "Ha, o'chirish"}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
         </>
       )}
     </div>

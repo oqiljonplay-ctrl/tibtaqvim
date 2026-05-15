@@ -713,6 +713,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       const doctorName = a.doctor ? `${a.doctor.firstName} ${a.doctor.lastName}` : undefined;
       const slotTime = a.slot ? `${a.slot.startTime} — ${a.slot.endTime}` : undefined;
 
+      const queueMode = (a as any).queueMode || "online";
+      const isLive = queueMode === "live";
+
       const successText = [
         "✅ *Qabul tasdiqlandi!*",
         "",
@@ -720,12 +723,17 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         `📅 Sana: *${date}*`,
         a.service?.name ? `📋 Xizmat: *${a.service.name}*` : "",
         state.servicePrice != null ? `💰 Narx: *${formatPrice(state.servicePrice)}*` : "",
-        a.queueNumber ? `🔢 Navbat raqami: *${a.queueNumber}*` : "📋 Navbat: ro'yxatga qo'shildingiz",
         doctorName ? `👨‍⚕️ Shifokor: *${doctorName}*` : "",
         slotTime ? `🕐 Vaqt: *${slotTime}*` : "",
         finalTibId ? `🆔 ID: *${finalTibId}*` : "",
         "",
-        finalTibId ? "📍 Klinikaga kelganda ushbu ID ni ko'rsating" : "Klinikaga o'z vaqtida keling! 🏥",
+        isLive
+          ? "💵 *Rejim:* Kunlik ro'yxatga kirish"
+          : (a.queueNumber ? `🔢 Navbat raqami: *#${a.queueNumber}*` : "📋 Navbat: ro'yxatga qo'shildingiz"),
+        "",
+        isLive
+          ? "⚠️ Klinikaga kelib kassadan jonli navbat raqami oling"
+          : (finalTibId ? "📍 Klinikaga kelganda ushbu ID ni ko'rsating" : "Klinikaga o'z vaqtida keling! 🏥"),
       ].filter(Boolean).join("\n");
 
       if (msgId) {

@@ -23,7 +23,16 @@ function bookingError(code: string, message: string, status: number): BookingRes
 }
 
 // ─── Doctor Queue ─────────────────────────────────────────────────────────────
-async function bookDoctorQueue(input: BookingInput, service: { dailyLimit: number | null }, bookingDate: Date): Promise<BookingResult> {
+async function bookDoctorQueue(
+  input: BookingInput,
+  service: { dailyLimit: number | null; requiresPrePayment: boolean },
+  bookingDate: Date,
+  queueMode: "live" | "online" | "slot"
+): Promise<BookingResult> {
+  if (queueMode === "slot") {
+    return bookingError("SLOT_MODE_DISABLED", "Aniq vaqt sloti hali ishga tushmagan", 400);
+  }
+
   try {
     const appt = await prisma.$transaction(async (tx) => {
       if (service.dailyLimit !== null) {
@@ -47,11 +56,21 @@ async function bookDoctorQueue(input: BookingInput, service: { dailyLimit: numbe
         throw { code: "DUPLICATE_BOOKING", message: "Bu raqam uchun bugun allaqachon navbat bron qilingan" };
       }
 
-      const last = await tx.appointment.findFirst({
-        where: { serviceId: input.serviceId, date: bookingDate, status: { not: "cancelled" } },
-        orderBy: { queueNumber: "desc" },
-      });
-      const queueNumber = (last?.queueNumber ?? 0) + 1;
+      let queueNumber: number | null = null;
+      let paymentStatus = "not_required";
+
+      if (queueMode === "online") {
+        const last = await tx.appointment.findFirst({
+          where: { serviceId: input.serviceId, date: bookingDate, status: { not: "cancelled" } },
+          orderBy: { queueNumber: "desc" },
+        });
+        queueNumber = (last?.queueNumber ?? 0) + 1;
+        paymentStatus = service.requiresPrePayment ? "pending" : "not_required";
+      } else {
+        // live — kassada queueNumber beriladi
+        queueNumber = null;
+        paymentStatus = "pending";
+      }
 
       return tx.appointment.create({
         data: {
@@ -65,6 +84,8 @@ async function bookDoctorQueue(input: BookingInput, service: { dailyLimit: numbe
           patientPhone: normalizePhone(input.patientPhone),
           address: null,
           queueNumber,
+          queueMode,
+          paymentStatus,
           status: "booked",
         },
         include: {
@@ -75,7 +96,7 @@ async function bookDoctorQueue(input: BookingInput, service: { dailyLimit: numbe
       });
     });
 
-    logger.info("DoctorQueue booked", { appointmentId: appt.id, queueNumber: appt.queueNumber });
+    logger.info("DoctorQueue booked", { appointmentId: appt.id, queueNumber: appt.queueNumber, queueMode });
     return { success: true, data: appt, tibId: null };
   } catch (err: any) {
     if (err?.code === "LIMIT_REACHED") return bookingError("LIMIT_REACHED", err.message, 409);
@@ -210,14 +231,26 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
   }
 
   // Force UTC midnight so @db.Date stores the correct calendar date
-  // regardless of server timezone (Vercel = UTC, local dev = +5).
   const bookingDate = new Date(input.date + "T00:00:00.000Z");
+
+  // queueMode: serviceDoctor binding → service default → 'online'
+  const serviceDoctor = input.doctorId
+    ? await prisma.serviceDoctor.findUnique({
+        where: { serviceId_doctorId: { serviceId: input.serviceId, doctorId: input.doctorId } },
+      })
+    : null;
+  const queueMode = (serviceDoctor?.queueMode ?? service.defaultQueueMode) as "live" | "online" | "slot";
 
   try {
     let result: BookingResult;
     switch (service.type) {
       case "doctor_queue":
-        result = await bookDoctorQueue(input, service, bookingDate);
+        result = await bookDoctorQueue(
+          input,
+          { dailyLimit: service.dailyLimit, requiresPrePayment: service.requiresPrePayment },
+          bookingDate,
+          queueMode
+        );
         break;
       case "diagnostic":
         result = await bookDiagnostic(input, { dailyLimit: service.dailyLimit, requiresSlot: service.requiresSlot }, bookingDate);
@@ -230,15 +263,12 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
     }
 
     if (result.success) {
-      // Link appointment to user (background — bron bloklanmaydi)
       linkUserToAppointment(result.data.id, input.patientPhone).catch(() => {});
 
-      // Webapp bronlar uchun Telegram notification (bot bronlarda bot o'zi yuboradi)
       if (input.source !== "bot") {
         notifyPatientAsync(result.data, input.patientPhone);
       }
 
-      // tibId: userId dan yoki phone dan topib, yo'q bo'lsa yangi beradi
       const tibId = await resolveTibId(input);
       return { success: true, data: result.data, tibId };
     }
@@ -250,7 +280,6 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
   }
 }
 
-// tibId ni kafolatli qaytaradi: userId → phone → assign
 async function resolveTibId(input: BookingInput): Promise<string | null> {
   try {
     if (input.userId) {
@@ -266,7 +295,6 @@ async function resolveTibId(input: BookingInput): Promise<string | null> {
   }
 }
 
-// User phone orqali topib appointmentga userId bog'laydi
 async function linkUserToAppointment(appointmentId: string, phone: string): Promise<void> {
   const user = await prisma.user.findFirst({
     where: { phone: normalizePhone(phone) },
@@ -276,13 +304,11 @@ async function linkUserToAppointment(appointmentId: string, phone: string): Prom
   await prisma.appointment.update({ where: { id: appointmentId }, data: { userId: user.id } });
 }
 
-// Fire-and-forget: bronni buzmasin, faqat try/catch ichida ishlaydi
 async function notifyPatientAsync(
   appt: AppointmentWithRelations,
   patientPhone: string
 ): Promise<void> {
   try {
-    // User phone orqali topish → telegramId + tibId olish
     const user = await prisma.user.findFirst({
       where: { phone: normalizePhone(patientPhone) },
       select: { telegramId: true, tibId: true },
@@ -296,6 +322,7 @@ async function notifyPatientAsync(
     const slotTime = appt.slot
       ? `${appt.slot.startTime} — ${appt.slot.endTime}`
       : undefined;
+    const queueMode = (appt as any).queueMode as "live" | "online" | undefined;
 
     const msg = buildConfirmationMessage({
       patientName: appt.patientName,
@@ -305,6 +332,7 @@ async function notifyPatientAsync(
       slotTime,
       serviceName: appt.service?.name,
       tibId,
+      queueMode,
     });
 
     await sendTelegramConfirmation(user.telegramId, msg);

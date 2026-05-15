@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         branch: { select: { name: true } },
         services: {
           include: {
-            service: { select: { id: true, name: true, type: true, price: true } },
+            service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
           },
         },
       },
@@ -30,6 +30,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       services: doctor.services.map((sd) => ({
         ...sd.service,
         price: Number(sd.service.price),
+        queueMode: sd.queueMode,
       })),
     });
   } catch {
@@ -48,13 +49,46 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (auth.role !== "super_admin" && doctor.clinicId !== auth.clinicId) return forbidden();
 
     const body = await req.json();
-    const { firstName, lastName, specialty, phone, photoUrl, serviceIds } = body;
+    const { firstName, lastName, specialty, phone, photoUrl, serviceIds, serviceQueueModes } = body;
+
+    // serviceQueueModes: [{serviceId, queueMode}] — faqat queueMode yangilash
+    if (Array.isArray(serviceQueueModes) && serviceQueueModes.length > 0) {
+      for (const item of serviceQueueModes) {
+        if (!item.serviceId || !item.queueMode) continue;
+        if (!["live", "online", "slot"].includes(item.queueMode)) continue;
+        await prisma.serviceDoctor.update({
+          where: { serviceId_doctorId: { serviceId: item.serviceId, doctorId: params.id } },
+          data: { queueMode: item.queueMode },
+        });
+      }
+      // Faqat queueModes yangilash — boshqa field yo'q bo'lsa erta qayt
+      if (!firstName && !lastName && !specialty) {
+        const updated = await prisma.doctor.findUnique({
+          where: { id: params.id },
+          include: {
+            branch: { select: { name: true } },
+            services: {
+              include: {
+                service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
+              },
+            },
+          },
+        });
+        return ok({
+          ...updated,
+          services: updated!.services.map((sd) => ({
+            ...sd.service,
+            price: Number(sd.service.price),
+            queueMode: sd.queueMode,
+          })),
+        });
+      }
+    }
 
     if (!firstName || !lastName || !specialty) {
       return error("firstName, lastName, specialty are required");
     }
 
-    // ServiceDoctor M2M ni qayta yoz
     if (Array.isArray(serviceIds)) {
       await prisma.serviceDoctor.deleteMany({ where: { doctorId: params.id } });
     }
@@ -75,7 +109,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         branch: { select: { name: true } },
         services: {
           include: {
-            service: { select: { id: true, name: true, type: true, price: true } },
+            service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
           },
         },
       },
@@ -86,6 +120,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       services: updated.services.map((sd) => ({
         ...sd.service,
         price: Number(sd.service.price),
+        queueMode: sd.queueMode,
       })),
     });
   } catch {
@@ -103,7 +138,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (!doctor) return notFound("Doctor not found");
     if (auth.role !== "super_admin" && doctor.clinicId !== auth.clinicId) return forbidden();
 
-    // Soft-delete — appointments saqlanib qoladi
     await prisma.doctor.update({
       where: { id: params.id },
       data: { isActive: false },

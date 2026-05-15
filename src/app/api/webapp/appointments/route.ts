@@ -5,8 +5,6 @@ import { ok, error } from "@/lib/api-response";
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
 
 // GET /api/webapp/appointments?telegramId=...&clinicId=...
-// JWT yo'q — telegramId orqali autentifikatsiya.
-// Phone bo'lmagan users uchun ham userId orqali qidiradi.
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const telegramId = searchParams.get("telegramId");
@@ -23,7 +21,6 @@ export async function GET(req: NextRequest) {
 
     if (!user) return ok([]);
 
-    // Search by patientPhone (for old appointments) OR userId (for new linked ones)
     const phoneFilter = user.phone ? { patientPhone: user.phone } : null;
     const userIdFilter = { userId: user.id };
 
@@ -40,6 +37,8 @@ export async function GET(req: NextRequest) {
         date: true,
         status: true,
         queueNumber: true,
+        queueMode: true,
+        paymentStatus: true,
         patientName: true,
         serviceId: true,
         service: { select: { name: true, type: true } },

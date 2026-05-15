@@ -8,13 +8,16 @@ interface ConfirmationData {
   slotTime?: string | null;
   serviceName?: string;
   tibId?: string | null;
+  queueMode?: "live" | "online" | "slot";
 }
 
 export function buildConfirmationMessage(data: ConfirmationData): string {
   const {
     patientName, date, doctorName, queueNumber,
-    slotTime, serviceName, tibId,
+    slotTime, serviceName, tibId, queueMode,
   } = data;
+
+  const isLive = queueMode === "live";
 
   const lines = [
     "✅ *Qabul tasdiqlandi*",
@@ -22,22 +25,22 @@ export function buildConfirmationMessage(data: ConfirmationData): string {
     `👤 Ism: *${patientName}*`,
     `📅 Sana: *${date}*`,
     serviceName ? `📋 Xizmat: *${serviceName}*` : "",
-    queueNumber
-      ? `🔢 Navbat: *${queueNumber}*`
-      : "📋 Navbat: ro'yxatga qo'shildingiz",
     doctorName ? `👨‍⚕️ Shifokor: *${doctorName}*` : "",
     slotTime ? `🕐 Vaqt: *${slotTime}*` : "",
     tibId ? `🆔 ID: *${tibId}*` : "",
     "",
-    tibId
-      ? "📍 Klinikaga kelganda ushbu kodni ko'rsating"
-      : "Klinikaga o'z vaqtida keling! 🏥",
+    isLive
+      ? "💵 *Rejim:* Kunlik ro'yxatga kirish"
+      : (queueNumber ? `🔢 Navbat: *#${queueNumber}*` : "📋 Navbat: ro'yxatga qo'shildingiz"),
+    "",
+    isLive
+      ? "⚠️ Klinikaga kelib kassadan jonli navbat raqami oling"
+      : (tibId ? "📍 Klinikaga kelganda ushbu kodni ko'rsating" : "Klinikaga o'z vaqtida keling! 🏥"),
   ].filter(Boolean).join("\n");
 
   return lines;
 }
 
-// API orqali Telegram xabar yuborish (webapp bronlar uchun)
 export async function sendTelegramConfirmation(
   telegramId: string,
   message: string
@@ -57,7 +60,6 @@ export async function sendTelegramConfirmation(
     clearTimeout(timer);
     if (!res.ok) logger.warn("Telegram confirmation send failed", { telegramId, status: res.status });
   } catch {
-    // Telegram xatosi bronni buzmasin
     logger.warn("Telegram confirmation error (non-critical)", { telegramId });
   }
 }

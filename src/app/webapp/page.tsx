@@ -14,11 +14,13 @@ type BookingStep = "services" | "date" | "slots" | "form" | "confirm" | "done";
 
 interface ServiceDoctor {
   id: string; firstName: string; lastName: string; specialty: string; photoUrl: string | null;
+  queueMode?: "live" | "online" | "slot";
 }
 interface Service {
   id: string; name: string; type: string; price: number;
   requiresSlot: boolean; requiresAddress: boolean; requiresPrePayment: boolean;
   dailyLimit: number | null; todayCount: number; isAvailable: boolean;
+  defaultQueueMode?: "live" | "online" | "slot";
   doctors: ServiceDoctor[];
 }
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
@@ -36,6 +38,8 @@ interface AppointmentItem {
   date: string;
   status: "booked" | "arrived" | "missed" | "cancelled";
   queueNumber: number | null;
+  queueMode?: "live" | "online" | "slot" | null;
+  paymentStatus?: string | null;
   patientName: string;
   serviceId: string;
   service: { name: string; type: string };
@@ -798,12 +802,24 @@ export default function WebApp() {
               ← Orqaga
             </button>
             {selectedService && (
-              <div className="bg-blue-50 rounded-xl p-3 mb-5 flex items-center gap-3">
+              <div className="bg-blue-50 rounded-xl p-3 mb-3 flex items-center gap-3">
                 <span className="text-xl">{typeEmojis[selectedService.type]}</span>
                 <div>
                   <div className="text-sm font-semibold text-blue-900">{selectedService.name}</div>
-                  <div className="text-xs text-blue-600">{selectedService.price.toLocaleString()} so'm</div>
+                  <div className="text-xs text-blue-600">{selectedService.price.toLocaleString()} so&apos;m</div>
                 </div>
+              </div>
+            )}
+            {selectedService?.defaultQueueMode === "live" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                <p className="text-xs font-semibold text-amber-800">💵 Kunlik ro&apos;yxatga kirish rejimi</p>
+                <p className="text-xs text-amber-700 mt-0.5">Sana tanlaysiz, klinikaga kelganda kassadan jonli navbat olasiz.</p>
+              </div>
+            )}
+            {(selectedService?.defaultQueueMode === "online" || !selectedService?.defaultQueueMode) && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+                <p className="text-xs font-semibold text-blue-800">🎫 Onlayn jonli navbat rejimi</p>
+                <p className="text-xs text-blue-700 mt-0.5">Navbat raqamingiz beriladi, kabinetga to&apos;g&apos;ridan kelasiz.</p>
               </div>
             )}
             <h2 className="font-semibold text-gray-900 mb-3">Sanani tanlang</h2>
@@ -1060,13 +1076,22 @@ function AppointmentCard({
         </div>
       </div>
 
-      {/* Navbat raqami — markazda */}
-      {appt.queueNumber && (
-        <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-center mb-4">
+      {/* Navbat raqami — markazda (online rejim) */}
+      {appt.queueNumber && appt.queueMode !== "live" && (
+        <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-center mb-3">
           <p className="text-xs text-blue-500 mb-0.5">Navbat raqami</p>
           <p className="text-3xl font-bold text-blue-600">#{appt.queueNumber}</p>
         </div>
       )}
+
+      {/* Live rejim badge */}
+      {appt.queueMode === "live" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center mb-3">
+          <p className="text-xs font-semibold text-amber-800">💵 Kunlik ro&apos;yxatga kirish</p>
+          <p className="text-xs text-amber-600 mt-0.5">Klinikada kassadan jonli navbat oling</p>
+        </div>
+      )}
+
       {appt.slot && (
         <p className="text-xs text-gray-500 text-center mb-4">🕐 {appt.slot.startTime} — {appt.slot.endTime}</p>
       )}

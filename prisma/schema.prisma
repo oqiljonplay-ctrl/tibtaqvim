@@ -31,6 +31,12 @@ enum UserRole {
   patient
 }
 
+enum QueueMode {
+  live
+  online
+  slot
+}
+
 // ─── CORE MODELS ─────────────────────────────────────────────────────────────
 
 model Clinic {
@@ -92,6 +98,7 @@ model Service {
   dailyLimit         Int?
   isActive           Boolean     @default(true)
   sortOrder          Int         @default(0)
+  defaultQueueMode   QueueMode   @default(online)
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
@@ -132,7 +139,8 @@ model Doctor {
 model ServiceDoctor {
   serviceId String
   doctorId  String
-  createdAt DateTime @default(now())
+  queueMode QueueMode @default(online)
+  createdAt DateTime  @default(now())
 
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
@@ -219,6 +227,8 @@ model Appointment {
   liveLastUpdatedAt  DateTime?   @db.Timestamp(6)
   liveMessageId      BigInt?
   liveStatus         String?
+  queueMode    QueueMode         @default(online)
+  paymentStatus String           @default("not_required")
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 

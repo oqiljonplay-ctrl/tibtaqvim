@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
         branch: { select: { name: true } },
         services: {
           include: {
-            service: { select: { id: true, name: true, type: true, price: true } },
+            service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
           },
         },
       },
@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
       services: d.services.map((sd) => ({
         ...sd.service,
         price: Number(sd.service.price),
+        queueMode: sd.queueMode,
       })),
     })));
   } catch {
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
         branch: { select: { name: true } },
         services: {
           include: {
-            service: { select: { id: true, name: true, type: true, price: true } },
+            service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
           },
         },
       },
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
       services: doctor.services.map((sd) => ({
         ...sd.service,
         price: Number(sd.service.price),
+        queueMode: sd.queueMode,
       })),
     });
   } catch {

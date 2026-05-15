@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ok, error, notFound } from "@/lib/api-response";
+import { error, notFound } from "@/lib/api-response";
 import { getDateRange } from "@/lib/utils/date";
 
 // GET /api/services?clinicId=xxx&type=doctor_queue&date=2024-01-01
@@ -42,7 +42,11 @@ export async function GET(req: NextRequest) {
       ...s,
       price: Number(s.price),
       prePaymentAmount: s.prePaymentAmount ? Number(s.prePaymentAmount) : null,
-      doctors: s.doctors.map((sd) => sd.doctor),
+      defaultQueueMode: s.defaultQueueMode,
+      doctors: s.doctors.map((sd) => ({
+        ...sd.doctor,
+        queueMode: sd.queueMode,
+      })),
       ...extra,
     });
 
