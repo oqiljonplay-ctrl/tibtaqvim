@@ -28,8 +28,8 @@ export default function EditDoctorPage() {
   useEffect(() => {
     const clinicId = localStorage.getItem("clinicId") || "";
     Promise.all([
-      fetch(`/api/admin/doctors/${doctorId}`).then((r) => r.json()),
-      fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`).then((r) => r.json()),
+      fetch(`/api/admin/doctors/${doctorId}`, { credentials: "include" }).then((r) => r.json()),
+      fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, { credentials: "include" }).then((r) => r.json()),
     ]).then(([doctorJson, servicesJson]) => {
       if (doctorJson.success) {
         const d = doctorJson.data;
@@ -60,17 +60,23 @@ export default function EditDoctorPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError(null);
     try {
+      const finalServiceIds = [...selectedServiceIds];
+      const matched = services.find((s) => s.name === form.specialty);
+      if (matched && !finalServiceIds.includes(matched.id)) finalServiceIds.push(matched.id);
+
       const res = await fetch(`/api/admin/doctors/${doctorId}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
           photoUrl: form.photoUrl || null,
           phone: form.phone || null,
-          serviceIds: selectedServiceIds,
+          serviceIds: finalServiceIds,
         }),
       });
       const json = await res.json();
@@ -132,13 +138,36 @@ export default function EditDoctorPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Mutaxassislik *</label>
-            <input
+            <select
               className="input"
               value={form.specialty}
-              onChange={(e) => setForm((p) => ({ ...p, specialty: e.target.value }))}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((p) => ({ ...p, specialty: val }));
+                if (val) {
+                  const matched = services.find((s) => s.name === val);
+                  if (matched && !selectedServiceIds.includes(matched.id)) {
+                    setSelectedServiceIds((prev) => [...prev, matched.id]);
+                  }
+                }
+              }}
               required
-              placeholder="Terapevt, Kardiolog..."
-            />
+            >
+              <option value="">-- Mutaxassislikni tanlang --</option>
+              {form.specialty && !services.some((s) => s.name === form.specialty) && (
+                <option value={form.specialty} disabled>
+                  {form.specialty} (eski qiymat — yangilang)
+                </option>
+              )}
+              {services.map((s) => (
+                <option key={s.id} value={s.name}>{s.name}</option>
+              ))}
+            </select>
+            {form.specialty && (
+              <p className="mt-1 text-xs text-gray-500">
+                &quot;{form.specialty}&quot; xizmati avtomatik biriktiriladi.
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>

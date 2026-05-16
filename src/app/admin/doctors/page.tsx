@@ -117,7 +117,18 @@ function DoctorQueueModes({ doctor, onSaved }: { doctor: Doctor; onSaved: () => 
     }
   }
 
-  if (doctor.services.length === 0) return null;
+  if (doctor.services.length === 0) {
+    return (
+      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <p className="text-sm text-amber-800 font-medium">
+          ⚠️ Hali biror xizmatga biriktirilmagan
+        </p>
+        <p className="text-xs text-amber-700 mt-1">
+          Bemorlar uchun ko&apos;rinmaydi.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-100">
@@ -158,6 +169,7 @@ export default function AdminDoctorsPage() {
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchDoctors();
@@ -192,22 +204,38 @@ export default function AdminDoctorsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/admin/doctors", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        photoUrl: form.photoUrl || null,
-        phone: form.phone || null,
-        serviceIds: selectedServiceIds,
-      }),
-    });
-    if (res.ok) {
-      setShowForm(false);
-      setForm(emptyForm);
-      setSelectedServiceIds([]);
-      fetchDoctors();
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/doctors", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          photoUrl: form.photoUrl || null,
+          phone: form.phone || null,
+          serviceIds: (() => {
+            const ids = [...selectedServiceIds];
+            const matched = services.find((s) => s.name === form.specialty);
+            if (matched && !ids.includes(matched.id)) ids.push(matched.id);
+            return ids;
+          })(),
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setShowForm(false);
+        setForm(emptyForm);
+        setSelectedServiceIds([]);
+        fetchDoctors();
+      } else {
+        alert(json.error?.message || "Saqlashda xatolik");
+      }
+    } catch {
+      alert("Server bilan bog'lanishda xatolik");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -258,7 +286,37 @@ export default function AdminDoctorsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Mutaxassislik *</label>
-              <input className="input" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} required placeholder="Terapevt, Kardiolog..." />
+              <select
+                className="input"
+                value={form.specialty}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm({ ...form, specialty: val });
+                  if (val) {
+                    const matched = services.find((s) => s.name === val);
+                    if (matched && !selectedServiceIds.includes(matched.id)) {
+                      setSelectedServiceIds((prev) => [...prev, matched.id]);
+                    }
+                  }
+                }}
+                required
+              >
+                <option value="">-- Mutaxassislikni tanlang --</option>
+                {services.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+              {services.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  ⚠️ Hech qanday xizmat topilmadi.{" "}
+                  <a href="/admin/services" className="underline">Xizmatlar sahifasida</a> xizmat qo&apos;shing.
+                </p>
+              )}
+              {form.specialty && (
+                <p className="mt-1 text-xs text-gray-500">
+                  &quot;{form.specialty}&quot; xizmati avtomatik biriktiriladi.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
@@ -300,7 +358,9 @@ export default function AdminDoctorsPage() {
               </div>
             )}
             <div className="md:col-span-2 flex gap-3">
-              <button type="submit" className="btn-primary">Qo&apos;shish</button>
+              <button type="submit" disabled={submitting} className="btn-primary disabled:opacity-50">
+                {submitting ? "Saqlanmoqda..." : "Qo'shish"}
+              </button>
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Bekor</button>
             </div>
           </form>
@@ -333,7 +393,11 @@ export default function AdminDoctorsPage() {
 
                 <DoctorCard doctor={d} size="md" />
                 {d.phone && <p className="text-xs text-gray-400 mt-2 ml-15">{d.phone}</p>}
-                {d.branch && <p className="text-xs text-gray-400">{d.branch.name}</p>}
+                {d.branch ? (
+                  <p className="text-xs text-gray-500 mt-1">🏥 {d.branch.name}</p>
+                ) : (
+                  <p className="text-xs text-amber-600 mt-1">⚠️ Filial belgilanmagan</p>
+                )}
 
                 <DoctorQueueModes doctor={d} onSaved={fetchDoctors} />
               </div>
