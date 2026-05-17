@@ -14,6 +14,7 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
     "seed:m2m": "ts-node prisma/seed-m2m.ts",
+    "cleanup:dups": "npx tsx prisma/cleanup-dups.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -35,6 +36,7 @@
     "postcss": "^8.5.12",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "recharts": "^3.8.1",
     "tailwindcss": "^3.4.19"
   },
   "devDependencies": {

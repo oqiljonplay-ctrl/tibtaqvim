@@ -1,4 +1,5 @@
 import KpiCards from "@/components/stats/KpiCards";
+import ChartsSection from "./components/ChartsSection";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -46,9 +47,13 @@ export default async function StatsPage() {
         </section>
 
         <section className="mb-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-            📈 Grafiklar va tahlillar — keyingi bosqichda qo'shiladi
-          </div>
+          {(payload.role === "super_admin" || payload.role === "clinic_admin") ? (
+            <ChartsSection />
+          ) : (
+            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+              📈 Grafiklar va tahlillar — keyingi bosqichda qo'shiladi
+            </div>
+          )}
         </section>
       </div>
     </div>
