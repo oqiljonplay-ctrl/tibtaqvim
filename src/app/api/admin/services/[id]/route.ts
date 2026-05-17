@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         ...(rest.name !== undefined && { name: rest.name }),
         ...(rest.price !== undefined && { price: rest.price }),
         ...(rest.dailyLimit !== undefined && { dailyLimit: rest.dailyLimit }),
-        ...(rest.requiresSlot !== undefined && { requiresSlot: rest.requiresSlot }),
+        // TODO: Bosqich 2 - slot tizimi yoqilganda rest.requiresSlot qaytariladi
         ...(rest.requiresAddress !== undefined && { requiresAddress: rest.requiresAddress }),
         ...(rest.requiresPrePayment !== undefined && { requiresPrePayment: rest.requiresPrePayment }),
         ...(rest.prePaymentAmount !== undefined && { prePaymentAmount: rest.prePaymentAmount }),

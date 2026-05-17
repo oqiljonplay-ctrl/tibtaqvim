@@ -166,10 +166,12 @@ export default function AdminServicesPage() {
               <input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
             <div className="flex gap-4 items-end">
+              {/* TODO: Bosqich 2 - slot tizimi yoqilganda qaytariladi
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={form.requiresSlot} onChange={(e) => setForm({ ...form, requiresSlot: e.target.checked })} />
                 Uyacha kerak
               </label>
+              */}
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={form.requiresAddress} onChange={(e) => setForm({ ...form, requiresAddress: e.target.checked })} />
                 Manzil kerak
@@ -287,7 +289,7 @@ export default function AdminServicesPage() {
                   </td>
                   <td className="py-2">
                     <div className="flex gap-1 flex-wrap">
-                      {s.requiresSlot && <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded">Uyacha</span>}
+                      {/* TODO: Bosqich 2 - slot tizimi yoqilganda qaytariladi: {s.requiresSlot && <span>Uyacha</span>} */}
                       {s.requiresAddress && <span className="bg-orange-50 text-orange-700 text-xs px-2 py-0.5 rounded">Manzil</span>}
                       {s.requiresPrePayment && <span className="bg-yellow-50 text-yellow-700 text-xs px-2 py-0.5 rounded">Oldindan to&apos;lov</span>}
                     </div>

@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const {
-      name, type, price, requiresSlot, requiresAddress, dailyLimit,
+      name, type, price, requiresAddress, dailyLimit,
       description, sortOrder, requiresPrePayment, prePaymentAmount, doctorIds,
     } = body;
 
@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
         name,
         type,
         price,
-        requiresSlot: requiresSlot ?? false,
+        // TODO: Bosqich 2 - slot tizimi yoqilganda body.requiresSlot qaytariladi
+        requiresSlot: false,
         requiresAddress: requiresAddress ?? false,
         requiresPrePayment: requiresPrePayment ?? false,
         prePaymentAmount: prePaymentAmount ?? null,
