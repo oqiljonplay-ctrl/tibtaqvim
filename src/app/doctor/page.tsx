@@ -24,18 +24,30 @@ const STATUS_CFG = {
 } as const;
 
 export default function DoctorPage() {
+  const getToday = () => new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD
+
+  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toLocaleDateString("sv-SE"));
+  const selectedDateRef = useRef<string>(new Date().toLocaleDateString("sv-SE"));
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<string>("");
   const [dateLabel, setDateLabel] = useState<string>("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const todayRef = useRef(new Date().toLocaleDateString("sv-SE"));
+
+  function formatDateLabel(dateStr: string) {
+    return new Date(dateStr + "T00:00:00").toLocaleDateString("uz-UZ", {
+      weekday: "long", day: "numeric", month: "long",
+    });
+  }
 
   useEffect(() => {
     // Client-only: avoid SSR/hydration mismatch with date strings
-    todayRef.current = new Date().toLocaleDateString("sv-SE");
-    setDateLabel(new Date().toLocaleDateString("uz-UZ", { weekday: "long", day: "numeric", month: "long" }));
+    const today = getToday();
+    selectedDateRef.current = today;
+    setSelectedDate(today);
+    setDateLabel(formatDateLabel(today));
     fetchAppointments();
     timerRef.current = setInterval(fetchAppointments, 30_000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
@@ -45,7 +57,7 @@ export default function DoctorPage() {
   async function fetchAppointments() {
     try {
       const clinicId = localStorage.getItem("clinicId") || "";
-      const params = new URLSearchParams({ date: todayRef.current });
+      const params = new URLSearchParams({ date: selectedDateRef.current });
       if (clinicId) params.set("clinicId", clinicId);
       const res = await fetch(`/api/appointments?${params}`);
       const json = await res.json();
@@ -61,6 +73,25 @@ export default function DoctorPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const d = e.target.value;
+    if (!d) return;
+    selectedDateRef.current = d;
+    setSelectedDate(d);
+    setDateLabel(formatDateLabel(d));
+    setLoading(true);
+    fetchAppointments();
+  }
+
+  function handleGoToToday() {
+    const today = getToday();
+    selectedDateRef.current = today;
+    setSelectedDate(today);
+    setDateLabel(formatDateLabel(today));
+    setLoading(true);
+    fetchAppointments();
   }
 
   async function updateStatus(id: string, status: "arrived" | "missed") {
@@ -83,14 +114,17 @@ export default function DoctorPage() {
     }
   }
 
+  const isToday = selectedDate === getToday();
   const booked = appointments.filter((a) => a.status === "booked");
   const done = appointments.filter((a) => ["arrived", "missed"].includes(a.status));
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bugungi navbat</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isToday ? "Bugungi navbat" : "Navbat ro'yxati"}
+          </h1>
           <p className="text-xs text-gray-400 mt-0.5">
             {dateLabel}
             {lastRefresh ? ` · Oxirgi yangilanish: ${lastRefresh}` : ""}
@@ -110,6 +144,24 @@ export default function DoctorPage() {
         </div>
       </div>
 
+      {/* Sana tanlash */}
+      <div className="flex items-center gap-2 mb-5">
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={handleDateChange}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        {!isToday && (
+          <button
+            onClick={handleGoToToday}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Bugunga qaytish
+          </button>
+        )}
+      </div>
+
       {errorMsg && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
           <span className="text-red-500 flex-shrink-0 mt-0.5">⚠️</span>
@@ -121,7 +173,9 @@ export default function DoctorPage() {
       {loading ? (
         <div className="text-center py-12 text-gray-400 text-sm">Yuklanmoqda...</div>
       ) : appointments.length === 0 ? (
-        <div className="card text-center py-12 text-gray-400">Bugun qayd yo'q</div>
+        <div className="card text-center py-12 text-gray-400">
+          {isToday ? "Bugun qayd yo'q" : `${dateLabel} kuni qayd yo'q`}
+        </div>
       ) : (
         <div className="space-y-3">
           {booked.length > 0 && (
