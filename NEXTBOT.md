@@ -414,6 +414,57 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-05-17 — Phase 0 Technical Debt Cleanup
+
+**Maqsad:** Real klinika va multi-clinic SaaS uchun mustahkam poydevor. Hech qanday foydalanuvchi-yuzli o'zgarish yo'q — faqat ichki tozalik.
+
+**O'zgartirilgan fayllar:**
+
+1. **`prisma/migrations/20260517000001_revoke_audit_function_public_execute/migration.sql`** (YANGI)
+   - `log_audit_event()` funksiyasidan PUBLIC/anon/authenticated EXECUTE huquqi olib tashlandi
+   - SECURITY DEFINER saqlandi (trigger uchun zarur)
+   - Tashqaridan PostgREST orqali chaqirib bo'lmaydi
+   - Triggerlar DB ichidan chaqirgani uchun ishlayveradi
+
+2. **`prisma/migrations/20260517000002_function_search_path_hardening/migration.sql`** (YANGI)
+   - 6 ta funksiyaga `SET search_path = public, pg_catalog` qo'shildi
+   - `next_tib_id`, `generate_tib_id`, `assign_tib_id_on_insert`
+   - `cleanup_expired_bot_states`, `update_bot_states_updated_at`
+   - `log_audit_event` (SECURITY DEFINER saqlandi)
+   - Funksiya logikasi o'zgarmagan
+   - search_path injection himoyasi (PostgreSQL best practice)
+
+3. **`.env.example`** (UPDATED)
+   - 3 ta yetishmagan variable qo'shildi:
+     - `DIRECT_URL` (Prisma migration uchun direct connection)
+     - `TELEGRAM_WEBHOOK_SECRET` (webhook X-header validation)
+     - `SUPERADMIN_KEY` (sa_key cookie, /admin/super gate)
+   - `JWT_EXPIRES_IN` default `"7d"` → `"24h"` (security audit bilan mos)
+   - `DATABASE_URL` pgbouncer formati ko'rsatildi
+   - Har biriga generatsiya komandasi qo'shildi
+
+4. **`src/app/api/health/route.ts`** (UPDATED)
+   - Default `GET /api/health` — db, env check, region, uptime (backward compatible)
+   - `?verbose=1` — webhook holati (`getWebhookInfo`), `bot_states` active count, oxirgi appointment vaqti
+   - Har tekshiruv timeout bilan (DB 2s, Telegram 3s)
+   - Sensitive qiymatlar chiqmaydi
+   - `status: "ok" | "degraded"` indikator
+
+**Muhim qoidalar:**
+- Hech qanday foydalanuvchi-yuzli xulq-atvor o'zgarmadi
+- Bot, WebApp, admin, doctor, reception — barchasi xuddi oldingidek ishlaydi
+- Migration fayllar Supabase MCP orqali apply qilindi (Vercel build paytida `prisma migrate deploy` EMAS)
+- `.env.example` o'zgarishi `.env` real faylga ta'sir qilmaydi
+- `/api/health` yangi `verbose` parametri ixtiyoriy — eski monitoring uchun backward compatible
+
+**Supabase Security Advisor natijasi (Phase 0 dan keyin):**
+- `anon_security_definer_function_executable` (log_audit_event) — ❌ → ✅
+- `authenticated_security_definer_function_executable` (log_audit_event) — ❌ → ✅
+- `function_search_path_mutable` (6 funksiya) — ❌ → ✅
+- `rls_enabled_no_policy` (15 jadval) — qoldirildi (Phase 4 — RLS Policy Pack)
+
+---
+
 ### 2026-05-15 — Queue Mode System Phase 1 (live/online/slot-disabled)
 
 **Maqsad:** Har service-doctor bog'lanishi uchun 3 xil navbat rejimi. `live` = kassadan jonli navbat, `online` = onlayn raqam, `slot` = disabled (bosqich 2).
