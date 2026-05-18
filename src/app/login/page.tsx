@@ -3,7 +3,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 const roleRedirects: Record<string, string> = {
-  super_admin: "/admin",
+  super_admin: "/admin/super",
   clinic_admin: "/admin",
   doctor: "/doctor",
   receptionist: "/reception",
@@ -116,6 +116,9 @@ function LoginForm() {
           </p>
           <p className="text-xs text-gray-400 text-center mt-1">
             Qabulxona: <code className="bg-gray-50 px-1 rounded">+998902222222</code> / <code className="bg-gray-50 px-1 rounded">reception123</code>
+          </p>
+          <p className="text-xs text-gray-400 text-center mt-1">
+            SuperAdmin: <code className="bg-gray-50 px-1 rounded">+998999999999</code> / <code className="bg-gray-50 px-1 rounded">super123</code>
           </p>
         </div>
       </div>

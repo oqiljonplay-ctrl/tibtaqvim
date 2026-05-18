@@ -12,7 +12,7 @@ const ROLE_PATHS: Record<string, string[]> = {
 };
 
 const ROLE_HOME: Record<string, string> = {
-  super_admin: "/admin",
+  super_admin: "/admin/super",
   clinic_admin: "/admin",
   doctor: "/doctor",
   receptionist: "/reception",
@@ -27,15 +27,6 @@ export async function middleware(req: NextRequest) {
 
   if (pathname.startsWith("/api")) {
     return NextResponse.next();
-  }
-
-  // SuperAdmin developer gate — /admin/super/auth sahifasi ochiq
-  if (pathname.startsWith("/admin/super") && pathname !== "/admin/super/auth") {
-    const saKey = req.cookies.get("sa_key")?.value;
-    const expected = process.env.SUPERADMIN_KEY;
-    if (!expected || saKey !== expected) {
-      return NextResponse.redirect(new URL("/admin/super/auth", req.url));
-    }
   }
 
   const token = req.cookies.get("auth_token")?.value;
