@@ -89,7 +89,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return error("firstName, lastName, specialty are required");
     }
 
+    let oldModes: Record<string, string> = {};
     if (Array.isArray(serviceIds)) {
+      const old = await prisma.serviceDoctor.findMany({ where: { doctorId: params.id } });
+      oldModes = Object.fromEntries(old.map((b) => [b.serviceId, b.queueMode]));
       await prisma.serviceDoctor.deleteMany({ where: { doctorId: params.id } });
     }
 
@@ -102,7 +105,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         phone: phone || null,
         photoUrl: photoUrl || null,
         ...(Array.isArray(serviceIds)
-          ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }
+          ? {
+              services: {
+                create: serviceIds.map((serviceId: string) => ({
+                  serviceId,
+                  queueMode: (oldModes[serviceId] as "live" | "online" | "slot") || "online",
+                })),
+              },
+            }
           : {}),
       },
       include: {

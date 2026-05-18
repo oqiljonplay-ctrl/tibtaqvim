@@ -210,6 +210,23 @@ export function mkConfirmText(state: any): string {
   ].filter(Boolean).join("\n");
 }
 
+export function mkClinicKeyboard(clinics: Array<{ id: string; name: string; city?: string | null }>): InlineKeyboardButton[][] {
+  return clinics.map((c) => ([{
+    text: `🏥 ${c.name}${c.city ? ` — ${c.city}` : ""}`,
+    callback_data: `clinic:${c.id}`,
+  }]));
+}
+
+export function mkBranchKeyboard(branches: Array<{ id: string; name: string; nearbyMetro?: string | null }>): InlineKeyboardButton[][] {
+  return [
+    ...branches.map((b) => ([{
+      text: `🏥 ${b.name}${b.nearbyMetro ? ` (🚇 ${b.nearbyMetro})` : ""}`,
+      callback_data: `branch:${b.id}`,
+    }])),
+    [back("select_clinic")],
+  ];
+}
+
 // ─── Private ──────────────────────────────────────────────────────────────────
 
 function back(step: string): InlineKeyboardButton {

@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
 
     const body = await req.json();
-    const { firstName, lastName, specialty, phone, branchId, photoUrl, serviceIds } = body;
+    const { firstName, lastName, specialty, phone, photoUrl, serviceIds } = body;
 
     if (!firstName || !lastName || !specialty) {
       return error("firstName, lastName, specialty are required");
@@ -54,6 +54,15 @@ export async function POST(req: NextRequest) {
     const clinicId = auth.role === "super_admin" ? body.clinicId : auth.clinicId;
     if (!clinicId) return error("clinicId required");
 
+    let resolvedBranchId = body.branchId as string | undefined;
+    if (!resolvedBranchId) {
+      const firstBranch = await prisma.branch.findFirst({
+        where: { clinicId, isActive: true },
+        orderBy: { createdAt: "asc" },
+      });
+      resolvedBranchId = firstBranch?.id;
+    }
+
     const doctor = await prisma.doctor.create({
       data: {
         clinicId,
@@ -61,7 +70,7 @@ export async function POST(req: NextRequest) {
         lastName,
         specialty,
         phone: phone ?? null,
-        branchId: branchId ?? null,
+        branchId: resolvedBranchId ?? null,
         photoUrl: photoUrl ?? null,
         ...(Array.isArray(serviceIds) && serviceIds.length > 0
           ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }

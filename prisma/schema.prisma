@@ -37,6 +37,20 @@ enum QueueMode {
   slot
 }
 
+enum SubscriptionPlan {
+  starter
+  standard
+  premium
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  past_due
+  suspended
+  cancelled
+}
+
 // ─── CORE MODELS ─────────────────────────────────────────────────────────────
 
 model Clinic {
@@ -50,6 +64,19 @@ model Clinic {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // ── Bosqich 1 faol maydonlar ──────────────────────────────────────────────
+  description  String?  @db.Text
+  city         String?
+  workingHours String?
+  rating       Float    @default(0) @db.Real
+  ratingCount  Int      @default(0)
+
+  // ── Kelajak: Bosqich 2 (to'lov) va Bosqich 3 (abonement) ─────────────────
+  paymentConfig         Json?             @db.JsonB
+  subscriptionPlan      SubscriptionPlan  @default(starter)
+  subscriptionStatus    SubscriptionStatus @default(trial)
+  subscriptionExpiresAt DateTime?
+
   branches      Branch[]
   services      Service[]
   doctors       Doctor[]
@@ -61,6 +88,8 @@ model Clinic {
   featureFlags  FeatureFlag[]
   moduleConfigs ModuleConfig[]
 
+  @@index([isActive, city])
+  @@index([subscriptionStatus])
   @@map("clinics")
 }
 
@@ -74,6 +103,13 @@ model Branch {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // ── Bosqich 1 faol maydonlar ──────────────────────────────────────────────
+  latitude     Float?  @db.DoublePrecision
+  longitude    Float?  @db.DoublePrecision
+  nearbyMetro  String?
+  workingHours String?
+  sortOrder    Int     @default(0)
+
   clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   doctors      Doctor[]
   staff        Staff[]
@@ -81,6 +117,7 @@ model Branch {
   slots        Slot[]
 
   @@index([clinicId])
+  @@index([clinicId, sortOrder])
   @@map("branches")
 }
 

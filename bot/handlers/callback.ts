@@ -16,6 +16,7 @@ import {
   mkConfirmText,
   mkLocationKeyboard,
 } from "../helpers/render";
+import { handleClinicCallback, handleBranchCallback, handleBackToClinic, showBranchOrService } from "./clinicFlow";
 
 export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   const chatId = query.message?.chat.id;
@@ -225,20 +226,6 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
 
   // ─── use_saved / change_info — welcome back flow ─────────────────────────
   if (data === "use_saved" || data === "change_info") {
-    const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
-    const clinicId = state.clinicId || DEFAULT_CLINIC_ID;
-
-    let services = state._services;
-    if (!services?.length) {
-      const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
-      const fetched = await fetchServices(clinicId, today);
-      services = fetched.services;
-    }
-    if (!services?.length) {
-      await bot.sendMessage(chatId, "⚠️ Hozirda mavjud xizmatlar yo'q. /start");
-      return;
-    }
-
     let patientName: string | undefined = undefined;
     let patientPhone: string | undefined = undefined;
     if (data === "use_saved") {
@@ -250,20 +237,23 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       }
     }
 
-    const newMsgId = await editOrSend(
-      bot, chatId, msgId,
-      "🏥 *ClinicBot ga xush kelibsiz!*\n\nQaysi xizmatdan foydalanmoqchisiz?",
-      mkServiceKeyboard(services)
-    );
-    await userState.set(chatId,{
-      step: "select_service",
-      clinicId,
-      messageId: newMsgId,
-      _services: services,
-      _createdAt: Date.now(),
-      ...(patientName && patientPhone ? { patientName, patientPhone } : {}),
-    });
-    return;
+    // State'da patientName/Phone saqlash, keyin klinika tanlash
+    if (patientName && patientPhone) {
+      await userState.set(chatId, { ...state, patientName, patientPhone, _createdAt: Date.now() });
+    }
+
+    // Agar state'da allaqachon clinicId va branchId bor bo'lsa — to'g'ridan xizmatlar
+    const existingClinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID;
+    const existingBranchId = state.branchId;
+    if (existingClinicId && existingBranchId) {
+      return showBranchOrService(bot, chatId, existingClinicId, msgId);
+    }
+    if (existingClinicId) {
+      return showBranchOrService(bot, chatId, existingClinicId, msgId);
+    }
+
+    // Klinika tanlash
+    return handleBackToClinic(bot, chatId, msgId);
   }
 
   // ─── back: navigation ─────────────────────────────────────────────────────
@@ -271,9 +261,10 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const target = data.slice(5);
 
     if (target === "select_service") {
+      const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
+      const branchId = state.branchId;
       let services = state._services;
       if (!services?.length) {
-        const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
         const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
         const fetched = await fetchServices(clinicId, today);
         services = fetched.services;
@@ -287,23 +278,29 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         "🏥 *ClinicBot ga xush kelibsiz!*\n\nQaysi xizmatdan foydalanmoqchisiz?",
         mkServiceKeyboard(services)
       );
-      await userState.set(chatId,{
+      await userState.set(chatId, {
         ...state,
-        step: "select_service",
-        messageId: newMsgId,
-        serviceId: undefined,
-        serviceType: undefined,
-        servicePrice: undefined,
-        serviceRequiresSlot: undefined,
+        step:                  "select_service",
+        clinicId,
+        branchId,
+        messageId:             newMsgId,
+        serviceId:             undefined,
+        serviceType:           undefined,
+        servicePrice:          undefined,
+        serviceRequiresSlot:   undefined,
         serviceRequiresAddress: undefined,
-        date: undefined,
-        doctorId: undefined,
-        slotId: undefined,
-        patientName: undefined,
-        patientPhone: undefined,
-        address: undefined,
+        date:                  undefined,
+        doctorId:              undefined,
+        slotId:                undefined,
+        patientName:           data === "use_saved" ? state.patientName : undefined,
+        patientPhone:          data === "use_saved" ? state.patientPhone : undefined,
+        address:               undefined,
       });
       return;
+    }
+
+    if (target === "select_clinic") {
+      return handleBackToClinic(bot, chatId, msgId);
     }
 
     if (target === "select_date") {
@@ -429,6 +426,18 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     return;
   }
 
+  // ─── clinic: — klinika tanlash ───────────────────────────────────────────
+  if (data.startsWith("clinic:")) {
+    const clinicId = data.split(":")[1];
+    return handleClinicCallback(bot, chatId, clinicId, msgId);
+  }
+
+  // ─── branch: — filial tanlash ─────────────────────────────────────────────
+  if (data.startsWith("branch:")) {
+    const branchId = data.split(":")[1];
+    return handleBranchCallback(bot, chatId, branchId, msgId);
+  }
+
   // ─── cal:day: — calendar day selected ────────────────────────────────────
   if (data.startsWith("cal:day:")) {
     data = "date:" + data.slice("cal:day:".length);
@@ -455,6 +464,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const baseState = {
       ...state,
       clinicId,
+      branchId: state.branchId || undefined,
       serviceId,
       serviceType,
       servicePrice: service?.price ?? null,

@@ -7,8 +7,12 @@ interface Clinic {
   name: string;
   phone: string | null;
   address: string | null;
+  city: string | null;
   isActive: boolean;
   createdAt: string;
+  subscriptionPlan: string;
+  subscriptionStatus: string;
+  subscriptionExpiresAt: string | null;
   _count: { branches: number; doctors: number; appointments: number };
   settings: { enableBot: boolean; enableWebapp: boolean; enableQueue: boolean } | null;
 }
@@ -30,7 +34,7 @@ export default function ClinicListPage() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", address: "" });
+  const [form, setForm] = useState({ name: "", phone: "", address: "", city: "Toshkent", workingHours: "08:00-20:00", description: "" });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -59,7 +63,7 @@ export default function ClinicListPage() {
       const j = await res.json();
       if (!j.success) { setError(j.error?.message ?? "Xatolik"); return; }
       setShowCreate(false);
-      setForm({ name: "", phone: "", address: "" });
+      setForm({ name: "", phone: "", address: "", city: "Toshkent", workingHours: "08:00-20:00", description: "" });
       load();
     } finally {
       setCreating(false);
@@ -118,21 +122,28 @@ export default function ClinicListPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-                <input
-                  className="input"
-                  placeholder="+998 90 000 00 00"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
+                <input className="input" placeholder="+998 90 000 00 00" value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Shahar</label>
+                <input className="input" placeholder="Toshkent" value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Manzil</label>
-                <input
-                  className="input"
-                  placeholder="Shahar, ko'cha"
-                  value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                />
+                <input className="input" placeholder="Ko'cha, uy" value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ish vaqti</label>
+                <input className="input" placeholder="08:00-20:00" value={form.workingHours}
+                  onChange={(e) => setForm({ ...form, workingHours: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tavsif</label>
+                <input className="input" placeholder="Klinika haqida qisqacha" value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
               {error && (
                 <div className="bg-red-50 text-red-600 text-sm rounded-lg px-3 py-2">{error}</div>
@@ -191,9 +202,16 @@ export default function ClinicListPage() {
                     >
                       {c.name}
                     </Link>
-                    {c.phone && (
-                      <div className="text-xs text-gray-400 mt-0.5">{c.phone}</div>
-                    )}
+                    {c.city && <div className="text-xs text-gray-400 mt-0.5">📍 {c.city}</div>}
+                    {c.phone && <div className="text-xs text-gray-400 mt-0.5">{c.phone}</div>}
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 font-medium ${
+                      c.subscriptionStatus === "active"   ? "bg-green-100 text-green-700"  :
+                      c.subscriptionStatus === "trial"    ? "bg-amber-100 text-amber-700"  :
+                      c.subscriptionStatus === "past_due" ? "bg-orange-100 text-orange-700" :
+                      "bg-red-100 text-red-700"
+                    }`}>
+                      {c.subscriptionPlan} / {c.subscriptionStatus}
+                    </span>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-1">
