@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
         city:                 city?.trim()         || "Toshkent",
         workingHours:         workingHours?.trim() || "08:00-20:00",
         logoUrl:              logoUrl?.trim()      || null,
+        isActive:             true,
         subscriptionPlan:     "starter",
         subscriptionStatus:   "trial",
         subscriptionExpiresAt: trialExpires,
