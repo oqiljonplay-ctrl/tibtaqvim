@@ -127,29 +127,13 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
 
     await userState.delete(chatId);
 
-    // Xizmatlarni ko'rsatish
-    const defaultClinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
-    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
-    let services = state._services;
-    if (!services?.length) {
-      const fetched = await fetchServices(defaultClinicId, today);
-      services = fetched.services;
-    }
-    if (services?.length) {
-      const sent = await bot.sendMessage(chatId, "🏥 Qaysi xizmatdan foydalanmoqchisiz?", {
-        reply_markup: { inline_keyboard: mkServiceKeyboard(services) },
-      });
-      await userState.set(chatId, {
-        step: "select_service",
-        clinicId: defaultClinicId,
-        _services: services,
-        messageId: sent.message_id,
-        _createdAt: Date.now(),
-        patientName: pendingFirstName,
-        patientPhone: state.pendingPhone,
-      });
-    }
-    return;
+    // Klinika tanlash — 1 ta bo'lsa auto-skip, ko'p bo'lsa selection
+    await userState.set(chatId, {
+      patientName: pendingFirstName || existingUser.firstName,
+      patientPhone: existingUser.phone ?? undefined,
+      _createdAt: Date.now(),
+    });
+    return handleBackToClinic(bot, chatId, undefined);
   }
 
   // ─── relink_no — yangi profil yaratish ───────────────────────────────────
@@ -200,28 +184,13 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
 
     await userState.delete(chatId);
 
-    // Xizmatlarni ko'rsatish
-    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
-    let services = state._services;
-    if (!services?.length) {
-      const fetched = await fetchServices(defaultClinicId, today);
-      services = fetched.services;
-    }
-    if (services?.length) {
-      const sent = await bot.sendMessage(chatId, "🏥 Qaysi xizmatdan foydalanmoqchisiz?", {
-        reply_markup: { inline_keyboard: mkServiceKeyboard(services) },
-      });
-      await userState.set(chatId, {
-        step: "select_service",
-        clinicId: defaultClinicId,
-        _services: services,
-        messageId: sent.message_id,
-        _createdAt: Date.now(),
-        patientName: pendingFirstName,
-        patientPhone: pendingPhone,
-      });
-    }
-    return;
+    // Klinika tanlash — 1 ta bo'lsa auto-skip, ko'p bo'lsa selection
+    await userState.set(chatId, {
+      patientName: pendingFirstName || "Foydalanuvchi",
+      patientPhone: pendingPhone,
+      _createdAt: Date.now(),
+    });
+    return handleBackToClinic(bot, chatId, undefined);
   }
 
   // ─── use_saved / change_info — welcome back flow ─────────────────────────
@@ -242,17 +211,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       await userState.set(chatId, { ...state, patientName, patientPhone, _createdAt: Date.now() });
     }
 
-    // Agar state'da allaqachon clinicId va branchId bor bo'lsa — to'g'ridan xizmatlar
-    const existingClinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID;
-    const existingBranchId = state.branchId;
-    if (existingClinicId && existingBranchId) {
-      return showBranchOrService(bot, chatId, existingClinicId, msgId);
-    }
-    if (existingClinicId) {
-      return showBranchOrService(bot, chatId, existingClinicId, msgId);
-    }
-
-    // Klinika tanlash
+    // Klinika tanlash — 1 ta bo'lsa auto-skip, ko'p bo'lsa selection
     return handleBackToClinic(bot, chatId, msgId);
   }
 
