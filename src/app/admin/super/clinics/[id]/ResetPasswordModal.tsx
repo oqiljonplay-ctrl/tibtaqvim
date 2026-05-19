@@ -3,12 +3,12 @@
 import { useState } from "react";
 
 type Props = {
-  clinicId: string;
+  apiUrl: string;
   admin: { id: string; username: string | null; firstName: string };
   onClose: () => void;
 };
 
-export function ResetPasswordModal({ clinicId, admin, onClose }: Props) {
+export function ResetPasswordModal({ apiUrl, admin, onClose }: Props) {
   const [newPassword, setNewPassword] = useState("");
   const [autoGenerate, setAutoGenerate] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export function ResetPasswordModal({ clinicId, admin, onClose }: Props) {
   const handleReset = async () => {
     setLoading(true);
     setErr(null);
-    const res = await fetch(`/api/admin/super/clinics/${clinicId}/admins/${admin.id}`, {
+    const res = await fetch(apiUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ resetPassword: true, newPassword: autoGenerate ? undefined : newPassword }),
@@ -35,7 +35,7 @@ export function ResetPasswordModal({ clinicId, admin, onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl p-6 max-w-md w-full">
-        <h2 className="text-xl font-bold mb-2 text-gray-900">Parolni o'zgartirish</h2>
+        <h2 className="text-xl font-bold mb-2 text-gray-900">Parolni o&apos;zgartirish</h2>
         <p className="text-sm text-gray-500 mb-4">
           Admin: <code className="bg-gray-100 px-1 rounded">{admin.username}</code> ({admin.firstName})
         </p>

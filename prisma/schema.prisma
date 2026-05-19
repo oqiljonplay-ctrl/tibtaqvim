@@ -26,6 +26,7 @@ enum AppointmentStatus {
 enum UserRole {
   super_admin
   clinic_admin
+  branch_admin
   doctor
   receptionist
   patient
@@ -111,6 +112,7 @@ model Branch {
   sortOrder    Int     @default(0)
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  admins       User[]
   doctors      Doctor[]
   staff        Staff[]
   appointments Appointment[]
@@ -212,6 +214,7 @@ model Staff {
 model User {
   id           String   @id @default(cuid())
   clinicId     String?
+  branchId     String?
   telegramId   String?  @unique
   tibId        String?  @unique
   phone        String?  @unique
@@ -225,12 +228,14 @@ model User {
   updatedAt    DateTime @updatedAt
 
   clinic             Clinic?             @relation(fields: [clinicId], references: [id])
+  branch             Branch?             @relation(fields: [branchId], references: [id])
   doctor             Doctor?
   staff              Staff?
   appointments       Appointment[]
   telegramIdHistory  TelegramIdHistory[]
 
   @@index([clinicId])
+  @@index([branchId])
   @@index([telegramId])
   @@index([username])
   @@map("users")

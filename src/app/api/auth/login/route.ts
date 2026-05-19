@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
       return error("Login va parol kerak");
     }
 
-    // username (tib_admin_...) yoki telefon raqam bo'yicha qidirish
-    const isUsername = /^tib_admin_/.test(rawLogin.trim());
+    // username (tib_admin_... yoki tib_badmin_...) yoki telefon raqam bo'yicha qidirish
+    const isUsername = /^tib_(b?admin)_/.test(rawLogin.trim());
     const phone = isUsername ? null : normalizePhone(rawLogin);
 
     const user = await prisma.user.findFirst({
@@ -48,12 +48,13 @@ export async function POST(req: NextRequest) {
     const token = signToken({
       userId: user.id,
       clinicId: user.clinicId,
+      branchId: user.branchId ?? null,
       role: user.role,
     });
 
     const response = NextResponse.json({
       success: true,
-      data: { user: { id: user.id, role: user.role, clinicId: user.clinicId, firstName: user.firstName } },
+      data: { user: { id: user.id, role: user.role, clinicId: user.clinicId, branchId: user.branchId ?? null, firstName: user.firstName } },
     });
     response.cookies.set("auth_token", token, {
       httpOnly: true,

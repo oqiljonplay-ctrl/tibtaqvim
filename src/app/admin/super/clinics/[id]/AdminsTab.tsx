@@ -120,7 +120,7 @@ export function AdminsTab({ clinicId }: { clinicId: string }) {
 
       {resetTarget && (
         <ResetPasswordModal
-          clinicId={clinicId}
+          apiUrl={`/api/admin/super/clinics/${clinicId}/admins/${resetTarget.id}`}
           admin={resetTarget}
           onClose={() => { setResetTarget(null); load(); }}
         />

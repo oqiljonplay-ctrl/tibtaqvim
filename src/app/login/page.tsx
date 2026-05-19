@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 const roleRedirects: Record<string, string> = {
   super_admin: "/admin/super",
   clinic_admin: "/admin",
+  branch_admin: "/admin",
   doctor: "/doctor",
   receptionist: "/reception",
 };
