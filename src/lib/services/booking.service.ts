@@ -5,6 +5,7 @@ import type { BookingInput } from "@/lib/validators/booking";
 import { getTibIdByPhone, assignTibId } from "@/lib/services/tib-id.service";
 import { buildConfirmationMessage, sendTelegramConfirmation } from "@/lib/services/confirmation.service";
 import { normalizePhone } from "@/lib/utils/phone";
+import { ensureUserClinic } from "@/lib/user-clinics";
 
 type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
   include: {
@@ -301,7 +302,12 @@ async function linkUserToAppointment(appointmentId: string, phone: string): Prom
     select: { id: true },
   });
   if (!user) return;
-  await prisma.appointment.update({ where: { id: appointmentId }, data: { userId: user.id } });
+  const appt = await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { userId: user.id },
+    select: { clinicId: true },
+  });
+  ensureUserClinic(user.id, appt.clinicId, 'patient').catch(() => {});
 }
 
 async function notifyPatientAsync(

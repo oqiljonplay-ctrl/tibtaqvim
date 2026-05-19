@@ -677,15 +677,28 @@ export default function WebApp() {
 
         {/* Sticky bottom bar */}
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pb-5 pt-3 bg-gray-50 border-t border-gray-100">
-          <button
-            onClick={() => {
-              const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "booking" });
-              window.location.href = `/webapp?${qs}`;
-            }}
-            className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
-          >
-            ➕ Yangi bron qilish
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "booking" });
+                window.location.href = `/webapp?${qs}`;
+              }}
+              className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
+            >
+              ➕ Yangi bron
+            </button>
+            <button
+              onClick={() => {
+                const qs = new URLSearchParams({ clinic: clinicIdRef.current });
+                if (telegramId) qs.set("tgid", telegramId);
+                window.location.href = `/webapp/history?${qs}`;
+              }}
+              className="w-14 py-3.5 rounded-2xl bg-white border border-gray-200 text-gray-700 text-xl flex items-center justify-center active:scale-95 transition-all"
+              title="Tarix"
+            >
+              📋
+            </button>
+          </div>
         </div>
       </div>
     );

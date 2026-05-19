@@ -88,6 +88,7 @@ model Clinic {
   settings      ClinicSettings?
   featureFlags  FeatureFlag[]
   moduleConfigs ModuleConfig[]
+  userClinics   UserClinic[]
 
   @@index([isActive, city])
   @@index([subscriptionStatus])
@@ -233,12 +234,30 @@ model User {
   staff              Staff?
   appointments       Appointment[]
   telegramIdHistory  TelegramIdHistory[]
+  userClinics        UserClinic[]
 
   @@index([clinicId])
   @@index([branchId])
   @@index([telegramId])
   @@index([username])
   @@map("users")
+}
+
+model UserClinic {
+  id        String   @id @default(cuid())
+  userId    String
+  clinicId  String
+  role      UserRole @default(patient)
+  joinedAt  DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clinicId])
+  @@index([userId])
+  @@index([clinicId])
+  @@map("user_clinics")
 }
 
 model Appointment {

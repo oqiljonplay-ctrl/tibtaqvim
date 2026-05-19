@@ -14,6 +14,7 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
     "seed:m2m": "ts-node prisma/seed-m2m.ts",
+    "seed:user-clinics": "npx tsx prisma/seed-user-clinics.ts",
     "cleanup:dups": "npx tsx prisma/cleanup-dups.ts",
     "test": "vitest run",
     "test:watch": "vitest"
