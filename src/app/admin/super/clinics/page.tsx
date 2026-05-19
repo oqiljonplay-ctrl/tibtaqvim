@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ClinicLogo } from "@/components/ClinicLogo";
 
 interface Clinic {
   id: string;
@@ -8,6 +9,7 @@ interface Clinic {
   phone: string | null;
   address: string | null;
   city: string | null;
+  logoUrl: string | null;
   isActive: boolean;
   createdAt: string;
   subscriptionPlan: string;
@@ -196,22 +198,27 @@ export default function ClinicListPage() {
               {clinics.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-4">
-                    <Link
-                      href={`/admin/super/clinics/${c.id}`}
-                      className="font-medium text-gray-900 hover:text-indigo-600 transition-colors"
-                    >
-                      {c.name}
-                    </Link>
-                    {c.city && <div className="text-xs text-gray-400 mt-0.5">📍 {c.city}</div>}
-                    {c.phone && <div className="text-xs text-gray-400 mt-0.5">{c.phone}</div>}
-                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 font-medium ${
-                      c.subscriptionStatus === "active"   ? "bg-green-100 text-green-700"  :
-                      c.subscriptionStatus === "trial"    ? "bg-amber-100 text-amber-700"  :
-                      c.subscriptionStatus === "past_due" ? "bg-orange-100 text-orange-700" :
-                      "bg-red-100 text-red-700"
-                    }`}>
-                      {c.subscriptionPlan} / {c.subscriptionStatus}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <ClinicLogo src={c.logoUrl} name={c.name} size={44} />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/admin/super/clinics/${c.id}`}
+                          className="font-medium text-gray-900 hover:text-indigo-600 transition-colors"
+                        >
+                          {c.name}
+                        </Link>
+                        {c.city && <div className="text-xs text-gray-400 mt-0.5">📍 {c.city}</div>}
+                        {c.phone && <div className="text-xs text-gray-400 mt-0.5">{c.phone}</div>}
+                        <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 font-medium ${
+                          c.subscriptionStatus === "active"   ? "bg-green-100 text-green-700"  :
+                          c.subscriptionStatus === "trial"    ? "bg-amber-100 text-amber-700"  :
+                          c.subscriptionStatus === "past_due" ? "bg-orange-100 text-orange-700" :
+                          "bg-red-100 text-red-700"
+                        }`}>
+                          {c.subscriptionPlan} / {c.subscriptionStatus}
+                        </span>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-1">
@@ -239,6 +246,12 @@ export default function ClinicListPage() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/admin/super/clinics/${c.id}/edit`}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        Tahrirlash
+                      </Link>
                       <Link
                         href={`/admin/super/clinics/${c.id}`}
                         className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"

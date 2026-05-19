@@ -23,18 +23,24 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return ok(clinic);
 }
 
+const LOGO_URL_REGEX = /^https?:\/\/.+\.(jpg|jpeg|png|webp|svg|gif)(\?.*)?$/i;
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
   if (user.role !== "super_admin") return forbidden();
 
   const body = await req.json();
-  const { name, phone, address, isActive } = body;
+  const { name, phone, address, city, description, workingHours, logoUrl, isActive } = body;
 
   const clinic = await prisma.clinic.findFirst({ where: { id: params.id, deletedAt: null } });
   if (!clinic) return notFound("Klinika topilmadi");
 
   if (!name?.trim()) return error("Klinika nomi majburiy");
+
+  if (logoUrl && !LOGO_URL_REGEX.test(logoUrl)) {
+    return error("logoUrl noto'g'ri format. https:// bilan boshlansin va .jpg/.png/.webp bo'lsin", 400);
+  }
 
   const updated = await prisma.clinic.update({
     where: { id: params.id },
@@ -42,6 +48,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       name: name.trim(),
       phone: phone?.trim() || null,
       address: address?.trim() || null,
+      city: city?.trim() || null,
+      description: description?.trim() || null,
+      workingHours: workingHours?.trim() || null,
+      logoUrl: logoUrl?.trim() || null,
       isActive: isActive ?? clinic.isActive,
     },
   });

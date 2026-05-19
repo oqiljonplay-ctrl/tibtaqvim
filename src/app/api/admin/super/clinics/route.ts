@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
       phone:                true,
       address:              true,
       city:                 true,
+      logoUrl:              true,
       workingHours:         true,
       isActive:             true,
       subscriptionPlan:     true,
