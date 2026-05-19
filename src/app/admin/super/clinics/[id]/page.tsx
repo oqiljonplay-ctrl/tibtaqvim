@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { AdminsTab } from "./AdminsTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ interface AuditEntry {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-type Tab = "settings" | "modules" | "features" | "audit";
+type Tab = "settings" | "modules" | "features" | "audit" | "admins";
 
 const MODULE_META: Record<string, { icon: string; label: string; desc: string }> = {
   doctor_queue: { icon: "🩺", label: "Shifokor Navbati", desc: "Kunlik navbat tizimi, limit bilan" },
@@ -230,6 +231,7 @@ export default function ClinicBuilderPage() {
     { key: "settings", label: "Sozlamalar", icon: "⚙️" },
     { key: "modules", label: "Modullar", icon: "🧩" },
     { key: "features", label: "Feature Flaglar", icon: "🚩" },
+    { key: "admins", label: "Adminlar", icon: "👤" },
     { key: "audit", label: "Audit", icon: "📋" },
   ];
 
@@ -577,6 +579,9 @@ export default function ClinicBuilderPage() {
           </div>
         </div>
       )}
+
+      {/* ── ADMINS TAB ── */}
+      {tab === "admins" && <AdminsTab clinicId={id} />}
 
       {/* ── AUDIT TAB ── */}
       {tab === "audit" && (

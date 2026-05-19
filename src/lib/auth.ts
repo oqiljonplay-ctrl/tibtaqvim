@@ -46,3 +46,22 @@ export function requireAuth(req: NextRequest): JwtPayload | null {
   if (!token) return null;
   return verifyToken(token);
 }
+
+export function validatePasswordStrength(password: string): { valid: boolean; error?: string } {
+  if (password.length < 8) return { valid: false, error: "Parol kamida 8 belgi bo'lishi kerak" };
+  if (!/[a-zA-Z]/.test(password)) return { valid: false, error: "Parol kamida 1 ta harf bo'lishi kerak" };
+  if (!/[0-9]/.test(password)) return { valid: false, error: "Parol kamida 1 ta raqam bo'lishi kerak" };
+  return { valid: true };
+}
+
+// o, l, 0, 1 yo'q — chalg'itadi
+const PWD_CHARS = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export function generateRandomPassword(length = 12): string {
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += PWD_CHARS[Math.floor(Math.random() * PWD_CHARS.length)];
+  }
+  if (!/[0-9]/.test(result)) result = result.slice(0, -1) + "7";
+  return result;
+}

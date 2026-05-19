@@ -12,7 +12,7 @@ const roleRedirects: Record<string, string> = {
 function LoginForm() {
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl");
-  const [form, setForm] = useState({ phone: "", password: "" });
+  const [form, setForm] = useState({ identifier: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -26,7 +26,7 @@ function LoginForm() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ identifier: form.identifier, password: form.password }),
       });
 
       const json = await res.json();
@@ -65,14 +65,15 @@ function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Telefon raqam
+              Login yoki telefon
             </label>
             <input
-              type="tel"
+              type="text"
               className="input"
-              placeholder="+998 90 000 00 00"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="tib_admin_xxxx yoki +998901234567"
+              value={form.identifier}
+              onChange={(e) => setForm({ ...form, identifier: e.target.value })}
+              autoComplete="username"
               required
               autoFocus
             />

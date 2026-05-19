@@ -215,6 +215,7 @@ model User {
   telegramId   String?  @unique
   tibId        String?  @unique
   phone        String?  @unique
+  username     String?  @unique
   firstName    String
   lastName     String?
   role         UserRole @default(patient)
@@ -231,6 +232,7 @@ model User {
 
   @@index([clinicId])
   @@index([telegramId])
+  @@index([username])
   @@map("users")
 }
 

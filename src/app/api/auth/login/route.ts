@@ -16,17 +16,22 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { phone: rawPhone, password, clinicId } = await req.json();
+    const { phone: rawPhone, identifier: rawIdentifier, password, clinicId } = await req.json();
 
-    if (!rawPhone || !password) {
-      return error("Phone and password required");
+    const rawLogin = rawIdentifier || rawPhone;
+    if (!rawLogin || !password) {
+      return error("Login va parol kerak");
     }
 
-    const phone = normalizePhone(rawPhone);
+    // username (tib_admin_...) yoki telefon raqam bo'yicha qidirish
+    const isUsername = /^tib_admin_/.test(rawLogin.trim());
+    const phone = isUsername ? null : normalizePhone(rawLogin);
 
     const user = await prisma.user.findFirst({
       where: {
-        phone,
+        OR: isUsername
+          ? [{ username: rawLogin.trim() }]
+          : [{ phone: phone! }, { username: rawLogin.trim() }],
         ...(clinicId ? { clinicId } : {}),
         isActive: true,
         role: { not: "patient" },
