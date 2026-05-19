@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { ClinicProvider } from "@/lib/clinic-context";
+import { ClinicGuard } from "@/components/webapp/ClinicGuard";
 
 export const metadata: Metadata = {
   title: "TibTaqvim — Onlayn qabul",
@@ -7,5 +10,20 @@ export const metadata: Metadata = {
 };
 
 export default function WebAppLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="text-4xl mb-3">🏥</div>
+            <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
+          </div>
+        </div>
+      }
+    >
+      <ClinicProvider>
+        <ClinicGuard>{children}</ClinicGuard>
+      </ClinicProvider>
+    </Suspense>
+  );
 }

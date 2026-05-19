@@ -2,6 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/Calendar";
 import { formatDateLabel } from "@/lib/calendar";
+import { useClinic } from "@/lib/clinic-context";
+import { ClinicSwitcher } from "@/components/webapp/ClinicSwitcher";
+import { ClinicLogo } from "@/components/ClinicLogo";
 
 declare global {
   interface Window { Telegram?: { WebApp?: any } }
@@ -156,15 +159,22 @@ export default function WebApp() {
 
   const tgUserRef = useRef<TgUser | null>(null);
   const rebookServiceIdRef = useRef<string | null>(null);
-  // Computed once on mount — avoids recompute on every render
+
+  const { clinic: activeClinic, clinicId: contextClinicId } = useClinic();
+  // clinicId sources: context (localStorage/URL) → URL clinicId param → env fallback
   const clinicIdRef = useRef<string>("");
 
   // ─── Init ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    // Use clinic context first, then legacy URL param, then env fallback
     clinicIdRef.current =
-      urlParams.get("clinicId") || process.env.NEXT_PUBLIC_CLINIC_ID || "";
+      contextClinicId ||
+      urlParams.get("clinicId") ||
+      urlParams.get("clinic") ||
+      process.env.NEXT_PUBLIC_CLINIC_ID ||
+      "";
 
     // URL-dan mode o'qiymiz — "dashboard" | "booking" | null
     const urlMode = urlParams.get("mode");
@@ -320,14 +330,12 @@ export default function WebApp() {
   }
 
   function startRebook(serviceId: string) {
-    // Bronlash URL navigation orqali — sahifa yangilanadi, mode=booking
-    const qs = new URLSearchParams({ clinicId: clinicIdRef.current, mode: "booking", serviceId });
+    const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "booking", serviceId });
     window.location.href = `/webapp?${qs}`;
   }
 
   function goToDashboard() {
-    // Dashboard URL navigation orqali — refresh qilsa ham dashboard qoladi
-    const qs = new URLSearchParams({ clinicId: clinicIdRef.current, mode: "dashboard" });
+    const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "dashboard" });
     window.location.href = `/webapp?${qs}`;
   }
 
@@ -509,6 +517,12 @@ export default function WebApp() {
 
         <div className="flex-1 px-4 -mt-3 pb-24 space-y-4">
 
+          {/* Clinic switcher */}
+          {activeClinic && (
+            <div className="mt-3">
+              <ClinicSwitcher />
+            </div>
+          )}
 
           {/* Error */}
           {errorMsg && (
@@ -665,7 +679,7 @@ export default function WebApp() {
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pb-5 pt-3 bg-gray-50 border-t border-gray-100">
           <button
             onClick={() => {
-              const qs = new URLSearchParams({ clinicId: clinicIdRef.current, mode: "booking" });
+              const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "booking" });
               window.location.href = `/webapp?${qs}`;
             }}
             className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
