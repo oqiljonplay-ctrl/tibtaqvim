@@ -83,6 +83,14 @@ export async function PATCH(
       accountFieldName?: string;
       cashboxId?: string;
     };
+    click?: {
+      enabled?: boolean;
+      merchantId?: string;
+      serviceId?: string;
+      merchantUserId?: string;
+      secretKey?: string;
+      testMode?: boolean;
+    };
   };
 
   const clinic = await prisma.clinic.findUnique({
@@ -110,9 +118,24 @@ export async function PATCH(
       }
     : existing?.payme;
 
+  const mergedClick = body.click
+    ? {
+        enabled: body.click.enabled ?? existing?.click?.enabled ?? false,
+        merchantId: body.click.merchantId ?? existing?.click?.merchantId ?? "",
+        serviceId: body.click.serviceId ?? existing?.click?.serviceId ?? "",
+        merchantUserId:
+          body.click.merchantUserId ?? existing?.click?.merchantUserId,
+        secretKey:
+          body.click.secretKey && body.click.secretKey.length > 0
+            ? encryptSecret(body.click.secretKey)
+            : (existing?.click?.secretKey ?? ""),
+        testMode: body.click.testMode ?? existing?.click?.testMode ?? true,
+      }
+    : existing?.click;
+
   const newConfig = {
     ...(mergedPayme ? { payme: mergedPayme } : {}),
-    ...(existing?.click ? { click: existing.click } : {}),
+    ...(mergedClick ? { click: mergedClick } : {}),
   };
 
   try {
@@ -127,7 +150,12 @@ export async function PATCH(
         actorId: auth.userId,
         clinicId: params.id,
         action: PAYMENT_AUDIT_ACTIONS.PAYMENT_CONFIG_UPDATED,
-        payload: { provider: "payme" },
+        payload: {
+        providers: [
+          ...(body.payme !== undefined ? ["payme"] : []),
+          ...(body.click !== undefined ? ["click"] : []),
+        ],
+      },
       },
     });
 

@@ -2,6 +2,8 @@ import TelegramBot, { CallbackQuery } from "node-telegram-bot-api";
 import { fetchSlots, bookAppointment, registerPatient, fetchServices, fetchUserByTelegramId } from "../api";
 import { userState } from "../state";
 import { prisma } from "@/lib/prisma";
+import { parsePaymentConfig, isProviderEnabled } from "@/lib/payment/config-schema";
+import { decimalSumToTiyin, formatSum } from "@/lib/payment/money";
 import { archivePhone, isArchivedPhone } from "../helpers/phone";
 import {
   editOrSend,
@@ -737,6 +739,47 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           "Tayyor bo'lganingizda quyidagi tugmani bosing:",
           { parse_mode: "Markdown", reply_markup: mkLocationKeyboard() as any }
         );
+      }
+
+      // To'lov tugmasi — requiresPrePayment bo'lgan xizmatlar uchun
+      if (result.data?.id && serviceId) {
+        try {
+          const svc = await prisma.service.findUnique({
+            where: { id: serviceId },
+            select: { requiresPrePayment: true, prePaymentAmount: true, name: true },
+          });
+          if (svc?.requiresPrePayment && svc.prePaymentAmount) {
+            const clinic = await prisma.clinic.findUnique({
+              where: { id: clinicId },
+              select: { paymentConfig: true },
+            });
+            const config = parsePaymentConfig(clinic?.paymentConfig ?? null);
+            const hasPayme = isProviderEnabled(config, "payme");
+            const hasClick = isProviderEnabled(config, "click");
+
+            if (hasPayme || hasClick) {
+              const amountTiyin = decimalSumToTiyin(svc.prePaymentAmount);
+              const amountText = amountTiyin ? formatSum(amountTiyin) : "";
+              const webappUrl = process.env.NEXT_PUBLIC_WEBAPP_URL || "https://tibtaqvim.vercel.app/webapp";
+              const payUrl = `${webappUrl}/appointments/${result.data.id}/pay`;
+
+              await bot.sendMessage(
+                chatId,
+                `💳 *To'lov talab qilinadi*\n\nXizmat: *${svc.name}*\nSumma: *${amountText}*\n\nTo'lov qilish uchun quyidagi tugmani bosing:`,
+                {
+                  parse_mode: "Markdown",
+                  reply_markup: {
+                    inline_keyboard: [[
+                      { text: `💳 To'lov qilish (${amountText})`, web_app: { url: payUrl } },
+                    ]],
+                  } as any,
+                }
+              );
+            }
+          }
+        } catch (payErr) {
+          console.error("[payment-button] Error:", payErr);
+        }
       }
     } else {
       const errMsg = typeof result.error === "object"

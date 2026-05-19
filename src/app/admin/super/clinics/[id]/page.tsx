@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { AdminsTab } from "./AdminsTab";
 import { BranchesTab } from "./BranchesTab";
+import { PaymentTab } from "./PaymentTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ interface AuditEntry {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-type Tab = "settings" | "modules" | "features" | "audit" | "admins" | "branches";
+type Tab = "settings" | "modules" | "features" | "payment" | "audit" | "admins" | "branches";
 
 const MODULE_META: Record<string, { icon: string; label: string; desc: string }> = {
   doctor_queue: { icon: "🩺", label: "Shifokor Navbati", desc: "Kunlik navbat tizimi, limit bilan" },
@@ -232,6 +233,7 @@ export default function ClinicBuilderPage() {
     { key: "settings", label: "Sozlamalar", icon: "⚙️" },
     { key: "modules", label: "Modullar", icon: "🧩" },
     { key: "features", label: "Feature Flaglar", icon: "🚩" },
+    { key: "payment", label: "To'lov", icon: "💳" },
     { key: "branches", label: "Filiallar", icon: "🏥" },
     { key: "admins", label: "Adminlar", icon: "👤" },
     { key: "audit", label: "Audit", icon: "📋" },
@@ -581,6 +583,9 @@ export default function ClinicBuilderPage() {
           </div>
         </div>
       )}
+
+      {/* ── PAYMENT TAB ── */}
+      {tab === "payment" && <PaymentTab clinicId={id} />}
 
       {/* ── BRANCHES TAB ── */}
       {tab === "branches" && <BranchesTab clinicId={id} />}
