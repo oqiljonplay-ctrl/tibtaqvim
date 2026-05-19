@@ -52,6 +52,27 @@ enum SubscriptionStatus {
   cancelled
 }
 
+enum PaymentProvider {
+  payme
+  click
+}
+
+enum PaymentState {
+  pending
+  authorized
+  paid
+  cancelled
+  failed
+  refunded
+  partial_refunded
+}
+
+enum RefundState {
+  pending
+  succeeded
+  failed
+}
+
 // ─── CORE MODELS ─────────────────────────────────────────────────────────────
 
 model Clinic {
@@ -89,6 +110,7 @@ model Clinic {
   featureFlags  FeatureFlag[]
   moduleConfigs ModuleConfig[]
   userClinics   UserClinic[]
+  payments      Payment[]
 
   @@index([isActive, city])
   @@index([subscriptionStatus])
@@ -235,6 +257,7 @@ model User {
   appointments       Appointment[]
   telegramIdHistory  TelegramIdHistory[]
   userClinics        UserClinic[]
+  payments           Payment[]
 
   @@index([clinicId])
   @@index([branchId])
@@ -302,6 +325,7 @@ model Appointment {
   user          User?    @relation(fields: [userId], references: [id])
   slot          Slot?    @relation(fields: [slotId], references: [id])
   assignedStaff Staff?   @relation("AssignedStaff", fields: [staffId], references: [id])
+  payments      Payment[]
 
   @@index([clinicId])
   @@index([clinicId, date])
@@ -413,6 +437,60 @@ model TelegramIdHistory {
   @@index([userId])
   @@index([tibId])
   @@map("telegram_id_history")
+}
+
+// ─── PAYMENT MODELS ───────────────────────────────────────────────────────────
+
+model Payment {
+  id            String          @id @default(cuid())
+
+  appointmentId String
+  appointment   Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  clinicId      String
+  clinic        Clinic          @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  userId        String?
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  provider      PaymentProvider
+  providerTxId  String?
+  amount        BigInt
+  currency      String          @default("UZS")
+  state         PaymentState    @default(pending)
+
+  rawCallback   Json?
+  rawCreate     Json?
+  errorCode     String?
+  errorMessage  String?
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  authorizedAt  DateTime?
+  paidAt        DateTime?
+  cancelledAt   DateTime?
+
+  refunds       Refund[]
+
+  @@unique([provider, providerTxId], name: "provider_tx_unique")
+  @@index([appointmentId])
+  @@index([clinicId, state])
+  @@index([state, createdAt])
+  @@map("payments")
+}
+
+model Refund {
+  id              String      @id @default(cuid())
+  paymentId       String
+  payment         Payment     @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  amount          BigInt
+  reason          String?
+  state           RefundState @default(pending)
+  providerRefundId String?
+  rawCallback     Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([paymentId])
+  @@map("refunds")
 }
 
 model BotState {
