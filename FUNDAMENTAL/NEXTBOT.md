@@ -75,6 +75,8 @@ Doctor Panel → bugungi bemorlar ro'yxati
 │    POST /api/user/register                              │
 │    GET  /api/webapp/appointments (JWT'siz, phone chk)  │
 │    POST /api/webapp/cancel (JWT'siz, phone chk)        │
+│    GET  /api/me/appointments (telegramId, scope, filters)│
+│    GET  /api/me/clinics (telegramId, last clinic)       │
 │    GET  /api/reminders  (cron)                          │
 │    CRUD /api/admin/*                                    │
 └────────────────┬────────────────────────────────────────┘
@@ -425,6 +427,46 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-05-19 — Faza 5: Appointment History + UserClinic M2M
+
+**Maqsad:** Bemor o'z bron tarixini ko'ra olishi — "Shu klinika" va "Barcha klinikalar" tablari bilan.
+
+**DB (Supabase MCP via DDL):**
+- Yangi `user_clinics` table: `id, userId, clinicId, role, joinedAt, isActive`
+- `@@unique([userId, clinicId])` — duplikat yo'q
+- FK: `userId → users.id CASCADE`, `clinicId → clinics.id CASCADE`
+- Seed: `prisma/seed-user-clinics.ts` — 10 ta row backfill qilindi (7 from users.clinicId + 3 from appointments)
+- Schema: `prisma/schema.prisma` — `UserClinic` model + User/Clinic reverse relations qo'shildi
+
+**Yangi fayllar:**
+- `src/lib/user-clinics.ts` — `ensureUserClinic(userId, clinicId, role)` idempotent upsert + `getUserAllClinicIds()`
+- `src/app/api/me/appointments/route.ts` — `GET /api/me/appointments`
+  - Query: `telegramId`, `scope` (current/all), `clinicId`, `status`, `dateFrom`, `dateTo`, `sort`, `cursor`
+  - tibId/phone orqali related user IDlarni topadi
+  - Cursor pagination (20 per page)
+  - Include: clinic, branch, service, doctor, slot
+- `src/app/webapp/history/page.tsx` — `/webapp/history` sahifasi
+  - 2 tab: "Shu klinika" (default) / "Barcha klinikalar"
+  - Loading skeleton, empty state, error state
+  - "Yana yuklash" tugmasi (cursor pagination)
+  - Back ← tugmasi (dashboard'ga qaytadi)
+- `src/app/webapp/history/HistoryFilters.tsx` — collapsible filter panel
+  - 4 status: booked/arrived/missed/cancelled
+  - Sana oralig'i: dateFrom/dateTo
+  - Sort: yangi→eski / eski→yangi
+  - "Tozalash" tugmasi
+- `src/components/webapp/AppointmentCard.tsx` — reusable karta
+  - `showClinic` prop: "Barcha" tabida klinika logo+nomi tepada, "Shu" tabida yo'q
+  - date + slot.startTime/endTime, queueNumber, service, doctor, price, branch
+
+**O'zgartirilgan fayllar:**
+- `src/lib/services/booking.service.ts` — `linkUserToAppointment()` endi `ensureUserClinic()` ham chaqiradi
+- `src/app/webapp/page.tsx` — sticky bottom bar'ga "📋 Tarix" tugmasi qo'shildi (URL'da tgid+clinic parametrlarini saqlaydi)
+
+**Commit:** `bb60064` — 10 fayl, +796/-10
+
+---
+
 ### 2026-05-18 — Multi-Clinic Foundation (Bosqich 1)
 
 **Maqsad:** Bir nechta klinikani bitta platformada qo'llab-quvvatlash — bot/webapp'da klinika va filial tanlash, super_admin CRUD, subscription/trial mexanizmi.
@@ -658,6 +700,91 @@ Phone kiritilganda → /api/user/register → phone qo'shildi (update), tibId o'
 - `processBooking()` ichida `result.success` bo'lganda chaqiriladi
 - Fire-and-forget — bron bloklanmaydi
 - User topilmasa — silent skip
+
+---
+
+## 12.1 2026-05-19 — Sprint 1: Payment Foundation (Schema Poydevor)
+
+**Maqsad:** To'lov tizimi uchun schema va TypeScript yordamchi fayllar. Hech qanday provider API ishlamaydi — faqat poydevor.
+
+**Prisma schema:**
+- Yangi enum'lar: `PaymentProvider` (payme/click), `PaymentState` (pending/authorized/paid/cancelled/failed/refunded/partial_refunded), `RefundState` (pending/succeeded/failed)
+- Yangi `Payment` modeli: appointmentId, clinicId, userId, provider, providerTxId, amount (BigInt/tiyin), currency, state, rawCallback, rawCreate, errorCode, paidAt, authorizedAt, cancelledAt
+- Yangi `Refund` modeli: paymentId, amount, reason, state, providerRefundId
+- Back-relation: `Appointment.payments`, `Clinic.payments`, `User.payments`
+- `appointments.paymentStatus` text ustuni O'ZGARMADI (ortga moslik)
+- `@@unique([provider, providerTxId])` — idempotency
+
+**Migratsiya:** `20260519000003_add_payment_foundation` — Supabase MCP orqali apply (shadow DB muammosi sababli `prisma migrate dev` ishlamaydi)
+
+**Yangi TypeScript fayllar:**
+- `src/lib/payment/config-schema.ts` — `PaymentConfig`, `PaymeConfig`, `ClickConfig` interface'lar; `parsePaymentConfig()`, `validatePaymentConfigOrThrow()`, `isProviderEnabled()` funksiyalari
+- `src/lib/payment/secrets.ts` — `encryptSecret()`, `decryptSecret()` (hozir pass-through), `maskSecret()` — Sprint 4 da KMS bilan almashtiriladi
+- `src/lib/payment/money.ts` — `sumToTiyin()`, `tiyinToSum()`, `formatSum()`, `decimalSumToTiyin()` — pul BigInt/tiyin formatida
+- `src/lib/audit/actions.ts` — `PAYMENT_AUDIT_ACTIONS` const (Sprint 2/3 webhook'larida ishlatiladi)
+
+**Sanity check (Supabase):** `payments` ✅, `refunds` ✅, 3 ta enum ✅, jadvallar bo'sh ✅
+
+**Commit:** `cdfcae8` — 6 fayl, +317
+
+**Keyingi qadam:** Sprint 2 — Payme JSON-RPC integratsiya
+
+---
+
+## 12.2 2026-05-19 — Sprint 2: Payme JSON-RPC Integratsiya
+
+**Maqsad:** Payme Merchant API (JSON-RPC 2.0) to'liq integratsiyasi — sandbox test bilan.
+
+**Yangi fayllar:**
+- `src/lib/payment/payme/types.ts` — CheckPerform, CreateTransaction, PerformTransaction, CancelTransaction, CheckTransaction, GetStatement tiplar
+- `src/lib/payment/payme/errors.ts` — `PaymeError` class, 12 xato kodi, `toRpcError()`
+- `src/lib/payment/payme/handlers.ts` — 6 handler (idempotent, `prisma.auditLog.create`, BigInt tiyin)
+- `src/lib/payment/payme/checkout-url.ts` — `buildPaymeCheckoutUrl()` (base64 params, testMode URL)
+- `src/app/api/payments/payme/route.ts` — JSON-RPC endpoint, Basic Auth (constant-time), clinicId resolve
+- `src/app/api/payments/payme/create-link/route.ts` — Frontend checkout URL generator
+- `src/app/webapp/appointments/[id]/pay/page.tsx` — To'lov UI (Payme tugmasi, Sprint 3 da yangilanadi)
+- `src/app/api/admin/clinics/[id]/payment-config/route.ts` — GET/PATCH (secretKey masked)
+
+**Sandbox test:** CheckPerform✅, Create✅, Perform✅, Cancel✅, Check✅, Idempotency✅
+
+**Commit:** `1e051a1` — 8 fayl, +780
+
+---
+
+## 12.3 2026-05-19 — Sprint 3: Click Shop API Integratsiya
+
+**Maqsad:** Click Shop API (Prepare/Complete, form-urlencoded) + Webapp yakuniy UI + Bot to'lov tugmasi.
+
+**Click vs Payme farqi:**
+- Click = `application/x-www-form-urlencoded` POST (Payme = JSON-RPC)
+- Click sign = `md5(fields)` (Payme = Basic Auth)
+- Click amount = SO'M `"5000.00"` (Payme = TIYIN BigInt)
+- Complete'da `merchant_prepare_id` ham sign hash ichida (Prepare'da yo'q)
+
+**Yangi fayllar:**
+- `src/lib/payment/click/errors.ts` — `ClickError` class, 9 xato kodi (-1 to -9)
+- `src/lib/payment/click/types.ts` — ClickPrepareRequest/Response, ClickCompleteRequest/Response
+- `src/lib/payment/click/signature.ts` — `buildPrepareSignString()`, `buildCompleteSignString()`, `constantTimeEqual()`
+- `src/lib/payment/click/resolve-clinic.ts` — `resolveClinicForClick()` (appointment → clinic fallback)
+- `src/lib/payment/click/handlers.ts` — `handleClickPrepare()`, `handleClickComplete()` (idempotent)
+- `src/lib/payment/click/checkout-url.ts` — `buildClickCheckoutUrl()` (my.click.uz/services/pay)
+- `src/app/api/payments/click/route.ts` — POST endpoint (form-urlencoded + JSON), action 0/1 dispatch
+- `src/app/api/payments/click/create-link/route.ts` — Frontend checkout URL generator
+- `src/app/api/appointments/[id]/payment-info/route.ts` — GET (amount, paymentStatus, providers)
+- `src/lib/payment/notifications.ts` — `notifyPaymentResult()` Telegram xabarnomasi
+- `src/app/admin/super/clinics/[id]/PaymentTab.tsx` — Payme + Click config UI
+
+**O'zgartirilgan fayllar:**
+- `src/app/webapp/appointments/[id]/pay/page.tsx` — Payme + Click ikkalasi (payment-info API dan providers)
+- `src/app/api/admin/clinics/[id]/payment-config/route.ts` — Click `mergedClick` qo'shildi
+- `src/app/admin/super/clinics/[id]/page.tsx` — "To'lov 💳" tab qo'shildi
+- `bot/handlers/callback.ts` — confirm success'da to'lov tugmasi (requiresPrePayment && provider enabled)
+
+**Pul birligi:** Click SO'M → TIYIN: `sumToTiyin("5000.00") = 500000n`. DB'da doim BigInt tiyin.
+
+**Visual test:** `GET /api/appointments/[id]/payment-info` → 200 ✅, `GET /api/payments/click` → `{error:-8}` ✅
+
+**Commit:** `dcb8f3d` — 15 fayl, +1327/-49
 
 ---
 
