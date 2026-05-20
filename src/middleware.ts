@@ -11,11 +11,6 @@ const PUBLIC_PATHS = [
   "/api/clinics",
 ];
 
-/**
- * Sahifalar va ularga ruxsat etilgan role'lar.
- * branch_admin — Faza 3'da qo'shilgan, /admin va uning subroute'lariga kira oladi
- * (lekin permissions.ts helper'lari clinicId/branchId scope tekshiradi)
- */
 const ROLE_PATHS: Record<string, string[]> = {
   "/admin/super": ["super_admin"],
   "/admin": ["super_admin", "clinic_admin", "branch_admin"],
@@ -32,20 +27,45 @@ const ROLE_HOME: Record<string, string> = {
   receptionist: "/reception",
 };
 
+/**
+ * /admin/super uchun ikkinchi himoya qatlami.
+ * super_admin roli yetarli emas — sa_key cookie ham bo'lishi kerak.
+ * sa_key qiymati SUPERADMIN_KEY env var bilan tekshiriladi.
+ * /admin/super/auth — gate'siz (foydalanuvchi key kiritadi).
+ * SUPERADMIN_KEY set qilinmagan bo'lsa (dev), gate skip qilinadi.
+ */
+function checkSuperAdminGate(req: NextRequest): boolean {
+  const pathname = req.nextUrl.pathname;
+
+  // /admin/super/auth — gate yo'q (foydalanuvchi key kiritadi)
+  if (pathname === "/admin/super/auth" || pathname.startsWith("/admin/super/auth/")) {
+    return true;
+  }
+
+  // Faqat /admin/super/* uchun ishlaydi
+  if (!pathname.startsWith("/admin/super")) {
+    return true;
+  }
+
+  const expected = process.env.SUPERADMIN_KEY;
+  // Dev: SUPERADMIN_KEY set qilinmagan bo'lsa, gate'ni skip qil
+  if (!expected) return true;
+
+  const saKey = req.cookies.get("sa_key")?.value;
+  return saKey === expected;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Public sahifalar va asosiy /
   if (pathname === "/" || PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  // API route'lar uchun authentication har route'da alohida tekshiriladi
   if (pathname.startsWith("/api")) {
     return NextResponse.next();
   }
 
-  // Token tekshiruvi
   const token = req.cookies.get("auth_token")?.value;
   if (!token) {
     const loginUrl = new URL("/login", req.url);
@@ -60,12 +80,17 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Role-based access control
+  // Role-based access
   for (const [path, roles] of Object.entries(ROLE_PATHS)) {
     if (pathname.startsWith(path) && !roles.includes(payload.role)) {
       const home = ROLE_HOME[payload.role] ?? "/login";
       return NextResponse.redirect(new URL(home, req.url));
     }
+  }
+
+  // SuperAdmin sa_key gate (ikkinchi qatlam)
+  if (!checkSuperAdminGate(req)) {
+    return NextResponse.redirect(new URL("/admin/super/auth", req.url));
   }
 
   return NextResponse.next();
