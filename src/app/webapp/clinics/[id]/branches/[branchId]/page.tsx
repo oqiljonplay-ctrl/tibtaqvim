@@ -78,7 +78,7 @@ export default function BranchServicesPage() {
           if (j.success && j.data) {
             tgUserRef.current = j.data;
             setTgUser(j.data);
-            setForm((f) => ({ ...f, name: f.name || j.data.firstName, phone: f.phone || j.data.phone || "" }));
+            setForm((f) => ({ ...f, name: j.data.firstName || f.name, phone: f.phone || j.data.phone || "" }));
           }
         } catch {}
       }

@@ -211,9 +211,24 @@ export default function WebApp() {
         setForm((f) => ({ ...f, name: f.name || tgFirstName }));
       }
 
-      // Faqat rebook mode=booking → booking
+      // mode=booking: xizmatlarni yukla + user ma'lumotini ham ol (form step chiqmasin)
       if (urlMode === "booking") {
         setAppMode("booking");
+        if (tgId) {
+          try {
+            const res = await fetch(`/api/user/by-telegram?telegramId=${tgId}`);
+            const json = await res.json();
+            if (json.success && json.data) {
+              tgUserRef.current = json.data as TgUser;
+              setTgUser(json.data as TgUser);
+              setForm((f) => ({
+                ...f,
+                name: (json.data.firstName as string) || f.name,
+                phone: f.phone || (json.data.phone as string) || "",
+              }));
+            }
+          } catch {}
+        }
         loadServices(todayStr());
         setUserLoading(false);
         return;
@@ -244,7 +259,7 @@ export default function WebApp() {
           user = json.data as TgUser;
           tgUserRef.current = user;
           setTgUser(user);
-          setForm((f) => ({ ...f, name: f.name || user!.firstName, phone: f.phone || user!.phone || "" }));
+          setForm((f) => ({ ...f, name: user!.firstName || f.name, phone: f.phone || user!.phone || "" }));
         } else {
           const regRes = await fetch("/api/user/register", {
             method: "POST",
@@ -680,8 +695,14 @@ export default function WebApp() {
           <div className="flex gap-2">
             <button
               onClick={() => {
-                const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "booking" });
-                window.location.href = `/webapp?${qs}`;
+                const cId = clinicIdRef.current;
+                if (cId) {
+                  // PatientSelector bor branches booking sahifasiga o'tish
+                  window.location.href = `/webapp/clinics/${cId}`;
+                } else {
+                  const qs = new URLSearchParams({ mode: "booking" });
+                  window.location.href = `/webapp?${qs}`;
+                }
               }}
               className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
             >
