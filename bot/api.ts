@@ -93,11 +93,11 @@ export async function registerUserAtStart(
 // Direct DB — fast lookup by telegramId, auto-assigns tibId if missing
 export async function fetchUserByTelegramId(
   telegramId: number
-): Promise<{ firstName: string; phone: string | null; tibId: string | null; hasPhone: boolean } | null> {
+): Promise<{ firstName: string; lastName: string | null; phone: string | null; tibId: string | null; hasPhone: boolean; userId: string | null } | null> {
   try {
     const user = await prisma.user.findUnique({
       where: { telegramId: String(telegramId) },
-      select: { id: true, firstName: true, phone: true, tibId: true },
+      select: { id: true, firstName: true, lastName: true, phone: true, tibId: true },
     });
     if (!user) return null;
 
@@ -108,10 +108,43 @@ export async function fetchUserByTelegramId(
 
     return {
       firstName: user.firstName,
+      lastName: user.lastName,
       phone: user.phone,
       tibId,
       hasPhone: !!user.phone,
+      userId: user.id,
     };
+  } catch {
+    return null;
+  }
+}
+
+// Direct DB — fetch user with dependents for patient selection
+export async function fetchUserWithDependents(
+  telegramId: number
+): Promise<{
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  phone: string | null;
+  dependents: { id: string; firstName: string; lastName: string | null; phone: string | null; relation: string | null }[];
+} | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: String(telegramId) },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        dependents: {
+          where: { deletedAt: null },
+          select: { id: true, firstName: true, lastName: true, phone: true, relation: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+    return user ?? null;
   } catch {
     return null;
   }

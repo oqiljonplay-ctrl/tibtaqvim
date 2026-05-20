@@ -7,12 +7,14 @@ import Link from "next/link";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
 
-type BookingStep = "services" | "date" | "slots" | "form" | "confirm" | "done";
+type BookingStep = "services" | "date" | "slots" | "patient" | "form" | "confirm" | "done";
 
 interface ServiceDoctor { id: string; firstName: string; lastName: string; specialty: string; photoUrl: string | null; queueMode?: string }
 interface Service { id: string; name: string; type: string; price: number; requiresSlot: boolean; requiresAddress: boolean; requiresPrePayment: boolean; dailyLimit: number | null; todayCount: number; isAvailable: boolean; defaultQueueMode?: string; doctors: ServiceDoctor[] }
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
-interface TgUser { firstName: string; phone: string | null; tibId: string | null; hasPhone: boolean }
+interface Dependent { id: string; firstName: string; lastName: string | null; phone: string | null; relation: string | null }
+interface TgUser { id: string; firstName: string; lastName: string | null; fullName: string; phone: string | null; tibId: string | null; hasPhone: boolean; dependents: Dependent[]; canAddDependent: boolean }
+interface PatientSelection { type: "self" | "dependent" | "guest"; dependentId: string | null; patientName: string; patientPhone: string }
 
 const typeEmojis: Record<string, string> = { doctor_queue: "👨‍⚕️", diagnostic: "🔬", home_service: "🏠" };
 const typeLabels: Record<string, string> = { doctor_queue: "Shifokor navbati", diagnostic: "Diagnostika", home_service: "Uyga chiqish" };
@@ -35,20 +37,28 @@ export default function BranchServicesPage() {
   const { id: clinicId, branchId } = useParams<{ id: string; branchId: string }>();
   const router = useRouter();
 
-  const [step, setStep]           = useState<BookingStep>("services");
-  const [services, setServices]   = useState<Service[]>([]);
-  const [slots, setSlots]         = useState<Slot[]>([]);
-  const [selSvc, setSelSvc]       = useState<Service | null>(null);
-  const [selDate, setSelDate]     = useState("");
-  const [selSlot, setSelSlot]     = useState("");
-  const [form, setForm]           = useState({ name: "", phone: "", address: "" });
-  const [loading, setLoading]     = useState(true);
+  const [step, setStep]             = useState<BookingStep>("services");
+  const [services, setServices]     = useState<Service[]>([]);
+  const [slots, setSlots]           = useState<Slot[]>([]);
+  const [selSvc, setSelSvc]         = useState<Service | null>(null);
+  const [selDate, setSelDate]       = useState("");
+  const [selSlot, setSelSlot]       = useState("");
+  const [patient, setPatient]       = useState<PatientSelection>({ type: "guest", dependentId: null, patientName: "", patientPhone: "" });
+  const [form, setForm]             = useState({ name: "", phone: "", address: "" });
+  const [loading, setLoading]       = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult]       = useState<any>(null);
-  const [err, setErr]             = useState<string | null>(null);
-  const [tgUser, setTgUser]       = useState<TgUser | null>(null);
+  const [result, setResult]         = useState<any>(null);
+  const [err, setErr]               = useState<string | null>(null);
+  const [tgUser, setTgUser]         = useState<TgUser | null>(null);
   const [telegramId, setTelegramId] = useState<string | null>(null);
-  const [tibId, setTibId]         = useState<string | null>(null);
+  const [tibId, setTibId]           = useState<string | null>(null);
+
+  // Adding a new dependent inline
+  const [addingDep, setAddingDep]   = useState(false);
+  const [newDepName, setNewDepName] = useState("");
+  const [newDepLast, setNewDepLast] = useState("");
+  const [newDepRel, setNewDepRel]   = useState("");
+  const [depSaving, setDepSaving]   = useState(false);
 
   const tgUserRef = useRef<TgUser | null>(null);
 
@@ -98,7 +108,49 @@ export default function BranchServicesPage() {
         }
       } finally { setLoading(false); }
     }
-    setStep(tgUserRef.current?.hasPhone ? "confirm" : "form");
+    goToPatientOrForm();
+  }
+
+  function goToPatientOrForm() {
+    if (tgUserRef.current?.hasPhone) {
+      // Pre-fill with "self" by default
+      const u = tgUserRef.current;
+      setPatient({ type: "self", dependentId: null, patientName: u.fullName, patientPhone: u.phone || "" });
+      setStep("patient");
+    } else {
+      setStep("form");
+    }
+  }
+
+  async function handleAddDependent() {
+    if (!newDepName.trim() || newDepName.length < 2) { alert("Ism kamida 2 harf bo'lishi kerak"); return; }
+    if (!telegramId) { alert("Telegram ID topilmadi"); return; }
+    setDepSaving(true);
+    try {
+      // Dependents API needs cookie auth — use telegramId-based register first
+      // Actually we call /api/dependents but need userId. We'll use the user's cookie if available.
+      // For webapp users (no cookie), we need a different approach.
+      // Use the telegramId to find user and create dependent via the API.
+      const res = await fetch("/api/dependents/by-telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telegramId, firstName: newDepName.trim(), lastName: newDepLast.trim() || null, relation: newDepRel || null }),
+      });
+      const j = await res.json();
+      if (!j.success) { alert(j.error?.message || "Qo'shib bo'lmadi"); return; }
+
+      // Refresh user data
+      const r2 = await fetch(`/api/user/by-telegram?telegramId=${telegramId}`);
+      const j2 = await r2.json();
+      if (j2.success && j2.data) {
+        tgUserRef.current = j2.data;
+        setTgUser(j2.data);
+        setPatient({ type: "dependent", dependentId: j.data.id, patientName: [j.data.firstName, j.data.lastName].filter(Boolean).join(" "), patientPhone: j.data.phone || j2.data.phone || "" });
+      }
+      setAddingDep(false);
+      setNewDepName(""); setNewDepLast(""); setNewDepRel("");
+    } catch { alert("Xato"); }
+    finally { setDepSaving(false); }
   }
 
   async function handleBook() {
@@ -106,16 +158,24 @@ export default function BranchServicesPage() {
     setSubmitting(true); setErr(null);
     try {
       let resolvedTibId = tgUser?.tibId ?? null;
-      const regRes = await fetch("/api/user/register", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: form.phone, firstName: form.name, ...(telegramId ? { telegramId } : {}), clinicId }),
-      });
-      const regJ = await regRes.json();
-      if (regJ.success) resolvedTibId = regJ.data?.tibId ?? resolvedTibId;
+      let resolvedUserId: string | null = tgUser?.id ?? null;
+      if (!resolvedUserId && telegramId) {
+        const regRes = await fetch("/api/user/register", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: patient.patientPhone || form.phone, firstName: patient.patientName || form.name, ...(telegramId ? { telegramId } : {}), clinicId }),
+        });
+        const regJ = await regRes.json();
+        if (regJ.success) { resolvedTibId = regJ.data?.tibId ?? resolvedTibId; resolvedUserId = regJ.data?.userId ?? null; }
+      }
+
+      const finalName = patient.type === "guest" ? form.name : patient.patientName;
+      const finalPhone = patient.type === "guest" ? form.phone : patient.patientPhone;
 
       const payload: Record<string, unknown> = {
         clinicId, branchId, serviceId: selSvc.id, date: selDate,
-        patientName: form.name, patientPhone: form.phone, source: "webapp",
+        patientName: finalName, patientPhone: finalPhone, source: "webapp",
+        ...(resolvedUserId ? { userId: resolvedUserId } : {}),
+        ...(patient.dependentId ? { dependentId: patient.dependentId } : {}),
       };
       if (selSlot) payload.slotId = selSlot;
       if (selSvc.requiresAddress && form.address) payload.address = form.address;
@@ -123,12 +183,16 @@ export default function BranchServicesPage() {
       const r = await fetch("/api/book", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await r.json();
       if (j.success) { setResult(j.data); setTibId(resolvedTibId); setStep("done"); }
-      else setErr(j.error?.message ?? "Xatolik yuz berdi");
+      else {
+        if (r.status === 409) setErr(`⚠️ ${j.error?.message ?? "Bron mavjud"}`);
+        else setErr(j.error?.message ?? "Xatolik yuz berdi");
+      }
     } catch { setErr("Tarmoq xatosi"); }
     finally { setSubmitting(false); }
   }
 
   const displayTibId = tgUser?.tibId ?? tibId;
+  const u = tgUser;
 
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto flex flex-col">
@@ -147,7 +211,7 @@ export default function BranchServicesPage() {
         {step !== "services" && step !== "done" && (
           <div className="mt-2 h-1.5 bg-blue-500 rounded-full overflow-hidden">
             <div className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${step === "confirm" ? 85 : step === "form" ? 70 : step === "slots" ? 55 : 35}%` }} />
+              style={{ width: `${step === "confirm" ? 85 : step === "form" || step === "patient" ? 70 : step === "slots" ? 55 : 35}%` }} />
           </div>
         )}
       </div>
@@ -223,7 +287,7 @@ export default function BranchServicesPage() {
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {slots.map((s) => (
-                  <button key={s.id} onClick={() => { setSelSlot(s.id); setStep(tgUserRef.current?.hasPhone ? "confirm" : "form"); }}
+                  <button key={s.id} onClick={() => { setSelSlot(s.id); goToPatientOrForm(); }}
                     className="p-4 rounded-2xl bg-white border-2 border-transparent shadow-sm text-center hover:border-blue-200 active:scale-95">
                     <div className="text-sm font-bold text-gray-900">{s.startTime}</div>
                     <div className="text-xs text-gray-400">— {s.endTime}</div>
@@ -234,9 +298,97 @@ export default function BranchServicesPage() {
           </div>
         )}
 
-        {/* Form */}
+        {/* Patient selection */}
+        {step === "patient" && u && (
+          <div>
+            <button onClick={() => setStep(selSvc?.requiresSlot ? "slots" : "date")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
+            <h2 className="font-semibold text-gray-900 mb-4">👤 Bron kim uchun?</h2>
+            <div className="space-y-2 mb-4">
+              {/* O'zim */}
+              <button type="button"
+                onClick={() => setPatient({ type: "self", dependentId: null, patientName: u.fullName, patientPhone: u.phone || "" })}
+                className={`w-full text-left p-3 rounded-xl border-2 transition ${patient.type === "self" ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">✅</span>
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{u.fullName}</div>
+                    <div className="text-xs text-gray-500">O&apos;zim · {u.phone}</div>
+                  </div>
+                  {patient.type === "self" && <span className="text-blue-500 text-xs">●</span>}
+                </div>
+              </button>
+
+              {/* Mavjud dependents */}
+              {u.dependents.map((dep) => {
+                const depName = [dep.firstName, dep.lastName].filter(Boolean).join(" ");
+                const isSelected = patient.dependentId === dep.id;
+                return (
+                  <button key={dep.id} type="button"
+                    onClick={() => setPatient({ type: "dependent", dependentId: dep.id, patientName: depName, patientPhone: dep.phone || u.phone || "" })}
+                    className={`w-full text-left p-3 rounded-xl border-2 transition ${isSelected ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"}`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">👤</span>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{depName}</div>
+                        <div className="text-xs text-gray-500">{dep.relation || "Qaramog’imdagi"} · {dep.phone || u.phone}</div>
+                      </div>
+                      {isSelected && <span className="text-blue-500 text-xs">●</span>}
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* Qo'shish */}
+              {u.canAddDependent && !addingDep && (
+                <button type="button" onClick={() => setAddingDep(true)}
+                  className="w-full p-3 rounded-xl border-2 border-dashed border-gray-300 text-sm text-gray-600 hover:bg-gray-50">
+                  ➕ Qaramog&apos;imdagi shaxs qo&apos;shish ({u.dependents.length}/2)
+                </button>
+              )}
+
+              {addingDep && (
+                <div className="p-3 bg-gray-50 rounded-xl space-y-2">
+                  <input type="text" placeholder="Ism *" value={newDepName} onChange={(e) => setNewDepName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white" maxLength={50} />
+                  <input type="text" placeholder="Familiya" value={newDepLast} onChange={(e) => setNewDepLast(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white" maxLength={50} />
+                  <select value={newDepRel} onChange={(e) => setNewDepRel(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
+                    <option value="">— Kim bo&apos;ladi (ixtiyoriy) —</option>
+                    {["Onam","Otam","O’g’lim","Qizim","Xotinim","Erim","Aka","Singil","Boshqa"].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={handleAddDependent} disabled={depSaving}
+                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50">
+                      {depSaving ? "Saqlanmoqda..." : "Qo’shish"}
+                    </button>
+                    <button type="button" onClick={() => { setAddingDep(false); setNewDepName(""); setNewDepLast(""); setNewDepRel(""); }}
+                      className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">Bekor</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {selSvc?.requiresAddress && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Manzil *</label>
+                <textarea className="input resize-none" required rows={3} value={form.address}
+                  onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} placeholder="Toshkent, Yunusobod, 5-uy" />
+              </div>
+            )}
+
+            <button onClick={() => setStep("confirm")} disabled={!patient.patientName || !patient.patientPhone}
+              className="btn-primary w-full py-3.5 text-base disabled:opacity-50">
+              Davom etish →
+            </button>
+          </div>
+        )}
+
+        {/* Form (guest / no-phone user) */}
         {step === "form" && (
-          <form onSubmit={(e) => { e.preventDefault(); setStep("confirm"); }}>
+          <form onSubmit={(e) => { e.preventDefault(); setPatient({ type: "guest", dependentId: null, patientName: form.name, patientPhone: form.phone }); setStep("confirm"); }}>
             <button type="button" onClick={() => setStep(selSvc?.requiresSlot ? "slots" : "date")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
             <h2 className="font-semibold text-gray-900 mb-4">Ma&apos;lumotlaringizni kiriting</h2>
             <div className="space-y-4">
@@ -265,8 +417,7 @@ export default function BranchServicesPage() {
         {/* Confirm */}
         {step === "confirm" && selSvc && (
           <div>
-            <button onClick={() => setStep(tgUserRef.current?.hasPhone ? (selSvc.requiresSlot ? "slots" : "date") : "form")}
-              className="text-blue-600 text-sm mb-4">← Orqaga</button>
+            <button onClick={() => setStep(u?.hasPhone ? "patient" : "form")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
             <h2 className="font-semibold text-gray-900 mb-4">Tasdiqlash</h2>
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 mb-5">
               <SummaryRow label="Xizmat" value={`${typeEmojis[selSvc.type]} ${selSvc.name}`} />
@@ -276,8 +427,9 @@ export default function BranchServicesPage() {
                 <SummaryRow label="Vaqt" value={`${slots.find((s) => s.id === selSlot)!.startTime} — ${slots.find((s) => s.id === selSlot)!.endTime}`} />
               )}
               <div className="border-t border-gray-100 pt-3 space-y-2">
-                <SummaryRow label="Ism" value={form.name} />
-                <SummaryRow label="Telefon" value={form.phone} />
+                <SummaryRow label="Bemor" value={patient.patientName || form.name} />
+                <SummaryRow label="Telefon" value={patient.patientPhone || form.phone} />
+                {patient.dependentId && <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">👨‍👩‍👧 Qaramog&apos;idagi uchun bron</div>}
                 {displayTibId && (
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500">ID</span>
@@ -313,7 +465,7 @@ export default function BranchServicesPage() {
                 </div>
               )}
               <SummaryRow label="Sana" value={selDate ? formatDateLabel(selDate) : ""} />
-              <SummaryRow label="Ism" value={result.patientName} />
+              <SummaryRow label="Bemor" value={result.patientName} />
             </div>
             <p className="text-xs text-gray-400 mb-6">Klinikaga o&apos;z vaqtida keling 🏥</p>
             {telegramId && (

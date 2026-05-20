@@ -11,6 +11,7 @@ export interface BookingInput {
   address?: string;
   source?: "bot" | "webapp";
   userId?: string;
+  dependentId?: string;
 }
 
 function sanitizeText(value: string): string {

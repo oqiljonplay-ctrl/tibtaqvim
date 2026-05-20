@@ -1,5 +1,5 @@
 import TelegramBot, { CallbackQuery } from "node-telegram-bot-api";
-import { fetchSlots, bookAppointment, registerPatient, fetchServices, fetchUserByTelegramId } from "../api";
+import { fetchSlots, bookAppointment, registerPatient, fetchServices, fetchUserByTelegramId, fetchUserWithDependents } from "../api";
 import { userState } from "../state";
 import { prisma } from "@/lib/prisma";
 import { parsePaymentConfig, isProviderEnabled } from "@/lib/payment/config-schema";
@@ -484,18 +484,8 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           messageId: newMsgId,
         });
       } else {
-        const newMsgId = await editOrSend(
-          bot, chatId, msgId,
-          "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
-          mkNameKeyboard("select_date")
-        );
-        await userState.set(chatId,{
-          ...state,
-          date: selectedDate,
-          step: "enter_name",
-          messageId: newMsgId,
-          _nameBack: "select_date",
-        });
+        const newState = { ...state, date: selectedDate, _nameBack: "select_date" };
+        await showPatientSelection(bot, chatId, newState, msgId);
       }
       return;
     }
@@ -523,19 +513,8 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         );
         await userState.set(chatId,{ ...confirmState, messageId: newMsgId });
       } else {
-        const newMsgId = await editOrSend(
-          bot, chatId, msgId,
-          "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
-          mkNameKeyboard("select_date")
-        );
-        await userState.set(chatId,{
-          ...state,
-          date: selectedDate,
-          step: "enter_name",
-          messageId: newMsgId,
-          _nameBack: "select_date",
-          _slots: [],
-        });
+        const newState = { ...state, date: selectedDate, _nameBack: "select_date", _slots: [] };
+        await showPatientSelection(bot, chatId, newState, msgId);
       }
       return;
     }
@@ -613,18 +592,8 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       );
       await userState.set(chatId,{ ...confirmState, messageId: newMsgId });
     } else {
-      const newMsgId = await editOrSend(
-        bot, chatId, msgId,
-        "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
-        mkNameKeyboard("select_doctor_or_slot")
-      );
-      await userState.set(chatId,{
-        ...state,
-        slotId,
-        step: "enter_name",
-        messageId: newMsgId,
-        _nameBack: "select_doctor_or_slot",
-      });
+      const newState = { ...state, slotId, _nameBack: "select_doctor_or_slot" };
+      await showPatientSelection(bot, chatId, newState, msgId);
     }
     return;
   }
@@ -804,6 +773,129 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     return;
   }
 
+  // ─── patient: — bemor tanlash ────────────────────────────────────────────
+  if (data === "patient:self") {
+    const user = await fetchUserWithDependents(chatId);
+    if (!user || !user.firstName || !user.phone) {
+      await showPatientSelection(bot, chatId, state, msgId);
+      return;
+    }
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+    const updatedState = {
+      ...state,
+      patientType: "self",
+      dependentId: null,
+      patientName: fullName,
+      patientPhone: user.phone,
+    };
+    await goToNextAfterPatient(bot, chatId, updatedState, msgId);
+    return;
+  }
+
+  if (data.startsWith("patient:dep:")) {
+    const depId = data.replace("patient:dep:", "");
+    const user = await fetchUserWithDependents(chatId);
+    if (!user) {
+      await bot.sendMessage(chatId, "❌ Profil topilmadi. /start");
+      return;
+    }
+    const dep = user.dependents.find((d) => d.id === depId);
+    if (!dep) {
+      await bot.sendMessage(chatId, "❌ Qaramog'idagi topilmadi. /start");
+      return;
+    }
+    const depFullName = [dep.firstName, dep.lastName].filter(Boolean).join(" ");
+    const phone = dep.phone || user.phone || "";
+    const updatedState = {
+      ...state,
+      patientType: "dependent",
+      dependentId: dep.id,
+      patientName: depFullName,
+      patientPhone: phone,
+    };
+    await goToNextAfterPatient(bot, chatId, updatedState, msgId);
+    return;
+  }
+
+  if (data === "patient:add_dep") {
+    const user = await fetchUserWithDependents(chatId);
+    if (!user) {
+      await bot.sendMessage(chatId, "❌ Profil topilmadi. /start");
+      return;
+    }
+    if (user.dependents.length >= 2) {
+      await bot.sendMessage(chatId, "❌ Maksimal 2 ta qaramog'idagi shaxs qo'shishingiz mumkin");
+      await showPatientSelection(bot, chatId, state, msgId);
+      return;
+    }
+    await userState.set(chatId, { ...state, step: "add_dep_name" });
+    await bot.sendMessage(chatId,
+      `👤 Qaramog'idagi shaxs ismini kiriting:\n\nMasalan: "Munira" 👇`,
+      { reply_markup: { inline_keyboard: [[{ text: "⬅️ Orqaga", callback_data: "patient:back" }]] } }
+    );
+    return;
+  }
+
+  if (data === "patient:back") {
+    await showPatientSelection(bot, chatId, state, msgId);
+    return;
+  }
+
+  if (data === "dep_relation:skip_lastname") {
+    // Familiyasiz — relation bosqichiga o'tish
+    await userState.set(chatId, { ...state, tempDepLastName: null, step: "add_dep_relation" });
+    const relations = ["Onam", "Otam", "O'g'lim", "Qizim", "Xotinim", "Erim", "Aka", "Singil", "Boshqa"];
+    const newMsgId = await editOrSend(
+      bot, chatId, msgId,
+      "Kim bo'ladi? (tugmadan tanlang yoki o'tkazib yuboring)",
+      [
+        ...relations.map((r) => [{ text: r, callback_data: `dep_relation:${r}` }]),
+        [{ text: "⏭ O'tkazib yuborish", callback_data: "dep_relation:skip" }],
+      ]
+    );
+    await userState.set(chatId, { ...state, tempDepLastName: null, step: "add_dep_relation", messageId: newMsgId });
+    return;
+  }
+
+  if (data.startsWith("dep_relation:")) {
+    const relation = data === "dep_relation:skip" ? null : data.replace("dep_relation:", "");
+    const user = await fetchUserWithDependents(chatId);
+    if (!user) {
+      await bot.sendMessage(chatId, "❌ Profil topilmadi. /start");
+      return;
+    }
+    try {
+      const dep = await (await import("@/lib/prisma")).prisma.dependent.create({
+        data: {
+          userId: user.id,
+          firstName: state.tempDepFirstName,
+          lastName: state.tempDepLastName || null,
+          relation,
+        },
+      });
+      const depFullName = [dep.firstName, dep.lastName].filter(Boolean).join(" ");
+      const updatedState = {
+        ...state,
+        patientType: "dependent",
+        dependentId: dep.id,
+        patientName: depFullName,
+        patientPhone: dep.phone || user.phone || "",
+        tempDepFirstName: undefined,
+        tempDepLastName: undefined,
+      };
+      await bot.sendMessage(chatId, `✅ ${depFullName} qaramog'ingizga qo'shildi`);
+      await goToNextAfterPatient(bot, chatId, updatedState, msgId);
+    } catch (err: any) {
+      if (err?.message?.includes("DEPENDENTS_LIMIT_EXCEEDED")) {
+        await bot.sendMessage(chatId, "❌ Maksimal 2 ta qaramog'idagi shaxs qo'shishingiz mumkin");
+        return showPatientSelection(bot, chatId, state, msgId);
+      }
+      console.error("[dep_relation] error:", err);
+      await bot.sendMessage(chatId, "❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.");
+    }
+    return;
+  }
+
   // ─── cancel ───────────────────────────────────────────────────────────────
   if (data === "cancel") {
     await userState.delete(chatId);
@@ -833,4 +925,75 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
 
 function formatPrice(price: number): string {
   return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " so'm";
+}
+
+async function showPatientSelection(
+  bot: TelegramBot,
+  chatId: number,
+  state: any,
+  msgId?: number
+): Promise<void> {
+  const user = await fetchUserWithDependents(chatId);
+
+  // Profil yo'q yoki telefon yo'q → eski enter_name flow
+  if (!user || !user.firstName || !user.phone) {
+    const newMsgId = await editOrSend(
+      bot, chatId, msgId,
+      "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
+      mkNameKeyboard(state._nameBack || "select_date")
+    );
+    await userState.set(chatId, { ...state, step: "enter_name", messageId: newMsgId });
+    return;
+  }
+
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const buttons: any[] = [
+    [{ text: `✅ O'zim (${fullName})`, callback_data: "patient:self" }],
+  ];
+
+  for (const dep of user.dependents) {
+    const depName = [dep.firstName, dep.lastName].filter(Boolean).join(" ");
+    const label = dep.relation ? `👤 ${depName} (${dep.relation})` : `👤 ${depName}`;
+    buttons.push([{ text: label, callback_data: `patient:dep:${dep.id}` }]);
+  }
+
+  if (user.dependents.length < 2) {
+    buttons.push([{ text: `➕ Qaramog'imdagi (${user.dependents.length}/2)`, callback_data: "patient:add_dep" }]);
+  }
+
+  buttons.push([{ text: "⬅️ Orqaga", callback_data: `back:${state._nameBack || "select_date"}` }]);
+
+  const newMsgId = await editOrSend(
+    bot, chatId, msgId,
+    "👤 *Bron kim uchun?*",
+    buttons
+  );
+  await userState.set(chatId, { ...state, step: "select_patient", messageId: newMsgId });
+}
+
+async function goToNextAfterPatient(
+  bot: TelegramBot,
+  chatId: number,
+  state: any,
+  msgId?: number
+): Promise<void> {
+  if (state.serviceType === "home_service") {
+    if (state.address) {
+      // Manzil allaqachon kiritilgan — confirmga o'tish
+      const confirmState = { ...state, step: "confirm" };
+      const newMsgId = await editOrSend(bot, chatId, msgId, mkConfirmText(confirmState), mkConfirmKeyboard());
+      await userState.set(chatId, { ...confirmState, messageId: newMsgId });
+    } else {
+      const newMsgId = await editOrSend(
+        bot, chatId, msgId,
+        `👤 Ism: *${state.patientName}*\n📞 Tel: *${state.patientPhone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
+        mkAddressKeyboard()
+      );
+      await userState.set(chatId, { ...state, step: "enter_address", messageId: newMsgId });
+    }
+  } else {
+    const confirmState = { ...state, step: "confirm" };
+    const newMsgId = await editOrSend(bot, chatId, msgId, mkConfirmText(confirmState), mkConfirmKeyboard());
+    await userState.set(chatId, { ...confirmState, messageId: newMsgId });
+  }
 }

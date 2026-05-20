@@ -494,6 +494,47 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
     return;
   }
 
+  // ─── Qaramog'idagi ismi ──────────────────────────────────────────────────────
+  if (state.step === "add_dep_name") {
+    if (text.length < 2 || text.length > 50) {
+      await bot.sendMessage(chatId, "❌ Ism 2-50 harf bo'lishi kerak. Qaytadan kiriting:");
+      return;
+    }
+    await userState.set(chatId, { ...state, tempDepFirstName: text.trim(), step: "add_dep_lastname" });
+    await bot.sendMessage(chatId,
+      "Familiyasini kiriting (familiya bo'lmasa — yuboring):",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "⏭ Familiyasiz davom etish", callback_data: "dep_relation:skip_lastname" }],
+            [{ text: "⬅️ Orqaga", callback_data: "patient:back" }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  // ─── Qaramog'idagi familiyasi ─────────────────────────────────────────────
+  if (state.step === "add_dep_lastname") {
+    const lastName = text.trim() || null;
+    await userState.set(chatId, { ...state, tempDepLastName: lastName, step: "add_dep_relation" });
+    const relations = ["Onam", "Otam", "O'g'lim", "Qizim", "Xotinim", "Erim", "Aka", "Singil", "Boshqa"];
+    await bot.sendMessage(
+      chatId,
+      "Kim bo'ladi? (tugmadan tanlang yoki o'tkazib yuboring)",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            ...relations.map((r) => [{ text: r, callback_data: `dep_relation:${r}` }]),
+            [{ text: "⏭ O'tkazib yuborish", callback_data: "dep_relation:skip" }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
   // ─── Manzil ──────────────────────────────────────────────────────────────────
   if (state.step === "enter_address") {
     if (text.length < 5) {

@@ -13,7 +13,18 @@ export async function GET(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { telegramId },
-      select: { id: true, firstName: true, phone: true, tibId: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        tibId: true,
+        dependents: {
+          where: { deletedAt: null },
+          select: { id: true, firstName: true, lastName: true, phone: true, relation: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
     });
 
     if (!user) return notFound("User not found");
@@ -24,10 +35,15 @@ export async function GET(req: NextRequest) {
     }
 
     return ok({
+      id: user.id,
       firstName: user.firstName,
+      lastName: user.lastName ?? null,
+      fullName: [user.firstName, user.lastName].filter(Boolean).join(" "),
       phone: user.phone ?? null,
       tibId,
       hasPhone: !!user.phone,
+      dependents: user.dependents,
+      canAddDependent: user.dependents.length < 2,
     });
   } catch {
     return error("Server error", 500);

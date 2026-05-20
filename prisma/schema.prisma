@@ -258,12 +258,32 @@ model User {
   telegramIdHistory  TelegramIdHistory[]
   userClinics        UserClinic[]
   payments           Payment[]
+  dependents         Dependent[]
 
   @@index([clinicId])
   @@index([branchId])
   @@index([telegramId])
   @@index([username])
   @@map("users")
+}
+
+model Dependent {
+  id        String    @id @default(cuid())
+  userId    String
+  firstName String
+  lastName  String?
+  phone     String?
+  relation  String?
+  birthYear Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+  @@map("dependents")
 }
 
 model UserClinic {

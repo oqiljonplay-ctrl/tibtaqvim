@@ -57,6 +57,25 @@ async function bookDoctorQueue(
         throw { code: "DUPLICATE_BOOKING", message: "Bu raqam uchun bugun allaqachon navbat bron qilingan" };
       }
 
+      // Cross-doctor dublikat: bir telefon + shifokor + kun = 1 bron
+      if (input.doctorId) {
+        const doctorDuplicate = await tx.appointment.findFirst({
+          where: {
+            patientPhone: normalizePhone(input.patientPhone),
+            doctorId: input.doctorId,
+            date: bookingDate,
+            status: { in: ["booked", "arrived"] },
+          },
+          select: { id: true, queueNumber: true, status: true },
+        });
+        if (doctorDuplicate) {
+          throw {
+            code: "DOCTOR_DUPLICATE",
+            message: `Bu shifokorga shu sanada bron allaqachon mavjud (#${doctorDuplicate.queueNumber ?? "—"})`,
+          };
+        }
+      }
+
       let queueNumber: number | null = null;
       let paymentStatus = "not_required";
 
@@ -102,6 +121,7 @@ async function bookDoctorQueue(
   } catch (err: any) {
     if (err?.code === "LIMIT_REACHED") return bookingError("LIMIT_REACHED", err.message, 409);
     if (err?.code === "DUPLICATE_BOOKING") return bookingError("DUPLICATE_BOOKING", err.message, 409);
+    if (err?.code === "DOCTOR_DUPLICATE") return bookingError("DOCTOR_DUPLICATE", err.message, 409);
     throw err;
   }
 }
@@ -217,6 +237,33 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
 
 // ─── Main dispatcher ──────────────────────────────────────────────────────────
 export async function processBooking(input: BookingInput): Promise<BookingResult> {
+  // Smart fill: userId yoki dependentId orqali ism/telefon avtomatik to'ldirish
+  if (input.userId && input.dependentId) {
+    const dep = await prisma.dependent.findFirst({
+      where: { id: input.dependentId, userId: input.userId, deletedAt: null },
+      select: { firstName: true, lastName: true, phone: true },
+    });
+    if (!dep) return bookingError("DEPENDENT_NOT_FOUND", "Qaramog'idagi topilmadi", 400);
+    input.patientName = [dep.firstName, dep.lastName].filter(Boolean).join(" ");
+    if (!input.patientPhone) {
+      if (dep.phone) {
+        input.patientPhone = dep.phone;
+      } else {
+        const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { phone: true } });
+        input.patientPhone = user?.phone ?? "";
+      }
+    }
+  } else if (input.userId && !input.patientName) {
+    const user = await prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { firstName: true, lastName: true, phone: true },
+    });
+    if (user) {
+      input.patientName = input.patientName || [user.firstName, user.lastName].filter(Boolean).join(" ");
+      input.patientPhone = input.patientPhone || user.phone || "";
+    }
+  }
+
   const service = await prisma.service.findFirst({
     where: { id: input.serviceId, clinicId: input.clinicId, isActive: true },
   });
