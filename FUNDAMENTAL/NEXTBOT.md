@@ -134,26 +134,67 @@ nextBOT/
 │   │   │   ├── clinics/[id]/branches/  # GET (public)
 │   │   │   ├── admin/branches/         # CRUD (clinic_admin/super_admin)
 │   │   │   ├── admin/                  # Admin CRUD routes
-│   │   │   └── webhook/telegram/route.ts  # POST webhook (prod)
-│   │   ├── admin/branches/page.tsx # Filial CRUD UI (clinic_admin)
+│   │   │   ├── admin/clinics/[id]/payment-config/ # GET/PATCH Payme+Click config
+│   │   │   ├── payments/payme/         # JSON-RPC endpoint + create-link
+│   │   │   ├── payments/click/         # form-urlencoded endpoint + create-link
+│   │   │   ├── appointments/[id]/payment-info/ # providers + amount
+│   │   │   ├── me/appointments/route.ts  # Tarix cursor pagination
+│   │   │   ├── me/clinics/route.ts       # User klinikalari
+│   │   │   └── webhook/telegram/route.ts # POST webhook (prod)
+│   │   ├── admin/
+│   │   │   ├── branches/page.tsx         # Filial CRUD UI (clinic_admin)
+│   │   │   └── super/clinics/
+│   │   │       ├── page.tsx              # Klinika ro'yxati + ClinicLogo + Tahrirlash
+│   │   │       └── [id]/
+│   │   │           ├── page.tsx          # Clinic Builder (tabs: sozlamalar/modullar/flaglar/adminlar/filiallar/to'lov/audit)
+│   │   │           ├── edit/page.tsx     # Klinika edit sahifasi
+│   │   │           ├── AdminsTab.tsx, CreateAdminModal.tsx, ResetPasswordModal.tsx
+│   │   │           ├── BranchesTab.tsx, CreateBranchModal.tsx
+│   │   │           ├── PaymentTab.tsx    # Payme + Click config UI
+│   │   │           └── branches/[branchId]/  # Filial detail (Info + Adminlar tabs)
 │   │   ├── doctor/page.tsx        # Doctor panel
 │   │   ├── reception/page.tsx     # Reception panel
 │   │   ├── webapp/
-│   │   │   ├── page.tsx           # Dashboard + booking (default clinicId)
-│   │   │   ├── clinics/page.tsx   # Klinika ro'yxati
-│   │   │   ├── clinics/[id]/page.tsx              # Klinika detail + filial tanlash
-│   │   │   └── clinics/[id]/branches/[branchId]/  # To'liq booking (multi-clinic)
+│   │   │   ├── page.tsx                # Dashboard + ClinicSwitcher + Tarix tugmasi
+│   │   │   ├── layout.tsx              # Suspense + ClinicProvider + ClinicGuard
+│   │   │   ├── select-clinic/page.tsx  # Klinika tanlash
+│   │   │   ├── history/page.tsx        # Bron tarixi (2 tab + filters)
+│   │   │   ├── history/HistoryFilters.tsx
+│   │   │   ├── appointments/[id]/pay/page.tsx  # To'lov UI
+│   │   │   ├── clinics/page.tsx        # Klinika ro'yxati (public)
+│   │   │   ├── clinics/[id]/page.tsx   # Klinika detail + filial tanlash
+│   │   │   └── clinics/[id]/branches/[branchId]/  # To'liq booking
 │   │   ├── login/page.tsx
 │   │   └── layout.tsx
 │   │
+│   ├── components/
+│   │   ├── ClinicLogo.tsx                      # Reusable logo (size prop, 🏥 fallback)
+│   │   └── webapp/
+│   │       ├── ClinicGuard.tsx                 # clinicId yo'q → redirect
+│   │       ├── ClinicSwitcher.tsx              # BottomSheet clinic almashtirish
+│   │       └── AppointmentCard.tsx             # Reusable bron karta
+│   │
 │   └── lib/
 │       ├── prisma.ts              # Singleton PrismaClient + withRetry
-│       ├── auth.ts                # JWT sign/verify, bcrypt, requireAuth
+│       ├── auth.ts                # JWT, bcrypt, requireAuth, validatePasswordStrength
 │       ├── api-response.ts        # ok(), error(), unauthorized() helpers
 │       ├── rate-limit.ts          # In-memory rate limiter
 │       ├── logger.ts              # Structured logger + generateRequestId
 │       ├── env.ts                 # Env validation (validateEnv, getEnv)
 │       ├── auth-edge.ts           # Edge runtime auth
+│       ├── clinic-context.tsx     # ClinicProvider + useClinic() hook
+│       ├── permissions.ts         # canManageClinic/Branch, sessionUser()
+│       ├── admin-username.ts      # generateClinicAdminUsername, generateBranchAdminUsername
+│       ├── user-clinics.ts        # ensureUserClinic(), getUserAllClinicIds()
+│       ├── payment/
+│       │   ├── config-schema.ts   # PaymentConfig, parsePaymentConfig, isProviderEnabled
+│       │   ├── secrets.ts         # encryptSecret/decryptSecret (placeholder)
+│       │   ├── money.ts           # tiyinToSum, sumToTiyin
+│       │   ├── notifications.ts   # notifyPaymentResult() Telegram xabarnoma
+│       │   ├── payme/             # types, errors, handlers, checkout-url
+│       │   └── click/             # types, errors, handlers, signature, checkout-url, resolve-clinic
+│       ├── audit/
+│       │   └── actions.ts         # PAYMENT_AUDIT_ACTIONS const
 │       ├── services/
 │       │   ├── booking.service.ts       # processBooking() — asosiy
 │       │   ├── reminder.service.ts      # Cron reminder sender
@@ -464,6 +505,112 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 - `src/app/webapp/page.tsx` — sticky bottom bar'ga "📋 Tarix" tugmasi qo'shildi (URL'da tgid+clinic parametrlarini saqlaydi)
 
 **Commit:** `bb60064` — 10 fayl, +796/-10
+
+---
+
+### 2026-05-19 — Faza 4: Webapp Clinic Selector + Global Context + ClinicSwitcher
+
+**Maqsad:** Webapp'da klinika tanlashni global state'ga o'tkazish — URL param, localStorage, API fallback.
+
+**Yangi fayllar:**
+- `src/lib/clinic-context.tsx` — `ClinicProvider` context: URL param (`?clinic=`) > localStorage (`tibtaqvim_clinic`) > `/api/me/clinics` API fallback; `useClinic()` hook
+- `src/components/webapp/ClinicGuard.tsx` — `clinicId` yo'q bo'lsa `/webapp/select-clinic` ga redirect
+- `src/components/webapp/ClinicSwitcher.tsx` — 40px `ClinicLogo` + chevron; BottomSheet'da user klinikalari ro'yxati bilan klinika almashtirish
+- `src/app/webapp/select-clinic/page.tsx` — qidiriladigan klinika ro'yxati, `ClinicLogo` 64px, tanlash → `setClinic()` → dashboard'ga redirect
+- `src/app/api/me/clinics/route.ts` — `GET /api/me/clinics?tgid=` — foydalanuvchi avval bron qilgan klinikalar (appointment history'dan)
+
+**O'zgartirilgan fayllar:**
+- `src/app/webapp/layout.tsx` — `<Suspense>` + `<ClinicProvider>` + `<ClinicGuard>` wrapper
+- `src/app/webapp/page.tsx` — `useClinic()` context'dan clinicId; header'da `ClinicSwitcher`
+
+**Qanday ishlaydi:**
+- Birinchi kirish → `?clinic=` URL param yo'q → `/webapp/select-clinic` → tanlash → localStorage'ga yoziladi
+- Bot deeplink `?clinic=clinic-demo` yoki `?clinicId=clinic-demo` — ikkalasi ham ishlaydi (backward compat)
+- Refresh → localStorage'dan eslab qoladi, API so'rovi yo'q
+- `ClinicSwitcher` → "Mening klinikalarim" (appointment history'dan) yoki barcha klinikalar
+
+**Commit:** `aea3fd5` — 7 fayl, +660/-29
+
+---
+
+### 2026-05-19 — Faza 3: Filial CRUD + branch_admin roli
+
+**Maqsad:** Super_admin klinika filiallari bilan ishlashi, har filialni boshqarish uchun branch_admin tayinlashi.
+
+**DB (Supabase MCP migration):**
+- `UserRole` enum'ga `branch_admin` qo'shildi
+- `users.branchId` column + FK (`branches.id CASCADE`) + index
+
+**Yangi backend fayllar:**
+- `src/lib/permissions.ts` — `canManageClinic()`, `canManageBranch()`, `canCreateBranchAdmin()`, `sessionUser()` helper
+- `src/lib/admin-username.ts` — `generateBranchAdminUsername()` → `tib_badmin_xxxxxx` format
+- `src/lib/auth.ts` — `JwtPayload.branchId` qo'shildi; login'da `branch_admin` pattern + branchId JWT'ga
+- `src/app/api/admin/clinics/[id]/branches/route.ts` — `GET /api/admin/clinics/[id]/branches`, `POST`
+- `src/app/api/admin/clinics/[id]/branches/[branchId]/route.ts` — `GET`, `PATCH`, `DELETE` (soft delete + cascade admins)
+- `src/app/api/admin/clinics/[id]/branches/[branchId]/admins/route.ts` — `GET`, `POST` (credentials)
+- `src/app/api/admin/clinics/[id]/branches/[branchId]/admins/[adminId]/route.ts` — `PATCH`, `DELETE`
+
+**Yangi frontend fayllar:**
+- Klinika detail sahifasida yangi "Filiallar 🏥" tab
+- `src/app/admin/super/clinics/[id]/BranchesTab.tsx` — filiallar ro'yxati, toggle, "Boshqarish" link
+- `src/app/admin/super/clinics/[id]/CreateBranchModal.tsx` — yangi filial yaratish modali
+- `src/app/admin/super/clinics/[id]/branches/[branchId]/page.tsx` — filial detail: Info / Adminlar tabs
+- `src/app/admin/super/clinics/[id]/branches/[branchId]/BranchInfoTab.tsx` — view/edit
+- `src/app/admin/super/clinics/[id]/branches/[branchId]/BranchAdminsTab.tsx` — admin CRUD + credentials banner
+- `src/app/admin/super/clinics/[id]/branches/[branchId]/CreateBranchAdminModal.tsx`
+- `src/app/admin/super/clinics/[id]/ResetPasswordModal.tsx` — `apiUrl` prop bilan generic (qayta ishlatildi)
+
+**Audit log:** `branch.create`, `branch.update`, `branch.delete`, `branch_admin.create`, `branch_admin.update`, `branch_admin.reset_password`, `branch_admin.delete`
+
+**Soft delete:** `branch.delete` → `$transaction`: `isActive=false` + barcha `branch_admin`larni `isActive=false`
+
+**Commit:** `4dc06fb` — 13 fayl, +1086/-16
+
+---
+
+### 2026-05-19 — Faza 2: Klinika Adminlari CRUD
+
+**Maqsad:** Super_admin har klinikaga clinic_admin yaratishi, parolini reset qilishi, o'chirishi.
+
+**DB (Supabase MCP migration):**
+- `users.username` column — `text UNIQUE nullable` + index (`20260519000001_add_username_to_users`)
+
+**Yangi backend fayllar:**
+- `src/lib/admin-username.ts` — `generateClinicAdminUsername()` → `tib_admin_xxxxxx` (unique loop check)
+- `src/lib/auth.ts` — `validatePasswordStrength()` (harf+raqam, min 8), `generateRandomPassword()` (12 ta random char)
+- `src/app/api/admin/super/clinics/[id]/admins/route.ts` — `GET` (ro'yxat), `POST` (yaratish, credentials qaytaradi)
+- `src/app/api/admin/super/clinics/[id]/admins/[adminId]/route.ts` — `PATCH` (tahrirlash + parol reset), `DELETE` (soft delete)
+- `src/app/api/auth/login/route.ts` — `identifier` maydoni: username YOKI phone bilan login
+
+**Yangi frontend fayllar:**
+- `src/app/login/page.tsx` — `phone` field → `identifier` field (username yoki telefon)
+- `src/app/admin/super/clinics/[id]/AdminsTab.tsx` — adminlar jadval ko'rinishi, credentials banner, reset tugmasi
+- `src/app/admin/super/clinics/[id]/CreateAdminModal.tsx` — auto/manual parol, credentials display (1 martacha)
+- `src/app/admin/super/clinics/[id]/ResetPasswordModal.tsx` — parol reset modali
+- `src/app/admin/super/clinics/[id]/page.tsx` — "Adminlar 👤" tab qo'shildi
+
+**Audit log:** `admin.create`, `admin.update`, `admin.reset_password`, `admin.delete`
+
+**Commit:** `562cc68` — 10 fayl, +526/-35
+
+---
+
+### 2026-05-19 — Faza 1: Klinika Edit Bug Fix + Logo URL
+
+**Maqsad:** Super admin klinikani to'liq tahrirlashi + logo URL qo'shish.
+
+**Bug:** Avvalgi `PATCH /api/admin/super/clinics/[id]` faqat `name/phone/address/isActive` saqlardi. `city`, `description`, `workingHours`, `logoUrl` e'tiborga olinmasdi.
+
+**O'zgartirilgan fayllar:**
+- `src/app/api/admin/super/clinics/[id]/route.ts` — `PATCH`: `city`, `description`, `workingHours`, `logoUrl` qo'shildi; `logoUrl` regex validatsiya (`https://….(jpg|png|webp|svg|gif)`)
+- `src/app/api/admin/super/clinics/route.ts` — `GET` select'ga `logoUrl` qo'shildi
+- `src/app/admin/super/clinics/page.tsx` — 44px `ClinicLogo` + "Tahrirlash" tugmasi har qatorda
+
+**Yangi fayllar:**
+- `src/app/admin/super/clinics/[id]/edit/page.tsx` — to'liq edit sahifasi: logo preview (onError fallback), barcha maydonlar, isActive toggle, success toast + redirect
+- `src/components/ClinicLogo.tsx` — reusable komponent: `size` prop, `onError` → `useState` fallback emoji `🏥`
+
+**Commit:** `c83d5ed` — 5 fayl, +346/-17
 
 ---
 
@@ -794,28 +941,23 @@ Phone kiritilganda → /api/user/register → phone qo'shildi (update), tibId o'
 > Tegmaslik kerak narsalar: mavjud KPI grafiklar, doctor date picker, specialty dropdown,
 > Service-Doctor M2M, queueMode, Cookie+JWT auth, RLS 16/16, audit log, webhook secret.
 
-### 1. TO'LOV TIZIMI (~10 soat) ⭐⭐⭐ BIRINCHI PRIORITET
+### 1. TO'LOV TIZIMI — ✅ SPRINT 1+2+3 TUGALLANDI (2026-05-19)
 
-**Qaror:** Redirect variant — Payme (birinchi) + Click (ikkinchi)
-- Bemor → "To'lash" → backend Payme API → redirect URL → to'lov → webhook → DB yangilanadi
-- Kassa apparat: ALOHIDA (klinika ichidagi qurilma — bizning tizim boshqarmaydi)
-- `appointments.paymentStatus` allaqachon mavjud (default `'not_required'`)
+**Sprint 1 (cdfcae8):** Schema + TypeScript helpers — `Payment` model, enum'lar, `lib/payment/` modullar
+**Sprint 2 (1e051a1):** Payme JSON-RPC — 6 handler (CheckPerform, Create, Perform, Cancel, Check, GetStatement), Basic Auth, sandbox test ✅
+**Sprint 3 (dcb8f3d):** Click Shop API — Prepare/Complete (form-urlencoded), md5 signature, `PaymentTab.tsx` admin config UI, bot to'lov tugmasi
 
-**DB qo'shimchalari:**
-- `appointments`: `paymentProvider`, `paymentTransactionId`, `paidAt`, `paymentAmount`, `paymentExpiresAt`
-- Yangi jadval: `payment_transactions` (provider, providerTransactionId, amount, status, rawWebhookPayload)
+**Keyingi qadam:** Click merchant kabineti → admin panelda config → sandbox test → production bot to'lov
 
-**Yangi endpoint'lar:**
-- `POST /api/payments/payme/create` — bron ID + summa → Payme URL
-- `POST /api/payments/payme/webhook` — Payme callback → paymentStatus='paid'
-- `POST /api/payments/click/create` + `/api/payments/click/webhook`
-- `GET /api/payments/status/[appointmentId]`
-- `POST /api/payments/cancel/[appointmentId]`
+**Muhim endpoint'lar:**
+- `POST /api/payments/payme/route.ts` — JSON-RPC endpoint, Basic Auth
+- `POST /api/payments/payme/create-link/route.ts` — frontend checkout link
+- `POST /api/payments/click/route.ts` — form-urlencoded endpoint
+- `POST /api/payments/click/create-link/route.ts` — frontend link
+- `GET /api/appointments/[id]/payment-info` — providers + amount
+- `GET/PATCH /api/admin/clinics/[id]/payment-config` — Payme + Click config
 
-**Frontend:** Webapp to'lov sahifasi (radio: Payme/Click/Klinikada), tasdiq sahifasi, xato sahifasi, profilim badge
-**Bot:** inline tugmalar (Payme/Click/Klinikada/Bekor qilish), to'lov xabari, tasdiq xabari
-**Admin:** "to'langan/kutilmoqda" filter
-**Paket:** `@paytechuz/payme @paytechuz/click` yoki `payme-pkg`
+**Pul birligi:** DB'da doim BigInt tiyin. Click = SO'M string, Payme = tiyin int.
 
 ---
 
@@ -857,15 +999,21 @@ Phone kiritilganda → /api/user/register → phone qo'shildi (update), tibId o'
 
 ### UMUMIY ROADMAP JADVALI
 
-| # | Vazifa | Taxminiy vaqt | Ustuvorlik | Holat |
-|---|---|---|---|---|
-| 1 | To'lov (Payme/Click) | 10 soat | ⭐⭐⭐ | Kutilmoqda |
-| 2 | Multi-clinic tanlash | 10 soat | ⭐⭐ | ✅ Tugallandi |
-| 3 | Uy xizmati natijalari | 9 soat | ⭐⭐ | Kutilmoqda |
-| 4 | Doctor /stats 3 ta grafik | 4 soat | ⭐ | Kutilmoqda |
-| 5 | Slot tizimi bosqich 2 | 5 soat | ⭐ | Kutilmoqda |
+| # | Vazifa | Ustuvorlik | Holat |
+|---|---|---|---|
+| 1 | To'lov — Sprint 1: Schema poydevor | ⭐⭐⭐ | ✅ Tugallandi (cdfcae8) |
+| 2 | To'lov — Sprint 2: Payme JSON-RPC | ⭐⭐⭐ | ✅ Tugallandi (1e051a1) |
+| 3 | To'lov — Sprint 3: Click Shop API | ⭐⭐⭐ | ✅ Tugallandi (dcb8f3d) |
+| 4 | Multi-clinic: Faza 1-4 (edit/admin/branch/switcher) | ⭐⭐ | ✅ Tugallandi |
+| 5 | Appointment history (Faza 5) | ⭐⭐ | ✅ Tugallandi (bb60064) |
+| 6 | Uy xizmati natijalari (upload+PDF) | ⭐⭐ | Kutilmoqda |
+| 7 | Bot to'lov tugmasi real sandbox test | ⭐⭐ | Kutilmoqda |
+| 8 | Click merchant config + sandbox test | ⭐⭐ | Kutilmoqda |
+| 9 | Doctor /stats 3 ta grafik | ⭐ | Kutilmoqda |
+| 10 | Slot tizimi bosqich 2 (aniq vaqt slot) | ⭐ | Kutilmoqda |
+| 11 | Multi-clinic Bosqich 2 (ratings, filial xizmatlar) | ⭐ | Kutilmoqda |
 
-**Tavsiya tartibi:** To'lov → Natijalar → Doctor grafiklar → Slot bosqich 2
+**Keyingi prioritetlar:** Click sandbox test → Bot to'lov → Uy xizmati natijalari
 
 ---
 
