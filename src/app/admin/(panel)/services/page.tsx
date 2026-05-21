@@ -130,6 +130,37 @@ export default function AdminServicesPage() {
     setShowForm(true);
   }
 
+  async function handleDeleteService(service: { id: string; name: string }) {
+    const confirmed = window.confirm(
+      `"${service.name}" xizmatini o'chirmoqchimisiz?\n\n` +
+      `Agar bu xizmatga bronlar bog'langan bo'lsa, u butunlay o'chirilmaydi, ` +
+      `balki deaktivatsiya qilinadi (tarix saqlanadi).`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/admin/services/${service.id}`, { method: "DELETE" });
+      const json = await res.json();
+
+      if (json.success) {
+        const data = json.data;
+        if (data?.deactivated) {
+          window.alert(
+            `"${service.name}" deaktivatsiya qilindi.\n` +
+            `(${data.appointmentCount ?? 0} bron mavjud bo'lgani uchun butunlay o'chirilmadi)`
+          );
+        } else if (data?.deleted) {
+          window.alert(`"${service.name}" butunlay o'chirildi.`);
+        }
+        await fetchServices();
+      } else {
+        window.alert(json.error?.message ?? "O'chirishda xatolik yuz berdi");
+      }
+    } catch {
+      window.alert("Tarmoq xatosi. Qayta urinib ko'ring.");
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -296,6 +327,7 @@ export default function AdminServicesPage() {
                   </td>
                   <td className="py-2">
                     <button onClick={() => startEdit(s)} className="text-blue-600 hover:underline text-xs mr-3">Tahrirlash</button>
+                    <button onClick={() => handleDeleteService(s)} className="text-red-600 hover:text-red-700 text-xs font-medium">O&apos;chirish</button>
                   </td>
                 </tr>
               ))}

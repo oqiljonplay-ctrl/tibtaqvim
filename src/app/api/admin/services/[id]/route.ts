@@ -67,8 +67,40 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (!auth) return unauthorized();
     if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
 
-    await prisma.service.update({ where: { id: params.id }, data: { isActive: false } });
-    return ok({ message: "Service deactivated" });
+    const service = await prisma.service.findUnique({ where: { id: params.id } });
+    if (!service) return notFound();
+    if (auth.role !== "super_admin" && service.clinicId !== auth.clinicId) return forbidden();
+
+    const [appointmentCount, slotCount] = await Promise.all([
+      prisma.appointment.count({ where: { serviceId: params.id } }),
+      prisma.slot.count({ where: { serviceId: params.id } }),
+    ]);
+
+    const hasReferences = appointmentCount > 0 || slotCount > 0;
+
+    if (hasReferences) {
+      await prisma.$transaction([
+        prisma.serviceDoctor.deleteMany({ where: { serviceId: params.id } }),
+        prisma.service.update({ where: { id: params.id }, data: { isActive: false } }),
+      ]);
+      return ok({
+        deleted: false,
+        deactivated: true,
+        message: `Xizmat deaktivatsiya qilindi (${appointmentCount} bron, ${slotCount} slot bog'langani uchun butunlay o'chirilmadi)`,
+        appointmentCount,
+        slotCount,
+      });
+    }
+
+    await prisma.$transaction([
+      prisma.serviceDoctor.deleteMany({ where: { serviceId: params.id } }),
+      prisma.service.delete({ where: { id: params.id } }),
+    ]);
+    return ok({
+      deleted: true,
+      deactivated: false,
+      message: "Xizmat butunlay o'chirildi",
+    });
   } catch {
     return error("Server error", 500);
   }
