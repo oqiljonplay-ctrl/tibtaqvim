@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ success: true });
-  res.cookies.set("sa_key", key, {
+  res.cookies.set("sa_key", key.trim(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",

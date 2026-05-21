@@ -47,11 +47,11 @@ function checkSuperAdminGate(req: NextRequest): boolean {
     return true;
   }
 
-  const expected = process.env.SUPERADMIN_KEY;
+  const expected = (process.env.SUPERADMIN_KEY ?? "").trim();
   // Dev: SUPERADMIN_KEY set qilinmagan bo'lsa, gate'ni skip qil
   if (!expected) return true;
 
-  const saKey = req.cookies.get("sa_key")?.value;
+  const saKey = (req.cookies.get("sa_key")?.value ?? "").trim();
   return saKey === expected;
 }
 
