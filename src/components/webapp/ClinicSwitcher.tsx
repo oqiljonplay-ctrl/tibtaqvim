@@ -78,7 +78,8 @@ function ClinicSwitcherSheet({ onClose }: { onClose: () => void }) {
 
     setClinic(c)
     onClose()
-    router.push('/')
+    // router.push shart emas — setClinic contextni yangilaydi,
+    // page.tsx useEffect [contextClinicId] bronlarni qayta yuklaydi
   }
 
   const handleAddNew = () => {

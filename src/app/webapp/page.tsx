@@ -307,6 +307,21 @@ export default function WebApp() {
     });
   }, []);
 
+  // ─── Klinika almashganda dashboard'ni qayta yuklash ────────────────────────
+  const didInitRef = useRef(false);
+  useEffect(() => {
+    if (!didInitRef.current) { didInitRef.current = true; return; }
+    if (!contextClinicId) return;
+    clinicIdRef.current = contextClinicId;
+    if (appMode === "dashboard" && telegramId) {
+      setAppointments([]);
+      fetchDashboardAppointments(telegramId, contextClinicId);
+    }
+    if (appMode === "booking") {
+      loadServices(todayStr());
+    }
+  }, [contextClinicId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Done step: 5 soniyadan keyin Telegram WebApp avtomatik yopish
   useEffect(() => {
     if (step !== "done") return;
