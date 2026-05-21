@@ -209,6 +209,13 @@ export default function WebApp() {
       console.log("[WebApp] telegramId:", tgId);
 
       setTelegramId(tgId);
+      // tgId sessionStorage'da saqlash — boshqa sahifalarda URL/initData yo'q bo'lsa ishlatadi
+      if (tgId) {
+        try { sessionStorage.setItem("tgid", tgId); } catch {}
+      } else {
+        // Fallback: sessionStorage'dan o'qish (mode=booking reload da URL'da tgid yo'q)
+        try { const s = sessionStorage.getItem("tgid"); if (s) tgId = s; } catch {}
+      }
       if (tgFirstName) {
         setForm((f) => ({ ...f, name: f.name || tgFirstName }));
       }
@@ -380,6 +387,7 @@ export default function WebApp() {
 
   function startRebook(serviceId: string) {
     const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "booking", serviceId });
+    if (telegramId) qs.set("tgid", telegramId);
     window.location.href = `/webapp?${qs}`;
   }
 

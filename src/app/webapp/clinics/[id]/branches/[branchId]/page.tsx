@@ -86,6 +86,8 @@ export default function BranchServicesPage() {
       let tgId = getTelegramId(tg);
       const urlParams = new URLSearchParams(window.location.search);
       if (!tgId) tgId = urlParams.get("tgid");
+      // sessionStorage fallback — webapp/page.tsx dan o'tish paytida tgid saqlanadi
+      if (!tgId) { try { const s = sessionStorage.getItem("tgid"); if (s) tgId = s; } catch {} }
       setTelegramId(tgId);
       if (tg?.initDataUnsafe?.user?.first_name) setForm((f) => ({ ...f, name: f.name || tg.initDataUnsafe.user.first_name }));
 
