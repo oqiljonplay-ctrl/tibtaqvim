@@ -12,8 +12,11 @@ export async function POST(req: NextRequest) {
   res.cookies.set("sa_key", key.trim(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 60 * 60 * 8, // 8 soat
+    // "lax" — client-side navigatsiya (router.push) + middleware redirect
+    // bilan to'g'ri ishlaydi. "strict" cookie'ni birinchi navigatsiyada
+    // yubormaydi va /admin/super/auth loop yuzaga keladi (auth_token ham "lax").
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 30, // 30 kun (dasturchi gate'i)
     path: "/",
   });
   return res;
