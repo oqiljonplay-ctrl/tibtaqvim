@@ -115,7 +115,6 @@ export default function AdminDashboard() {
                   <th className="text-left py-2 font-medium text-gray-500">Shifokor</th>
                   <th className="text-left py-2 font-medium text-gray-500">№</th>
                   <th className="text-left py-2 font-medium text-gray-500">Holat</th>
-                  <th className="text-left py-2 font-medium text-gray-500">Telegram</th>
                 </tr>
               </thead>
               <tbody>
@@ -127,6 +126,13 @@ export default function AdminDashboard() {
                     <td className="py-2">
                       <div>{a.patientName}</div>
                       <div className="text-xs text-gray-400">{a.patientPhone}</div>
+                      <TelegramChatButton
+                        telegramId={a.user?.telegramId}
+                        patientName={a.patientName}
+                        appointmentId={a.id}
+                        phone={a.patientPhone}
+                        variant="compact"
+                      />
                     </td>
                     <td className="py-2 text-gray-700">{a.service.name}</td>
                     <td className="py-2 text-gray-700">
@@ -137,15 +143,6 @@ export default function AdminDashboard() {
                       <span className={statusColors[a.status]}>
                         {statusLabels[a.status] ?? a.status}
                       </span>
-                    </td>
-                    <td className="py-2">
-                      <TelegramChatButton
-                        telegramId={a.user?.telegramId}
-                        patientName={a.patientName}
-                        appointmentId={a.id}
-                        phone={a.patientPhone}
-                        variant="icon"
-                      />
                     </td>
                   </tr>
                 ))}

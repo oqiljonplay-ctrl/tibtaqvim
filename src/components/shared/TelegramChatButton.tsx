@@ -17,16 +17,28 @@ export default function TelegramChatButton({
   appointmentId,
   variant = "button",
   className = "",
+  phone,
 }: Props) {
   const [opening, setOpening] = useState(false);
 
-  const hasTelegram = !!(telegramId && telegramId.length > 0);
+  const phoneDigits = phone?.replace(/\D/g, "") || "";
+  const hasPhone = phoneDigits.length >= 7;
+  const hasTelegramId = !!(telegramId && telegramId.length > 0);
+
+  // Phone orqali t.me link eng ishonchli — brauzerdan to'g'ridan-to'g'ri chatga tushadi
+  // Faqat telegramId bo'lsa — tg:// deep link ishlatamiz
+  const tgUrl = hasPhone
+    ? `https://t.me/+${phoneDigits}`
+    : hasTelegramId
+    ? `tg://user?id=${telegramId}`
+    : null;
+
+  const canOpen = !!tgUrl;
 
   const handleClick = () => {
-    if (!hasTelegram || opening) return;
+    if (!canOpen || opening) return;
     setOpening(true);
 
-    // Silent audit log
     fetch("/api/telegram-relay/log", {
       method: "POST",
       credentials: "include",
@@ -34,19 +46,12 @@ export default function TelegramChatButton({
       body: JSON.stringify({ appointmentId, patientTelegramId: telegramId, patientName }),
     }).catch(() => {});
 
-    // tg://user?id=N — Telegram Desktop va mobil ilova uchun
-    // Telegram o'rnatilmagan bo'lsa — phone orqali t.me
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) {
-      window.location.href = `tg://user?id=${telegramId}`;
-    } else {
-      window.open(`tg://user?id=${telegramId}`, "_blank", "noopener,noreferrer");
-    }
+    window.open(tgUrl!, "_blank", "noopener,noreferrer");
 
     setTimeout(() => setOpening(false), 2000);
   };
 
-  if (!hasTelegram) {
+  if (!canOpen) {
     if (variant === "icon") return null;
     return (
       <span className={`inline-flex items-center gap-1 text-xs text-gray-400 ${className}`}>
