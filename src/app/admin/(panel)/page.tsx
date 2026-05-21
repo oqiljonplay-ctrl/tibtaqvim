@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import StatsButton from "@/components/StatsButton";
+import TelegramChatButton from "@/components/shared/TelegramChatButton";
 
 interface Stats {
   totalAppointments: number;
@@ -20,6 +21,7 @@ interface Stats {
     createdAt: string;
     service: { name: string; type: string };
     doctor: { firstName: string; lastName: string } | null;
+    user: { telegramId: string | null } | null;
   }[];
 }
 
@@ -113,6 +115,7 @@ export default function AdminDashboard() {
                   <th className="text-left py-2 font-medium text-gray-500">Shifokor</th>
                   <th className="text-left py-2 font-medium text-gray-500">№</th>
                   <th className="text-left py-2 font-medium text-gray-500">Holat</th>
+                  <th className="text-left py-2 font-medium text-gray-500">Telegram</th>
                 </tr>
               </thead>
               <tbody>
@@ -134,6 +137,15 @@ export default function AdminDashboard() {
                       <span className={statusColors[a.status]}>
                         {statusLabels[a.status] ?? a.status}
                       </span>
+                    </td>
+                    <td className="py-2">
+                      <TelegramChatButton
+                        telegramId={a.user?.telegramId}
+                        patientName={a.patientName}
+                        appointmentId={a.id}
+                        phone={a.patientPhone}
+                        variant="icon"
+                      />
                     </td>
                   </tr>
                 ))}

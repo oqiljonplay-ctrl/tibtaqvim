@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
         include: {
           service: { select: { name: true, type: true } },
           doctor: { select: { firstName: true, lastName: true } },
+          user: { select: { telegramId: true } },
         },
       }),
     ]);

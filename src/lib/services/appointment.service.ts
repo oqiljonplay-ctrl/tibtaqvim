@@ -73,7 +73,7 @@ export async function getAppointments(filters: {
         doctor: { select: { firstName: true, lastName: true, specialty: true } },
         slot: { select: { startTime: true, endTime: true } },
         branch: { select: { name: true } },
-        user: { select: { tibId: true } },
+        user: { select: { tibId: true, telegramId: true, phone: true } },
       },
     }),
   ]);
