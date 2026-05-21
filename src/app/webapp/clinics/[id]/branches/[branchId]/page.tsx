@@ -60,7 +60,25 @@ export default function BranchServicesPage() {
   const [newDepRel, setNewDepRel]   = useState("");
   const [depSaving, setDepSaving]   = useState(false);
 
+  const [doneCountdown, setDoneCountdown] = useState(5);
   const tgUserRef = useRef<TgUser | null>(null);
+
+  // Done step: 5 soniyadan keyin Telegram WebApp avtomatik yopish
+  useEffect(() => {
+    if (step !== "done") return;
+    setDoneCountdown(5);
+    const iv = setInterval(() => {
+      setDoneCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(iv);
+          try { window.Telegram?.WebApp?.close(); } catch {}
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [step]);
 
   useEffect(() => {
     waitForTG().then(async (tg) => {
@@ -78,7 +96,7 @@ export default function BranchServicesPage() {
           if (j.success && j.data) {
             tgUserRef.current = j.data;
             setTgUser(j.data);
-            setForm((f) => ({ ...f, name: j.data.firstName || f.name, phone: f.phone || j.data.phone || "" }));
+            setForm((f) => ({ ...f, name: j.data.fullName || j.data.firstName || f.name, phone: f.phone || j.data.phone || "" }));
           }
         } catch {}
       }
@@ -113,10 +131,14 @@ export default function BranchServicesPage() {
 
   function goToPatientOrForm() {
     if (tgUserRef.current?.hasPhone) {
-      // Pre-fill with "self" by default
       const u = tgUserRef.current;
       setPatient({ type: "self", dependentId: null, patientName: u.fullName, patientPhone: u.phone || "" });
-      setStep("patient");
+      // Dependents yo'q va address kerak emas → to'g'ri confirm stepga o't (UX skip)
+      if (u.dependents.length === 0 && !selSvc?.requiresAddress) {
+        setStep("confirm");
+      } else {
+        setStep("patient");
+      }
     } else {
       setStep("form");
     }
@@ -467,7 +489,21 @@ export default function BranchServicesPage() {
               <SummaryRow label="Sana" value={selDate ? formatDateLabel(selDate) : ""} />
               <SummaryRow label="Bemor" value={result.patientName} />
             </div>
-            <p className="text-xs text-gray-400 mb-6">Klinikaga o&apos;z vaqtida keling 🏥</p>
+            <p className="text-xs text-gray-400 mb-4">Klinikaga o&apos;z vaqtida keling 🏥</p>
+            {doneCountdown > 0 && (
+              <p className="text-xs text-gray-400 mb-3">
+                {doneCountdown} soniyadan keyin botga qaytasiz...
+              </p>
+            )}
+            <button
+              onClick={() => {
+                try { window.Telegram?.WebApp?.close(); } catch {}
+                router.push(`/webapp?mode=dashboard&clinicId=${clinicId}`);
+              }}
+              className="w-full py-3 rounded-2xl bg-blue-600 text-white text-sm font-semibold active:scale-95 transition-all mb-3"
+            >
+              Hozir botga qaytish
+            </button>
             {telegramId && (
               <button onClick={() => router.push(`/webapp?mode=dashboard&clinicId=${clinicId}`)}
                 className="w-full py-3 rounded-2xl border-2 border-blue-100 text-blue-600 text-sm font-medium hover:bg-blue-50 active:scale-95">

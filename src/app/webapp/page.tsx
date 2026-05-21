@@ -157,6 +157,8 @@ export default function WebApp() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [bookingTibId, setBookingTibId] = useState<string | null>(null);
 
+  const [doneCountdown, setDoneCountdown] = useState(5);
+
   const tgUserRef = useRef<TgUser | null>(null);
   const rebookServiceIdRef = useRef<string | null>(null);
 
@@ -305,6 +307,23 @@ export default function WebApp() {
     });
   }, []);
 
+  // Done step: 5 soniyadan keyin Telegram WebApp avtomatik yopish
+  useEffect(() => {
+    if (step !== "done") return;
+    setDoneCountdown(5);
+    const iv = setInterval(() => {
+      setDoneCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(iv);
+          try { window.Telegram?.WebApp?.close(); } catch {}
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [step]);
+
   // ─── Dashboard functions ───────────────────────────────────────────────────
 
   async function fetchDashboardAppointments(tgId: string, cId: string) {
@@ -421,7 +440,18 @@ export default function WebApp() {
   }
 
   function goAfterDateSlot() {
-    setStep(tgUserRef.current?.hasPhone ? "confirm" : "form");
+    const user = tgUserRef.current;
+    if (user?.hasPhone) {
+      // Confirm step form.name/phone ni user ma'lumotidan to'ldirish
+      setForm((f) => ({
+        ...f,
+        name: f.name || user.firstName || "",
+        phone: f.phone || user.phone || "",
+      }));
+      setStep("confirm");
+    } else {
+      setStep("form");
+    }
   }
 
   function handleFormNext(e: React.FormEvent) {
@@ -1059,8 +1089,22 @@ export default function WebApp() {
                 Klinikaga kelganda <span className="font-semibold text-blue-500">{bookingTibId}</span> ni ko'rsating
               </p>
             )}
-            <p className="text-xs text-gray-400 mb-6">Klinikaga o'z vaqtida keling 🏥</p>
+            <p className="text-xs text-gray-400 mb-4">Klinikaga o'z vaqtida keling 🏥</p>
 
+            {doneCountdown > 0 && (
+              <p className="text-xs text-gray-400 mb-3">
+                {doneCountdown} soniyadan keyin botga qaytasiz...
+              </p>
+            )}
+            <button
+              onClick={() => {
+                try { window.Telegram?.WebApp?.close(); } catch {}
+                goToDashboard();
+              }}
+              className="w-full py-3 rounded-2xl bg-blue-600 text-white text-sm font-semibold active:scale-95 transition-all mb-3"
+            >
+              Hozir botga qaytish
+            </button>
             {telegramId && (
               <button
                 onClick={goToDashboard}
