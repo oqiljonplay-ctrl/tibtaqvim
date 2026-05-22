@@ -30,6 +30,7 @@ export async function fetchDoctors(clinicId: string) {
 
 export async function bookAppointment(data: {
   clinicId: string;
+  branchId?: string;
   serviceId: string;
   doctorId?: string;
   slotId?: string;

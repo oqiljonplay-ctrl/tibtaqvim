@@ -2,6 +2,7 @@ import { normalizePhone } from "@/lib/utils/phone";
 
 export interface BookingInput {
   clinicId: string;
+  branchId?: string;
   serviceId: string;
   doctorId?: string;
   slotId?: string;

@@ -605,7 +605,7 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       await userState.delete(chatId);
       return;
     }
-    const { clinicId, serviceId, doctorId, slotId, date, patientName, patientPhone, address } = state;
+    const { clinicId, branchId, serviceId, doctorId, slotId, date, patientName, patientPhone, address } = state;
     if (!clinicId || !serviceId || !date || !patientName || !patientPhone) {
       await bot.sendMessage(chatId, "❌ Ma'lumotlar to'liq emas. /start ni bosing.");
       await userState.delete(chatId);
@@ -637,7 +637,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     } catch {}
 
     const result = await bookAppointment({
-      clinicId, serviceId, doctorId, slotId, date, patientName, patientPhone, address,
+      clinicId,
+      ...(branchId ? { branchId } : {}),
+      serviceId, doctorId, slotId, date, patientName, patientPhone, address,
       ...(resolvedUserId ? { userId: resolvedUserId } : {}),
     });
 

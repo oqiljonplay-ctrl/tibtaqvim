@@ -95,6 +95,7 @@ async function bookDoctorQueue(
       return tx.appointment.create({
         data: {
           clinicId: input.clinicId,
+          branchId: input.branchId ?? null,
           serviceId: input.serviceId,
           doctorId: input.doctorId ?? null,
           userId: input.userId ?? null,
@@ -159,6 +160,7 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
       return tx.appointment.create({
         data: {
           clinicId: input.clinicId,
+          branchId: input.branchId ?? null,
           serviceId: input.serviceId,
           doctorId: input.doctorId ?? null,
           userId: input.userId ?? null,
@@ -208,6 +210,7 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
       return tx.appointment.create({
         data: {
           clinicId: input.clinicId,
+          branchId: input.branchId ?? null,
           serviceId: input.serviceId,
           doctorId: null,
           userId: input.userId ?? null,
