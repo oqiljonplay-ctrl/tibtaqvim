@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import LocationButtons from "@/components/LocationButtons";
 import LiveLocationPanel from "@/components/LiveLocationPanel";
+import TelegramChatButton from "@/components/shared/TelegramChatButton";
 
 interface Appointment {
   id: string; patientName: string; patientPhone: string;
@@ -14,7 +15,7 @@ interface Appointment {
   service: { name: string; type: string };
   doctor: { firstName: string; lastName: string } | null;
   slot: { startTime: string; endTime: string } | null;
-  user: { tibId: string | null } | null;
+  user: { tibId: string | null; telegramId: string | null } | null;
 }
 interface Service { id: string; name: string }
 
@@ -235,6 +236,15 @@ export default function ReceptionPage() {
                     <td className="py-3 px-4">
                       <div className="font-medium text-gray-900">{a.patientName}</div>
                       <div className="text-xs text-gray-400">{a.patientPhone}</div>
+                      <div className="mt-1">
+                        <TelegramChatButton
+                          telegramId={a.user?.telegramId}
+                          patientName={a.patientName}
+                          phone={a.patientPhone}
+                          appointmentId={a.id}
+                          variant="compact"
+                        />
+                      </div>
                       {a.address && <div className="text-xs text-orange-500 mt-0.5">📍 {a.address}</div>}
                       {a.service.type === "home_service" && (
                         <div className="mt-2">

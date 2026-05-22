@@ -259,6 +259,7 @@ model User {
   userClinics        UserClinic[]
   payments           Payment[]
   dependents         Dependent[]
+  relayLogs          TelegramRelayLog[] @relation("StaffRelayLog")
 
   @@index([clinicId])
   @@index([branchId])
@@ -346,6 +347,7 @@ model Appointment {
   slot          Slot?    @relation(fields: [slotId], references: [id])
   assignedStaff Staff?   @relation("AssignedStaff", fields: [staffId], references: [id])
   payments      Payment[]
+  relayLogs     TelegramRelayLog[]
 
   @@index([clinicId])
   @@index([clinicId, date])
@@ -523,4 +525,37 @@ model BotState {
 
   @@index([expiresAt])
   @@map("bot_states")
+}
+
+model TelegramRelayLog {
+  id                String   @id @default(cuid())
+  appointmentId     String?
+  staffUserId       String?
+  patientTelegramId String
+  patientName       String?
+
+  /// 'message' | 'photo' | 'document'
+  kind              String   @default("message")
+
+  fileName          String?
+  fileSize          Int?
+  mimeType          String?
+  caption           String?  @db.Text
+
+  tgMessageId       Int?
+  success           Boolean  @default(false)
+  errorMessage      String?
+
+  openedAt          DateTime @default(now())
+  ip                String?
+  userAgent         String?  @db.Text
+
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  staff       User?        @relation("StaffRelayLog", fields: [staffUserId], references: [id], onDelete: SetNull)
+
+  @@index([staffUserId])
+  @@index([appointmentId])
+  @@index([openedAt(sort: Desc)])
+  @@index([kind])
+  @@map("telegram_relay_log")
 }
