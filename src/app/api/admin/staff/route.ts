@@ -4,9 +4,10 @@ import { requireAuth } from "@/lib/auth";
 import { hashPassword } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { normalizePhone } from "@/lib/utils/phone";
+import { getBranchScope, resolveBranchIdForCreate, canCreateAdmin } from "@/lib/branch-scope";
 
-// POST /api/admin/staff — create a staff user account (receptionist or clinic_admin)
-// Body: { firstName, lastName, phone, password, role: "receptionist"|"clinic_admin"|"doctor" }
+// POST /api/admin/staff — xodim akkaunt yaratish (receptionist, clinic_admin, doctor)
+// faqat super_admin admin rol yarata oladi
 export async function POST(req: NextRequest) {
   try {
     const auth = requireAuth(req);
@@ -18,6 +19,12 @@ export async function POST(req: NextRequest) {
 
     if (!firstName || !rawPhone || !password || !role) {
       return error("firstName, phone, password, role majburiy");
+    }
+
+    // clinic_admin va branch_admin rollari faqat super_admin yarata oladi
+    const adminRoles = ["clinic_admin", "branch_admin"];
+    if (adminRoles.includes(role) && !canCreateAdmin(auth)) {
+      return forbidden();
     }
 
     const allowed = ["receptionist", "clinic_admin", "doctor"];
@@ -34,6 +41,8 @@ export async function POST(req: NextRequest) {
     const existing = await prisma.user.findFirst({ where: { phone } });
     if (existing) return error("Bu telefon raqam allaqachon ro'yxatdan o'tgan", 409);
 
+    const branchId = resolveBranchIdForCreate(auth, body.branchId);
+
     const user = await prisma.user.create({
       data: {
         firstName: firstName.trim(),
@@ -42,11 +51,11 @@ export async function POST(req: NextRequest) {
         passwordHash,
         role,
         clinicId,
+        branchId,
         isActive: true,
       },
     });
 
-    // If doctor role — also create Doctor record
     if (role === "doctor") {
       const { specialty } = body;
       if (!specialty) return error("Doctor uchun specialty majburiy");
@@ -54,6 +63,7 @@ export async function POST(req: NextRequest) {
       await prisma.doctor.create({
         data: {
           clinicId,
+          branchId,
           userId: user.id,
           firstName: firstName.trim(),
           lastName: lastName?.trim() ?? "",
@@ -63,11 +73,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // If receptionist — also create Staff record
     if (role === "receptionist") {
       await prisma.staff.create({
         data: {
           clinicId,
+          branchId,
           userId: user.id,
           firstName: firstName.trim(),
           lastName: lastName?.trim() ?? "",
@@ -83,6 +93,7 @@ export async function POST(req: NextRequest) {
       phone: user.phone,
       role: user.role,
       clinicId: user.clinicId,
+      branchId: user.branchId,
     });
   } catch (err: any) {
     if (err?.code === "P2002") return error("Bu telefon raqam allaqachon ishlatilgan", 409);
@@ -90,24 +101,23 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/admin/staff — list all staff for this clinic
+// GET /api/admin/staff — o'z darajasidagi xodimlar ro'yxati
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
     if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
 
-    const clinicId = auth.role === "super_admin"
-      ? new URL(req.url).searchParams.get("clinicId") || undefined
-      : auth.clinicId!;
+    const explicitClinicId = new URL(req.url).searchParams.get("clinicId");
+    const scope = getBranchScope(auth, explicitClinicId);
 
     const staff = await prisma.user.findMany({
       where: {
-        ...(clinicId ? { clinicId } : {}),
+        ...scope,
         role: { not: "patient" },
         isActive: true,
       },
-      select: { id: true, firstName: true, lastName: true, phone: true, role: true, createdAt: true },
+      select: { id: true, firstName: true, lastName: true, phone: true, role: true, branchId: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });
 

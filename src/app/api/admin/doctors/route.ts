@@ -2,18 +2,18 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
+import { getBranchScope, resolveBranchIdForCreate, canManageResources } from "@/lib/branch-scope";
 
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
 
-    const clinicId = auth.role === "super_admin"
-      ? new URL(req.url).searchParams.get("clinicId") || undefined
-      : auth.clinicId!;
+    const explicitClinicId = new URL(req.url).searchParams.get("clinicId");
+    const scope = getBranchScope(auth, explicitClinicId);
 
     const doctors = await prisma.doctor.findMany({
-      where: { ...(clinicId ? { clinicId } : {}), isActive: true },
+      where: { ...scope, isActive: true },
       include: {
         branch: { select: { name: true } },
         services: {
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
-    if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+    if (!canManageResources(auth)) return forbidden();
 
     const body = await req.json();
     const { firstName, lastName, specialty, phone, photoUrl, serviceIds } = body;
@@ -54,14 +54,7 @@ export async function POST(req: NextRequest) {
     const clinicId = auth.role === "super_admin" ? body.clinicId : auth.clinicId;
     if (!clinicId) return error("clinicId required");
 
-    let resolvedBranchId = body.branchId as string | undefined;
-    if (!resolvedBranchId) {
-      const firstBranch = await prisma.branch.findFirst({
-        where: { clinicId, isActive: true },
-        orderBy: { createdAt: "asc" },
-      });
-      resolvedBranchId = firstBranch?.id;
-    }
+    const branchId = resolveBranchIdForCreate(auth, body.branchId);
 
     const doctor = await prisma.doctor.create({
       data: {
@@ -70,7 +63,7 @@ export async function POST(req: NextRequest) {
         lastName,
         specialty,
         phone: phone ?? null,
-        branchId: resolvedBranchId ?? null,
+        branchId,
         photoUrl: photoUrl ?? null,
         ...(Array.isArray(serviceIds) && serviceIds.length > 0
           ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }

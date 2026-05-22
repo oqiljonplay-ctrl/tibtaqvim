@@ -2,18 +2,18 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
+import { getBranchScope, resolveBranchIdForCreate, canManageResources } from "@/lib/branch-scope";
 
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
 
-    const clinicId = auth.role === "super_admin"
-      ? new URL(req.url).searchParams.get("clinicId") || undefined
-      : auth.clinicId!;
+    const explicitClinicId = new URL(req.url).searchParams.get("clinicId");
+    const scope = getBranchScope(auth, explicitClinicId);
 
     const services = await prisma.service.findMany({
-      where: { ...(clinicId ? { clinicId } : {}), isActive: true },
+      where: { ...scope, isActive: true },
       include: {
         doctors: {
           include: {
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
-    if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+    if (!canManageResources(auth)) return forbidden();
 
     const body = await req.json();
     const {
@@ -56,13 +56,15 @@ export async function POST(req: NextRequest) {
     const clinicId = auth.role === "super_admin" ? body.clinicId : auth.clinicId;
     if (!clinicId) return error("clinicId required");
 
+    const branchId = resolveBranchIdForCreate(auth, body.branchId);
+
     const service = await prisma.service.create({
       data: {
         clinicId,
+        branchId,
         name,
         type,
         price,
-        // TODO: Bosqich 2 - slot tizimi yoqilganda body.requiresSlot qaytariladi
         requiresSlot: false,
         requiresAddress: requiresAddress ?? false,
         requiresPrePayment: requiresPrePayment ?? false,

@@ -140,6 +140,7 @@ model Branch {
   staff        Staff[]
   appointments Appointment[]
   slots        Slot[]
+  services     Service[]
 
   @@index([clinicId])
   @@index([clinicId, sortOrder])
@@ -149,6 +150,7 @@ model Branch {
 model Service {
   id                 String      @id @default(cuid())
   clinicId           String
+  branchId           String?
   name               String
   type               ServiceType
   price              Decimal     @db.Decimal(10, 2)
@@ -165,12 +167,14 @@ model Service {
   updatedAt          DateTime    @updatedAt
 
   clinic       Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  branch       Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
   appointments Appointment[]
   slots        Slot[]
   doctors      ServiceDoctor[]
 
   @@index([clinicId])
   @@index([clinicId, type])
+  @@index([branchId])
   @@map("services")
 }
 

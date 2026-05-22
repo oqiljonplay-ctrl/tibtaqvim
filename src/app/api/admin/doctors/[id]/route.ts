@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, notFound, serverError } from "@/lib/api-response";
+import { canManageResources } from "@/lib/branch-scope";
 
 type Params = { params: { id: string } };
 
@@ -42,11 +43,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
-    if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+    if (!canManageResources(auth)) return forbidden();
 
     const doctor = await prisma.doctor.findUnique({ where: { id: params.id } });
     if (!doctor) return notFound("Doctor not found");
     if (auth.role !== "super_admin" && doctor.clinicId !== auth.clinicId) return forbidden();
+    if (auth.role === "branch_admin" && doctor.branchId !== auth.branchId) return forbidden();
 
     const body = await req.json();
     const { firstName, lastName, specialty, phone, photoUrl, serviceIds, serviceQueueModes } = body;
@@ -142,11 +144,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
-    if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+    if (!canManageResources(auth)) return forbidden();
 
     const doctor = await prisma.doctor.findUnique({ where: { id: params.id } });
     if (!doctor) return notFound("Doctor not found");
     if (auth.role !== "super_admin" && doctor.clinicId !== auth.clinicId) return forbidden();
+    if (auth.role === "branch_admin" && doctor.branchId !== auth.branchId) return forbidden();
 
     await prisma.doctor.update({
       where: { id: params.id },

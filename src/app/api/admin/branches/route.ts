@@ -2,13 +2,14 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
+import { canCreateBranch } from "@/lib/branch-scope";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/admin/branches
- * clinic_admin — o'z klinikasining filiallari
- * super_admin  — ?clinicId=xxx bilan istalgan klinika
+ * super_admin + clinic_admin: o'z klinikasining filiallari
+ * branch_admin: filiallarga kira olmaydi
  */
 export async function GET(req: NextRequest) {
   try {
@@ -49,14 +50,14 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/admin/branches
- * clinic_admin — o'z klinikasiga yangi filial
- * super_admin  — istalgan klinikaga (body.clinicId bilan)
+ * super_admin + clinic_admin: filial yaratish
+ * branch_admin: ❌ ruxsat yo'q
  */
 export async function POST(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
-    if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+    if (!canCreateBranch(auth)) return forbidden();
 
     const body = await req.json();
     const { name, address, phone, workingHours, nearbyMetro, latitude, longitude, sortOrder } = body;

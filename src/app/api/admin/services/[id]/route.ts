@@ -2,18 +2,20 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, notFound } from "@/lib/api-response";
+import { canManageResources } from "@/lib/branch-scope";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
-    if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+    if (!canManageResources(auth)) return forbidden();
 
     const data = await req.json();
 
     const service = await prisma.service.findUnique({ where: { id: params.id } });
     if (!service) return notFound();
     if (auth.role !== "super_admin" && service.clinicId !== auth.clinicId) return forbidden();
+    if (auth.role === "branch_admin" && service.branchId !== auth.branchId) return forbidden();
 
     const { doctorIds, ...rest } = data;
 
@@ -65,11 +67,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
-    if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+    if (!canManageResources(auth)) return forbidden();
 
     const service = await prisma.service.findUnique({ where: { id: params.id } });
     if (!service) return notFound();
     if (auth.role !== "super_admin" && service.clinicId !== auth.clinicId) return forbidden();
+    if (auth.role === "branch_admin" && service.branchId !== auth.branchId) return forbidden();
 
     const [appointmentCount, slotCount] = await Promise.all([
       prisma.appointment.count({ where: { serviceId: params.id } }),

@@ -22,6 +22,7 @@ export default function Navbar({ items, title }: { items: NavItem[]; title: stri
     localStorage.removeItem("user_role");
     localStorage.removeItem("user_name");
     localStorage.removeItem("clinicId");
+    localStorage.removeItem("branchId");
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     router.push("/login");
   }

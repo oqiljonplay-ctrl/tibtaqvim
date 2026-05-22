@@ -26,6 +26,12 @@ export default function BranchesPage() {
   const [form, setForm]         = useState(EMPTY_FORM);
   const [saving, setSaving]     = useState(false);
   const [err, setErr]           = useState("");
+  const [canCreate, setCanCreate] = useState(false);
+
+  useEffect(() => {
+    const role = localStorage.getItem("user_role");
+    setCanCreate(role === "super_admin" || role === "clinic_admin");
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,12 +111,14 @@ export default function BranchesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Filiallar</h1>
           <p className="text-sm text-gray-500 mt-1">{branches.length} ta filial</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          + Yangi filial
-        </button>
+        {canCreate && (
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            + Yangi filial
+          </button>
+        )}
       </div>
 
       {/* Modal */}

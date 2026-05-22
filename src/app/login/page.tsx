@@ -44,6 +44,8 @@ function LoginForm() {
       localStorage.setItem("user_role", user.role);
       localStorage.setItem("user_name", user.firstName);
       if (user.clinicId) localStorage.setItem("clinicId", user.clinicId);
+      if (user.branchId) localStorage.setItem("branchId", user.branchId);
+      else localStorage.removeItem("branchId");
 
       const redirect = returnUrl || roleRedirects[user.role] || "/";
       window.location.href = redirect;
