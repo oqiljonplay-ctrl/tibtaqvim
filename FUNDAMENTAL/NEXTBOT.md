@@ -247,6 +247,9 @@ address       String?          ← home_service uchun
 queueNumber   Int?             ← doctor_queue uchun
 date          DateTime @db.Date
 status        booked|arrived|missed|cancelled
+paymentStatus not_required|pending|paid|cancelled  @default("pending")
+              ← CHECK constraint (DB). Qabulxona boshqaradi. Kelajak: Payme/Click webhook
+queueMode     live|online|slot-disabled
 notifiedDayBefore Boolean @default(false)   ← idempotency
 notifiedTwoHours  Boolean @default(false)   ← idempotency
 ```
@@ -850,6 +853,64 @@ Phone kiritilganda → /api/user/register → phone qo'shildi (update), tibId o'
 
 ---
 
+## 12.2 2026-05-23 — Payment Workflow: Qabulxona/Shifokor Mas'uliyat Ajratish
+
+**Maqsad:** Qabulxona (to'lov) + Shifokor (muolaja) ikki bosqichli workflow. Takror tugmalar yo'q.
+
+**Oqim:**
+```
+BEMOR bron qiladi → paymentStatus: pending
+QABULXONA "To'ladi" → paymentStatus: paid
+SHIFOKOR faqat paid bemorlarni ko'radi → "Keldi"/"Kelmadi"
+```
+
+**DB o'zgarishlar:**
+- `appointments.paymentStatus` default: `not_required` → `pending` (Supabase migration)
+- `CHECK constraint`: faqat `not_required|pending|paid|cancelled` qiymatlar
+- 2 yangi index: `appointments_payment_date_idx`, `appointments_doctor_workflow_idx`
+- Legacy 6 ta bron (arrived+not_required) — tegilmadi
+
+**Yangi fayllar:**
+- `src/lib/workflow/appointment-workflow.ts` — markaziy: `markAsPaid`, `markAsUnpaid`, `cancelAppointment`, `markAsArrived`, `markAsMissed`, `resetToBooked`
+- `src/app/api/reception/appointments/route.ts` — GET: 2 bo'lim (pending + paid)
+- `src/app/api/reception/appointments/[id]/payment/route.ts` — PATCH: paid/unpaid/cancel
+- `src/app/api/doctor/appointments/route.ts` — GET: faqat paid, xizmat bo'yicha grouped
+- `src/app/api/doctor/appointments/[id]/attendance/route.ts` — PATCH: arrived/missed/reset
+
+**O'zgartirilgan fayllar:**
+- `src/app/reception/page.tsx` — to'lov nazorati: 🟡 Kutilmoqda / 🟢 To'langan bo'limlari
+- `src/app/doctor/page.tsx` — xizmat orolchalari, Keldi/Kelmadi, per-island chop/PDF
+- `src/lib/services/booking.service.ts` — `online` mode: `not_required` → `pending`
+- `next.config.mjs` — webpack alias: `canvg/html2canvas/dompurify = false` (jspdf SSR fix)
+- `prisma/schema.prisma` — `paymentStatus @default("pending")`
+
+**Paket:** `jspdf + jspdf-autotable` qo'shildi (client-side PDF, dynamic import)
+
+**Kelajak:** `markAsPaid(id, clinicId, 'payme'/'click')` — webhook integratsiya uchun tayyor zamin.
+
+**Commit:** `a86df8a` — 12 fayl. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
+## 12.0 2026-05-22 — Branch Isolation S1-S4 (services.branchId + 3-level scope)
+
+**Maqsad:** Bosh ofis va filiallar mustaqil — har admin faqat o'z darajasini ko'radi.
+
+**Arxitektura:** `branchId=NULL` → bosh ofis; `branchId=X` → filial.
+Scope: `super_admin`=barcha; `clinic_admin`=branchId=null; `branch_admin`=o'z filiali.
+
+**DB (S1):** `services.branchId` nullable + FK + index. Migration: `20260522121640_add_service_branch_id`.
+**Data (S2):** 7 shifokor + 10 xizmat + 40 bron → `branchId=NULL`. KAMALAK bo'sh qoldi.
+
+**Yangi fayl:** `src/lib/branch-scope.ts` — `getBranchScope`, `resolveBranchIdForCreate`, `canCreate*`, `canManageResources`
+
+**API (S3):** services, doctors, stats, branches, staff — GET+POST scope. `[id]` PATCH+DELETE: branch_admin own-branch check.
+**UI (S4):** "Filiallar" tab branch_admin uchun yashirin. "Yangi filial" tugmasi faqat super/clinic_admin. Login: branchId localStorage.
+
+**Commit:** `f22c9fb` — 14 fayl. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ## 12.1 2026-05-19 — Sprint 1: Payment Foundation (Schema Poydevor)
 
 **Maqsad:** To'lov tizimi uchun schema va TypeScript yordamchi fayllar. Hech qanday provider API ishlamaydi — faqat poydevor.
@@ -1012,8 +1073,10 @@ Phone kiritilganda → /api/user/register → phone qo'shildi (update), tibId o'
 | 9 | Doctor /stats 3 ta grafik | ⭐ | Kutilmoqda |
 | 10 | Slot tizimi bosqich 2 (aniq vaqt slot) | ⭐ | Kutilmoqda |
 | 11 | Multi-clinic Bosqich 2 (ratings, filial xizmatlar) | ⭐ | Kutilmoqda |
+| 12 | Branch Isolation S1-S4 (services.branchId, scope) | ⭐⭐⭐ | ✅ Tugallandi (f22c9fb) |
+| 13 | Payment Workflow: Qabulxona/Shifokor ajratish | ⭐⭐⭐ | ✅ Tugallandi (a86df8a) |
 
-**Keyingi prioritetlar:** Click sandbox test → Bot to'lov → Uy xizmati natijalari
+**Keyingi prioritetlar:** Click sandbox test → Uy xizmati natijalari → Doctor /stats grafiklar
 
 ---
 
