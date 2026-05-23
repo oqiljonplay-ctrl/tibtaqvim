@@ -10,6 +10,22 @@ interface NavItem {
   label: string;
 }
 
+function getRoleNavItems(role: string): NavItem[] {
+  const reception: NavItem = { href: "/reception", label: "💰 Qabulxona" };
+  const doctor: NavItem    = { href: "/doctor",    label: "👨‍⚕️ Navbat" };
+  const admin: NavItem     = { href: "/admin",     label: "📊 Boshqaruv" };
+  const superA: NavItem    = { href: "/admin/super", label: "👑 SuperAdmin" };
+
+  switch (role) {
+    case "receptionist":  return [reception];
+    case "doctor":        return [doctor];
+    case "clinic_admin":  return [admin, reception, doctor];
+    case "branch_admin":  return [admin, reception, doctor];
+    case "super_admin":   return [superA, admin, reception, doctor];
+    default:              return [];
+  }
+}
+
 export default function Navbar({ items, title }: { items: NavItem[]; title: string }) {
   const path = usePathname();
   const router = useRouter();
@@ -32,6 +48,8 @@ export default function Navbar({ items, title }: { items: NavItem[]; title: stri
   }
 
   const roleMeta = user ? getRoleMeta(user.role) : null;
+  // Rol bo'yicha dinamik navlar; user yuklanmaguncha layout items'ni ko'rsat
+  const navItems: NavItem[] = user ? getRoleNavItems(user.role) : items;
   const clinicLabel =
     !user ? title
     : user.role === "super_admin" ? "Barcha klinikalar"
@@ -78,9 +96,9 @@ export default function Navbar({ items, title }: { items: NavItem[]; title: stri
           </div>
         </div>
 
-        {/* Nav links */}
+        {/* Nav links — rol bo'yicha dinamik */}
         <div className="flex items-center gap-1 h-full overflow-x-auto">
-          {items.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}

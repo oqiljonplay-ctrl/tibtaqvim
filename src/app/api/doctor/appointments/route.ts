@@ -33,18 +33,6 @@ export async function GET(req: NextRequest) {
     if (scope.clinicId) where.clinicId = scope.clinicId;
     if (scope.branchId !== undefined) where.branchId = scope.branchId;
 
-    // doctor role: faqat o'ziga biriktirilgan bronlar
-    if (auth.role === "doctor") {
-      const doctorRecord = await prisma.doctor.findFirst({
-        where: { userId: auth.userId },
-        select: { id: true },
-      });
-      if (!doctorRecord) {
-        return ok({ date: dateParam ?? new Date().toLocaleDateString("sv-SE"), services: [], counts: { total: 0, services: 0, arrived: 0, waiting: 0, missed: 0 } });
-      }
-      where.doctorId = doctorRecord.id;
-    }
-
     const appointments = await prisma.appointment.findMany({
       where,
       include: {
