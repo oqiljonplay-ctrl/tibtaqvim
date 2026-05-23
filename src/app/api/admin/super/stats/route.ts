@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { ok, unauthorized, forbidden } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
+import { getTodayRange } from "@/lib/utils/date";
 
 export async function GET(req: NextRequest) {
   const user = requireAuth(req);
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     prisma.clinic.count({ where: { isActive: true, deletedAt: null } }),
     prisma.appointment.count(),
     prisma.appointment.count({
-      where: { date: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
+      where: { date: getTodayRange() },
     }),
     prisma.user.count({ where: { role: "patient" } }),
     prisma.doctor.count({ where: { isActive: true } }),

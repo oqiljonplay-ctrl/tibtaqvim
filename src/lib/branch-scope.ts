@@ -3,7 +3,7 @@ import { JwtPayload } from "@/lib/auth";
 /**
  * Admin API'lar uchun branch-darajali scope filtri.
  * super_admin   → barcha (clinicId ixtiyoriy)
- * clinic_admin  → o'z klinikasi, faqat bosh ofis (branchId = null)
+ * clinic_admin  → o'z klinikasi, barcha filiallar (branchId filteri yo'q)
  * branch_admin  → o'z klinikasi, faqat o'z filiali (branchId = auth.branchId)
  */
 export function getBranchScope(
@@ -14,7 +14,7 @@ export function getBranchScope(
     return explicitClinicId ? { clinicId: explicitClinicId } : {};
   }
   if (auth.role === "clinic_admin") {
-    return { clinicId: auth.clinicId!, branchId: null };
+    return { clinicId: auth.clinicId! };
   }
   if (auth.role === "branch_admin") {
     return { clinicId: auth.clinicId!, branchId: auth.branchId ?? undefined };
