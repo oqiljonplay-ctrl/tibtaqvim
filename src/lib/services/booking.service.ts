@@ -85,7 +85,7 @@ async function bookDoctorQueue(
           orderBy: { queueNumber: "desc" },
         });
         queueNumber = (last?.queueNumber ?? 0) + 1;
-        paymentStatus = service.requiresPrePayment ? "pending" : "not_required";
+        paymentStatus = "pending";
       } else {
         // live — kassada queueNumber beriladi
         queueNumber = null;

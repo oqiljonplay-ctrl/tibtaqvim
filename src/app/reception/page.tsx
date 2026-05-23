@@ -1,303 +1,305 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import LocationButtons from "@/components/LocationButtons";
-import LiveLocationPanel from "@/components/LiveLocationPanel";
+
+import { useState, useEffect, useCallback } from "react";
 import TelegramChatButton from "@/components/shared/TelegramChatButton";
+import LocationButtons from "@/components/LocationButtons";
 
-interface Appointment {
-  id: string; patientName: string; patientPhone: string;
-  queueNumber: number | null; status: string; address: string | null;
-  locationLat?: number | null; locationLng?: number | null;
-  liveLat?: number | null; liveLng?: number | null;
-  liveStartedAt?: string | null; liveExpiresAt?: string | null;
-  liveLastUpdatedAt?: string | null; liveStatus?: string | null;
-  createdAt: string;
-  service: { name: string; type: string };
-  doctor: { firstName: string; lastName: string } | null;
-  slot: { startTime: string; endTime: string } | null;
-  user: { tibId: string | null; telegramId: string | null } | null;
+interface ReceptionAppointment {
+  id: string;
+  patientName: string;
+  patientPhone: string;
+  queueNumber: number | null;
+  status: string;
+  paymentStatus: string;
+  queueMode: string;
+  date: string;
+  address: string | null;
+  notes: string | null;
+  tibId: string | null;
+  service: { id: string; name: string; type: string; price: number } | null;
+  doctor: { id: string; name: string; specialty: string | null } | null;
+  patientTelegramId: string | null;
 }
-interface Service { id: string; name: string }
 
-const STATUS_CFG = {
-  booked:    { label: "Kutmoqda", cls: "badge-booked" },
-  arrived:   { label: "Keldi",    cls: "badge-arrived" },
-  missed:    { label: "Kelmadi", cls: "badge-missed" },
-  cancelled: { label: "Bekor",   cls: "badge-cancelled" },
-} as const;
+interface ReceptionData {
+  date: string;
+  pending: ReceptionAppointment[];
+  paid: ReceptionAppointment[];
+  counts: { pending: number; paid: number; total: number };
+}
 
 const AUTO_REFRESH_MS = 30_000;
 
 export default function ReceptionPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
+  const [data, setData] = useState<ReceptionData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [serviceFilter, setServiceFilter] = useState("all");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [search, setSearch] = useState("");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Refs hold current filter values so setInterval callback is never stale
-  const selectedDateRef = useRef("");
-  const serviceFilterRef = useRef("all");
-  function changeDate(d: string) { selectedDateRef.current = d; setSelectedDate(d); }
-  function changeServiceFilter(s: string) { serviceFilterRef.current = s; setServiceFilter(s); }
-  // Prevents duplicate fetch when setSelectedDate triggers [selectedDate] effect on init
-  const skipNextDateFetch = useRef(false);
+  const [date, setDate] = useState(() => new Date().toLocaleDateString("sv-SE"));
+  const [lastRefresh, setLastRefresh] = useState("");
 
-  useEffect(() => {
-    const today = new Date().toLocaleDateString("sv-SE");
-    selectedDateRef.current = today;
-    skipNextDateFetch.current = true;
-    setSelectedDate(today);
-    // Load appointments immediately; services load in parallel without blocking
-    fetchAppointments(today);
-    fetchServices();
-    timerRef.current = setInterval(() => fetchAppointments(), AUTO_REFRESH_MS);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedDate) return;
-    if (skipNextDateFetch.current) { skipNextDateFetch.current = false; return; }
-    fetchAppointments();
-  }, [selectedDate, serviceFilter]);
-
-  async function fetchServices() {
+  const fetchData = useCallback(async (d?: string) => {
     try {
-      const clinicId = localStorage.getItem("clinicId") || "";
-      const res = await fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`);
+      const target = d ?? date;
+      const res = await fetch(`/api/reception/appointments?date=${target}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
       const json = await res.json();
-      if (json.success) setServices(json.data);
-    } catch { /* non-critical, filter just stays empty */ }
-  }
-
-  async function fetchAppointments(dateOverride?: string) {
-    try {
-      const clinicId = localStorage.getItem("clinicId") || "";
-      const date = dateOverride ?? selectedDateRef.current;
-      const svcFilter = serviceFilterRef.current;
-      if (!date) return;
-      const params = new URLSearchParams({ date });
-      if (clinicId) params.set("clinicId", clinicId);
-      if (svcFilter !== "all") params.set("serviceId", svcFilter);
-      const res = await fetch(`/api/appointments?${params}`);
-      const json = await res.json();
-      if (json.success) { setAppointments(json.data.items ?? json.data); setLastRefresh(new Date().toLocaleTimeString("uz-UZ")); setErrorMsg(null); }
-      else setErrorMsg(json.error?.message ?? json.error ?? "Qabullar yuklanmadi");
+      if (json.success) {
+        setData(json.data);
+        setLastRefresh(new Date().toLocaleTimeString("uz-UZ"));
+        setErrorMsg(null);
+      } else {
+        setErrorMsg(json.error?.message ?? "Ma'lumot yuklanmadi");
+      }
     } catch {
       setErrorMsg("Tarmoq xatosi.");
     } finally {
       setLoading(false);
     }
+  }, [date]);
+
+  useEffect(() => {
+    fetchData();
+    const timer = setInterval(() => fetchData(), AUTO_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [fetchData]);
+
+  function handleDateChange(d: string) {
+    setDate(d);
+    setLoading(true);
+    fetchData(d);
   }
 
-  async function markStatus(id: string, status: "arrived" | "missed") {
-    const prev = appointments.find((a) => a.id === id)?.status;
-    setAppointments((list) => list.map((a) => a.id === id ? { ...a, status } : a));
+  async function handlePaymentAction(
+    appointmentId: string,
+    action: "paid" | "unpaid" | "cancel"
+  ) {
+    if (action === "cancel" && !confirm("Bronni butunlay bekor qilishni tasdiqlaysizmi?")) return;
+    setActionLoading(appointmentId);
     try {
-      const res = await fetch("/api/arrived", {
-        method: "POST",
+      const res = await fetch(`/api/reception/appointments/${appointmentId}/payment`, {
+        method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: id, status }),
+        body: JSON.stringify({ action }),
       });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        setErrorMsg(json.error?.message ?? json.error ?? "Holat o'zgartirilmadi");
-        if (prev) setAppointments((list) => list.map((a) => a.id === id ? { ...a, status: prev } : a));
+      const json = await res.json();
+      if (json.success) {
+        await fetchData();
+      } else {
+        setErrorMsg("Xato: " + (json.error?.message ?? json.message ?? "Amal bajarilmadi"));
       }
     } catch {
       setErrorMsg("Tarmoq xatosi");
-      if (prev) setAppointments((list) => list.map((a) => a.id === id ? { ...a, status: prev } : a));
+    } finally {
+      setActionLoading(null);
     }
   }
 
-  const markArrived = (id: string) => markStatus(id, "arrived");
-  const markMissed  = (id: string) => markStatus(id, "missed");
-
-  const filtered = appointments.filter((a) => {
-    if (statusFilter !== "all" && a.status !== statusFilter) return false;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      const tibId = a.user?.tibId?.toLowerCase() ?? "";
-      const name = a.patientName.toLowerCase();
-      const phone = a.patientPhone.toLowerCase();
-      if (!tibId.includes(q) && !name.includes(q) && !phone.includes(q)) return false;
-    }
-    return true;
-  });
-
-  const counts = {
-    all: appointments.length,
-    booked: appointments.filter((a) => a.status === "booked").length,
-    arrived: appointments.filter((a) => a.status === "arrived").length,
-    missed: appointments.filter((a) => a.status === "missed").length,
-  };
+  if (loading) {
+    return <div className="p-6 text-gray-400 text-sm">⏳ Yuklanmoqda...</div>;
+  }
 
   return (
     <div>
-      {/* Title + refresh */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Navbat ro'yxati</h1>
+          <h1 className="text-2xl font-bold text-gray-900">📋 Qabulxona — To'lov nazorati</h1>
           <p className="text-xs text-gray-400 mt-0.5">
-            {lastRefresh ? `Oxirgi yangilanish: ${lastRefresh}` : "Yuklanmoqda..."}
+            {lastRefresh ? `Oxirgi yangilanish: ${lastRefresh}` : ""}
             <span className="ml-2 text-blue-400">(har 30s avtomatik)</span>
           </p>
         </div>
-        <button onClick={() => fetchAppointments()} className="btn-secondary text-sm flex items-center gap-1.5">
+        <button onClick={() => fetchData()} className="btn-secondary text-sm flex items-center gap-1.5">
           ↻ Yangilash
         </button>
       </div>
 
-      {errorMsg && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
-          <span className="text-red-500 flex-shrink-0 mt-0.5">⚠️</span>
-          <p className="text-red-700 text-sm flex-1">{errorMsg}</p>
-          <button onClick={() => setErrorMsg(null)} className="text-red-400 text-lg leading-none flex-shrink-0">×</button>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-5">
+      {/* Date + stats */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
         <input
           type="date"
-          value={selectedDate}
-          onChange={(e) => changeDate(e.target.value)}
+          value={date}
+          onChange={(e) => handleDateChange(e.target.value)}
           className="input w-auto text-sm"
         />
-        <select
-          value={serviceFilter}
-          onChange={(e) => changeServiceFilter(e.target.value)}
-          className="input w-auto text-sm"
-        >
-          <option value="all">Barcha xizmatlar</option>
-          {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="input text-sm flex-1 min-w-[160px]"
-          placeholder="🔍 Ism, telefon yoki 🆔 tibId"
-        />
+        {data && (
+          <div className="flex gap-3 text-sm">
+            <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg font-medium">
+              🟡 {data.counts.pending} ta kutmoqda
+            </span>
+            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium">
+              🟢 {data.counts.paid} ta to'langan
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Status tabs */}
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {(["all", "booked", "arrived", "missed"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setStatusFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              statusFilter === f
-                ? "bg-blue-600 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {f === "all" ? "Barchasi" : f === "booked" ? "Kutmoqda" : f === "arrived" ? "Keldi" : "Kelmadi"}
-            <span className="ml-1.5 text-xs opacity-75">({counts[f]})</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Table */}
-      {loading ? (
-        <div className="text-center py-12 text-gray-400 text-sm">Yuklanmoqda...</div>
-      ) : filtered.length === 0 ? (
-        <div className="card text-center py-12 text-gray-400">Ro'yxat bo'sh</div>
-      ) : (
-        <div className="card overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr className="border-b border-gray-100">
-                <th className="text-left py-3 px-4 font-medium text-gray-500 w-12">№</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-500">Bemor</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-500 hidden md:table-cell">🆔 ID</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-500">Xizmat</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-500 hidden lg:table-cell">Shifokor</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-500">Vaqt</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-500">Holat</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-500">Amal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((a) => {
-                const sc = STATUS_CFG[a.status as keyof typeof STATUS_CFG] ?? STATUS_CFG.booked;
-                return (
-                  <tr key={a.id} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${a.status !== "booked" ? "opacity-60" : ""}`}>
-                    <td className="py-3 px-4 text-center">
-                      <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-md">
-                        {a.queueNumber ?? "—"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="font-medium text-gray-900">{a.patientName}</div>
-                      <div className="text-xs text-gray-400">{a.patientPhone}</div>
-                      <div className="mt-1">
-                        <TelegramChatButton
-                          telegramId={a.user?.telegramId}
-                          patientName={a.patientName}
-                          phone={a.patientPhone}
-                          appointmentId={a.id}
-                          variant="compact"
-                        />
-                      </div>
-                      {a.address && <div className="text-xs text-orange-500 mt-0.5">📍 {a.address}</div>}
-                      {a.service.type === "home_service" && (
-                        <div className="mt-2">
-                          <LocationButtons locationLat={a.locationLat} locationLng={a.locationLng} address={a.address} />
-                          {a.liveStatus === "active" &&
-                           a.liveLat != null &&
-                           a.liveLng != null && (
-                            <LiveLocationPanel
-                              appointmentId={a.id}
-                              patientName={a.patientName}
-                              liveLat={a.liveLat}
-                              liveLng={a.liveLng}
-                              liveStartedAt={a.liveStartedAt!}
-                              liveExpiresAt={a.liveExpiresAt!}
-                              liveLastUpdatedAt={a.liveLastUpdatedAt!}
-                              liveStatus={a.liveStatus}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 hidden md:table-cell">
-                      {a.user?.tibId
-                        ? <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{a.user.tibId}</span>
-                        : <span className="text-xs text-gray-300">—</span>}
-                    </td>
-                    <td className="py-3 px-4 text-gray-700">{a.service.name}</td>
-                    <td className="py-3 px-4 text-gray-700 hidden lg:table-cell">
-                      {a.doctor ? `${a.doctor.firstName} ${a.doctor.lastName}` : "—"}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
-                      {a.slot
-                        ? `${a.slot.startTime}–${a.slot.endTime}`
-                        : new Date(a.createdAt).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={sc.cls}>{sc.label}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      {a.status === "booked" && (
-                        <div className="flex gap-1.5">
-                          <button onClick={() => markArrived(a.id)} className="btn-success text-xs py-1 px-2.5">Keldi</button>
-                          <button onClick={() => markMissed(a.id)} className="btn-danger text-xs py-1 px-2.5">Kelmadi</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {errorMsg && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+          <span className="text-red-500 flex-shrink-0">⚠️</span>
+          <p className="text-red-700 text-sm flex-1">{errorMsg}</p>
+          <button onClick={() => setErrorMsg(null)} className="text-red-400 text-lg leading-none">×</button>
         </div>
       )}
+
+      {!data ? (
+        <div className="card text-center py-12 text-gray-400">Ma'lumot topilmadi</div>
+      ) : (
+        <div className="space-y-6">
+          {/* 🟡 TO'LOV KUTILMOQDA */}
+          <section>
+            <h2 className="text-sm font-semibold text-amber-700 mb-3 flex items-center gap-2">
+              🟡 To'lov kutilmoqda
+              <span className="px-2 py-0.5 bg-amber-100 rounded-full text-xs font-bold">
+                {data.counts.pending}
+              </span>
+            </h2>
+            {data.pending.length === 0 ? (
+              <div className="card text-center py-8 text-gray-400 text-sm">
+                To'lov kutilayotgan bemor yo'q
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data.pending.map((appt) => (
+                  <ReceptionCard
+                    key={appt.id}
+                    appt={appt}
+                    loading={actionLoading === appt.id}
+                    section="pending"
+                    onPaid={() => handlePaymentAction(appt.id, "paid")}
+                    onCancel={() => handlePaymentAction(appt.id, "cancel")}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* 🟢 TO'LANGAN */}
+          <section>
+            <h2 className="text-sm font-semibold text-emerald-700 mb-3 flex items-center gap-2">
+              🟢 To'langan — shifokorga uzatildi
+              <span className="px-2 py-0.5 bg-emerald-100 rounded-full text-xs font-bold">
+                {data.counts.paid}
+              </span>
+            </h2>
+            {data.paid.length === 0 ? (
+              <div className="card text-center py-8 text-gray-400 text-sm">
+                To'langan bemor yo'q
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data.paid.map((appt) => (
+                  <ReceptionCard
+                    key={appt.id}
+                    appt={appt}
+                    loading={actionLoading === appt.id}
+                    section="paid"
+                    onUnpaid={() => handlePaymentAction(appt.id, "unpaid")}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Kartochka komponenti ────────────────────────────────────────────────────────
+
+interface CardProps {
+  appt: ReceptionAppointment;
+  loading: boolean;
+  section: "pending" | "paid";
+  onPaid?: () => void;
+  onUnpaid?: () => void;
+  onCancel?: () => void;
+}
+
+function ReceptionCard({ appt, loading, section, onPaid, onUnpaid, onCancel }: CardProps) {
+  return (
+    <div className={`card p-3 ${section === "paid" ? "opacity-80" : ""}`}>
+      <div className="flex items-start gap-3">
+        {/* Navbat raqami */}
+        {appt.queueNumber != null && (
+          <div className="w-10 h-10 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-bold text-base flex-shrink-0">
+            {appt.queueNumber}
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div>
+              <h3 className="font-semibold text-gray-900">{appt.patientName}</h3>
+              <p className="text-xs text-gray-500">📞 {appt.patientPhone}</p>
+              {appt.tibId && (
+                <p className="text-xs font-mono text-blue-500 mt-0.5">🆔 {appt.tibId}</p>
+              )}
+            </div>
+            {section === "paid" && (
+              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium flex-shrink-0">
+                ✅ To'langan
+              </span>
+            )}
+          </div>
+
+          <div className="mt-1.5 text-xs text-gray-600 space-y-0.5">
+            <p>🏷 {appt.service?.name ?? "—"}{appt.service?.price ? ` · ${appt.service.price.toLocaleString()} so'm` : ""}</p>
+            {appt.doctor && <p>👨‍⚕️ {appt.doctor.name}{appt.doctor.specialty ? ` (${appt.doctor.specialty})` : ""}</p>}
+            {appt.address && <p className="text-orange-500">📍 {appt.address}</p>}
+          </div>
+
+          {/* Telegram va joylashuv */}
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <TelegramChatButton
+              telegramId={appt.patientTelegramId}
+              patientName={appt.patientName}
+              phone={appt.patientPhone}
+              appointmentId={appt.id}
+              variant="compact"
+            />
+            {appt.service?.type === "home_service" && (
+              <LocationButtons locationLat={null} locationLng={null} address={appt.address} />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tugmalar */}
+      <div className="flex gap-2 mt-3">
+        {section === "pending" && (
+          <>
+            <button
+              onClick={onPaid}
+              disabled={loading}
+              className="flex-1 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              {loading ? "..." : "💰 To'ladi"}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={loading}
+              className="px-3 py-2 bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 rounded-lg text-sm transition-colors"
+            >
+              Bekor
+            </button>
+          </>
+        )}
+        {section === "paid" && (
+          <button
+            onClick={onUnpaid}
+            disabled={loading}
+            className="px-3 py-2 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-700 rounded-lg text-sm transition-colors"
+          >
+            {loading ? "..." : "↩ To'lovni qaytarish"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

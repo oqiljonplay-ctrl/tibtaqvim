@@ -339,7 +339,7 @@ model Appointment {
   liveMessageId      BigInt?
   liveStatus         String?
   queueMode    QueueMode         @default(online)
-  paymentStatus String           @default("not_required")
+  paymentStatus String           @default("pending")
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
