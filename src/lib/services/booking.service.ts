@@ -26,7 +26,7 @@ function bookingError(code: string, message: string, status: number): BookingRes
 // ─── Doctor Queue ─────────────────────────────────────────────────────────────
 async function bookDoctorQueue(
   input: BookingInput,
-  service: { dailyLimit: number | null; requiresPrePayment: boolean },
+  service: { dailyLimit: number | null; requiresPrePayment: boolean; branchId: string | null },
   bookingDate: Date,
   queueMode: "live" | "online" | "slot"
 ): Promise<BookingResult> {
@@ -95,7 +95,7 @@ async function bookDoctorQueue(
       return tx.appointment.create({
         data: {
           clinicId: input.clinicId,
-          branchId: input.branchId ?? null,
+          branchId: service.branchId ?? null,
           serviceId: input.serviceId,
           doctorId: input.doctorId ?? null,
           userId: input.userId ?? null,
@@ -128,7 +128,7 @@ async function bookDoctorQueue(
 }
 
 // ─── Diagnostic ───────────────────────────────────────────────────────────────
-async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number | null; requiresSlot: boolean }, bookingDate: Date): Promise<BookingResult> {
+async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number | null; requiresSlot: boolean; branchId: string | null }, bookingDate: Date): Promise<BookingResult> {
   if (service.requiresSlot && !input.slotId) {
     return bookingError("SLOT_REQUIRED", "Bu xizmat uchun uyacha tanlash majburiy", 400);
   }
@@ -160,7 +160,7 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
       return tx.appointment.create({
         data: {
           clinicId: input.clinicId,
-          branchId: input.branchId ?? null,
+          branchId: service.branchId ?? null,
           serviceId: input.serviceId,
           doctorId: input.doctorId ?? null,
           userId: input.userId ?? null,
@@ -191,7 +191,7 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
 }
 
 // ─── Home Service ─────────────────────────────────────────────────────────────
-async function bookHomeService(input: BookingInput, service: { dailyLimit: number | null }, bookingDate: Date): Promise<BookingResult> {
+async function bookHomeService(input: BookingInput, service: { dailyLimit: number | null; branchId: string | null }, bookingDate: Date): Promise<BookingResult> {
   if (!input.address?.trim()) {
     return bookingError("ADDRESS_REQUIRED", "Uy xizmati uchun manzil majburiy", 400);
   }
@@ -210,7 +210,7 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
       return tx.appointment.create({
         data: {
           clinicId: input.clinicId,
-          branchId: input.branchId ?? null,
+          branchId: service.branchId ?? null,
           serviceId: input.serviceId,
           doctorId: null,
           userId: input.userId ?? null,
@@ -298,13 +298,13 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
       case "doctor_queue":
         result = await bookDoctorQueue(
           input,
-          { dailyLimit: service.dailyLimit, requiresPrePayment: service.requiresPrePayment },
+          { dailyLimit: service.dailyLimit, requiresPrePayment: service.requiresPrePayment, branchId: service.branchId ?? null },
           bookingDate,
           queueMode
         );
         break;
       case "diagnostic":
-        result = await bookDiagnostic(input, { dailyLimit: service.dailyLimit, requiresSlot: service.requiresSlot }, bookingDate);
+        result = await bookDiagnostic(input, { dailyLimit: service.dailyLimit, requiresSlot: service.requiresSlot, branchId: service.branchId ?? null }, bookingDate);
         break;
       case "home_service":
         result = await bookHomeService(input, service, bookingDate);

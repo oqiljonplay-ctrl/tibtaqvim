@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
             },
           },
         },
+        branch: { select: { id: true, name: true } },
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
       price: Number(s.price),
       prePaymentAmount: s.prePaymentAmount ? Number(s.prePaymentAmount) : null,
       defaultQueueMode: s.defaultQueueMode,
+      branchName: s.branch?.name ?? "Bosh ofis",
       doctors: s.doctors.map((sd) => ({
         ...sd.doctor,
         queueMode: sd.queueMode,
