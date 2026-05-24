@@ -1,10 +1,11 @@
 import Navbar from "@/components/ui/Navbar";
+import { Container } from "@/components/layout";
 
 export default function ReceptionLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-[100dvh] bg-gray-50">
       <Navbar title="Qabulxona" items={[{ href: "/reception", label: "💰 Qabulxona" }]} />
-      <div className="max-w-5xl mx-auto px-4 py-6">{children}</div>
+      <Container size="xl" className="py-6">{children}</Container>
     </div>
   );
 }

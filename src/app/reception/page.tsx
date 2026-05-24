@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import TelegramChatButton from "@/components/shared/TelegramChatButton";
 import LocationButtons from "@/components/LocationButtons";
+import { Stack } from "@/components/layout";
 
 interface ReceptionAppointment {
   id: string;
@@ -105,7 +106,7 @@ export default function ReceptionPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <Stack direction="row" stackOnMobile justify="between" align="start" gap={4} className="mb-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">📋 Qabulxona — To'lov nazorati</h1>
           <p className="text-xs text-gray-400 mt-0.5">
@@ -113,10 +114,10 @@ export default function ReceptionPage() {
             <span className="ml-2 text-blue-400">(har 30s avtomatik)</span>
           </p>
         </div>
-        <button onClick={() => fetchData()} className="btn-secondary text-sm flex items-center gap-1.5">
+        <button onClick={() => fetchData()} className="btn-secondary text-sm flex items-center gap-1.5 min-h-[44px]">
           ↻ Yangilash
         </button>
-      </div>
+      </Stack>
 
       {/* Date + stats */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
@@ -277,14 +278,14 @@ function ReceptionCard({ appt, loading, section, onPaid, onUnpaid, onCancel }: C
             <button
               onClick={onPaid}
               disabled={loading}
-              className="flex-1 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
+              className="flex-1 px-3 py-2 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
             >
               {loading ? "..." : "💰 To'ladi"}
             </button>
             <button
               onClick={onCancel}
               disabled={loading}
-              className="px-3 py-2 bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 rounded-lg text-sm transition-colors"
+              className="px-3 py-2 min-h-[44px] bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 rounded-lg text-sm transition-colors"
             >
               Bekor
             </button>
@@ -294,7 +295,7 @@ function ReceptionCard({ appt, loading, section, onPaid, onUnpaid, onCancel }: C
           <button
             onClick={onUnpaid}
             disabled={loading}
-            className="px-3 py-2 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-700 rounded-lg text-sm transition-colors"
+            className="px-3 py-2 min-h-[44px] bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-700 rounded-lg text-sm transition-colors"
           >
             {loading ? "..." : "↩ To'lovni qaytarish"}
           </button>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import StatsButton from "@/components/StatsButton";
+import { Stack } from "@/components/layout";
 
 interface DoctorPatient {
   id: string;
@@ -105,7 +106,7 @@ export default function DoctorPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <Stack direction="row" stackOnMobile justify="between" align="start" gap={4} className="mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             {isToday ? "Bugungi navbat" : "Navbat ro'yxati"}
@@ -131,7 +132,7 @@ export default function DoctorPage() {
           <button onClick={() => fetchData()} className="btn-secondary text-sm">↻</button>
           <StatsButton />
         </div>
-      </div>
+      </Stack>
 
       {/* Sana tanlash */}
       <div className="flex items-center gap-2 mb-5">
@@ -274,7 +275,7 @@ function ServiceIslandCard({ island, date, actionLoading, onAttendance }: Island
     <div className="card overflow-hidden p-0">
       {/* Orolcha sarlavhasi */}
       <div className="bg-gradient-to-r from-indigo-50 to-blue-50 px-4 py-3 border-b border-gray-100">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="font-semibold text-gray-900">{island.serviceName}</h3>
             <p className="text-xs text-gray-500 mt-0.5">
@@ -286,13 +287,13 @@ function ServiceIslandCard({ island, date, actionLoading, onAttendance }: Island
           <div className="flex gap-1.5 flex-shrink-0">
             <button
               onClick={handlePrint}
-              className="px-2.5 py-1 bg-white border border-gray-200 hover:bg-gray-50 rounded text-xs font-medium"
+              className="px-2.5 py-2 min-h-[44px] bg-white border border-gray-200 hover:bg-gray-50 rounded text-xs font-medium"
             >
               🖨 Chop
             </button>
             <button
               onClick={handleDownloadPDF}
-              className="px-2.5 py-1 bg-white border border-gray-200 hover:bg-gray-50 rounded text-xs font-medium"
+              className="px-2.5 py-2 min-h-[44px] bg-white border border-gray-200 hover:bg-gray-50 rounded text-xs font-medium"
             >
               ⬇ PDF
             </button>
@@ -324,14 +325,14 @@ function ServiceIslandCard({ island, date, actionLoading, onAttendance }: Island
                   <button
                     onClick={() => onAttendance(p.id, "arrived")}
                     disabled={actionLoading === p.id}
-                    className="flex-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                    className="flex-1 px-3 py-1.5 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
                   >
                     {actionLoading === p.id ? "..." : "✅ Keldi"}
                   </button>
                   <button
                     onClick={() => onAttendance(p.id, "missed")}
                     disabled={actionLoading === p.id}
-                    className="flex-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 rounded-lg text-sm transition-colors"
+                    className="flex-1 px-3 py-1.5 min-h-[44px] bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 rounded-lg text-sm transition-colors"
                   >
                     {actionLoading === p.id ? "..." : "❌ Kelmadi"}
                   </button>
@@ -341,7 +342,7 @@ function ServiceIslandCard({ island, date, actionLoading, onAttendance }: Island
                 <button
                   onClick={() => onAttendance(p.id, "reset")}
                   disabled={actionLoading === p.id}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-600 rounded-lg text-xs transition-colors"
+                  className="px-3 py-1.5 min-h-[44px] bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-600 rounded-lg text-xs transition-colors"
                 >
                   {actionLoading === p.id ? "..." : "↩ Qaytarish"}
                 </button>
