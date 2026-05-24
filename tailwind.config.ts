@@ -8,6 +8,7 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Breakpoint standarti: xs <640 mobil | sm 640 | md 768 planshet | lg 1024 noutbuk | xl 1280 desktop | 2xl 1536 keng monitor
       colors: {
         primary: {
           50: "#eff6ff",

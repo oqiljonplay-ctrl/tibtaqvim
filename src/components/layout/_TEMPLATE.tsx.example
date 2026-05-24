@@ -1,0 +1,53 @@
+/**
+ * Yangi responsive sahifa yozish uchun namuna.
+ * Ushbu faylni ko'chirib, src/app/.../page.tsx ga joylashtiring.
+ */
+import { Container, Stack, ResponsiveGrid } from "@/components/layout";
+
+// Ma'lumot turi
+interface CardItem {
+  id: string;
+  title: string;
+  description: string;
+}
+
+// Kichik karta komponenti
+function ItemCard({ item }: { item: CardItem }) {
+  return (
+    <div className="card">
+      <h3 className="font-semibold text-gray-900">{item.title}</h3>
+      <p className="text-gray-600 text-sm mt-1">{item.description}</p>
+    </div>
+  );
+}
+
+// Asosiy sahifa
+export default function TemplatePage() {
+  const items: CardItem[] = [
+    { id: "1", title: "Element 1", description: "Tavsif 1" },
+    { id: "2", title: "Element 2", description: "Tavsif 2" },
+    { id: "3", title: "Element 3", description: "Tavsif 3" },
+  ];
+
+  return (
+    // 1. Container — sahifani markazlashtiradi va chekkalarni boshqaradi
+    <Container size="lg">
+      {/* 2. Stack — vertikal tartib, elementlar orasida bo'shliq */}
+      <Stack gap={6}>
+        {/* Sarlavha qismi */}
+        <Stack direction="row" justify="between" align="center" stackOnMobile>
+          <h1 className="text-2xl font-bold text-gray-900">Sahifa sarlavhasi</h1>
+          <button className="btn-primary">Yangi qo'shish</button>
+        </Stack>
+
+        {/* 3. ResponsiveGrid — kartalar panjara ko'rinishida */}
+        {/* Mobil: 1 ustun | sm (640px+): 2 ustun | lg (1024px+): 3 ustun */}
+        <ResponsiveGrid cols={{ base: 1, sm: 2, lg: 3 }} gap={4}>
+          {items.map((item) => (
+            <ItemCard key={item.id} item={item} />
+          ))}
+        </ResponsiveGrid>
+      </Stack>
+    </Container>
+  );
+}
