@@ -92,14 +92,14 @@ export default function ClinicListPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Klinikalar</h1>
           <p className="text-sm text-gray-500 mt-1">{clinics.length} ta klinika ro'yxatda</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 min-h-[44px] rounded-lg transition-colors"
         >
           <span className="text-base leading-none">+</span>
           Yangi klinika
@@ -182,104 +182,171 @@ export default function ClinicListPage() {
             Hali klinikalar yo'q. Birinchisini yarating!
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-5 py-3 font-medium text-gray-500">Klinika</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Modullar</th>
-                <th className="text-center px-4 py-3 font-medium text-gray-500">Filialar</th>
-                <th className="text-center px-4 py-3 font-medium text-gray-500">Shifokorlar</th>
-                <th className="text-center px-4 py-3 font-medium text-gray-500">Bronlar</th>
-                <th className="text-center px-4 py-3 font-medium text-gray-500">Holat</th>
-                <th className="text-right px-5 py-3 font-medium text-gray-500">Amallar</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-gray-100">
               {clinics.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <ClinicLogo src={c.logoUrl} name={c.name} size={44} />
-                      <div className="min-w-0">
-                        <Link
-                          href={`/admin/super/clinics/${c.id}`}
-                          className="font-medium text-gray-900 hover:text-indigo-600 transition-colors"
-                        >
-                          {c.name}
-                        </Link>
-                        {c.city && <div className="text-xs text-gray-400 mt-0.5">📍 {c.city}</div>}
-                        {c.phone && <div className="text-xs text-gray-400 mt-0.5">{c.phone}</div>}
-                        <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 font-medium ${
-                          c.subscriptionStatus === "active"   ? "bg-green-100 text-green-700"  :
-                          c.subscriptionStatus === "trial"    ? "bg-amber-100 text-amber-700"  :
-                          c.subscriptionStatus === "past_due" ? "bg-orange-100 text-orange-700" :
-                          "bg-red-100 text-red-700"
-                        }`}>
-                          {c.subscriptionPlan} / {c.subscriptionStatus}
-                        </span>
-                      </div>
+                <div key={c.id} className="p-4">
+                  <div className="flex items-start gap-3 mb-2">
+                    <ClinicLogo src={c.logoUrl} name={c.name} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/admin/super/clinics/${c.id}`} className="font-medium text-gray-900 hover:text-indigo-600 transition-colors">
+                        {c.name}
+                      </Link>
+                      {c.city && <div className="text-xs text-gray-400">📍 {c.city}</div>}
+                      {c.phone && <div className="text-xs text-gray-400">{c.phone}</div>}
+                      <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 font-medium ${
+                        c.subscriptionStatus === "active"   ? "bg-green-100 text-green-700"  :
+                        c.subscriptionStatus === "trial"    ? "bg-amber-100 text-amber-700"  :
+                        c.subscriptionStatus === "past_due" ? "bg-orange-100 text-orange-700" :
+                        "bg-red-100 text-red-700"
+                      }`}>
+                        {c.subscriptionPlan} / {c.subscriptionStatus}
+                      </span>
                     </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      <TogglePill on={c.settings?.enableBot ?? true} label="Bot" />
-                      <TogglePill on={c.settings?.enableWebapp ?? true} label="WebApp" />
-                      <TogglePill on={c.settings?.enableQueue ?? true} label="Navbat" />
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-center text-gray-700">{c._count.branches}</td>
-                  <td className="px-4 py-4 text-center text-gray-700">{c._count.doctors}</td>
-                  <td className="px-4 py-4 text-center text-gray-700">{c._count.appointments}</td>
-                  <td className="px-4 py-4 text-center">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${
-                        c.isActive
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${c.isActive ? "bg-green-500" : "bg-gray-400"}`}
-                      />
+                    <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${
+                      c.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${c.isActive ? "bg-green-500" : "bg-gray-400"}`} />
                       {c.isActive ? "Faol" : "Nofaol"}
                     </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={`/admin/super/clinics/${c.id}/edit`}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
-                      >
-                        Tahrirlash
-                      </Link>
-                      <Link
-                        href={`/admin/super/clinics/${c.id}`}
-                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
-                      >
-                        Sozla
-                      </Link>
-                      <button
-                        onClick={() => toggleActive(c.id, c)}
-                        className={`text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
+                  </div>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    <TogglePill on={c.settings?.enableBot ?? true} label="Bot" />
+                    <TogglePill on={c.settings?.enableWebapp ?? true} label="WebApp" />
+                    <TogglePill on={c.settings?.enableQueue ?? true} label="Navbat" />
+                  </div>
+                  <div className="flex gap-3 text-xs text-gray-500 mb-3">
+                    <span>🏢 {c._count.branches} filial</span>
+                    <span>👨‍⚕️ {c._count.doctors} shifokor</span>
+                    <span>📋 {c._count.appointments} bron</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/admin/super/clinics/${c.id}/edit`} className="flex-1 min-h-[44px] flex items-center justify-center text-sm font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors">
+                      Tahrirlash
+                    </Link>
+                    <Link href={`/admin/super/clinics/${c.id}`} className="flex-1 min-h-[44px] flex items-center justify-center text-sm font-medium bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors">
+                      Sozla
+                    </Link>
+                    <button
+                      onClick={() => toggleActive(c.id, c)}
+                      className={`flex-1 min-h-[44px] text-sm font-medium rounded-lg transition-colors ${
+                        c.isActive ? "bg-orange-50 text-orange-600 hover:bg-orange-100" : "bg-green-50 text-green-600 hover:bg-green-100"
+                      }`}
+                    >
+                      {c.isActive ? "To'xtat" : "Yoq"}
+                    </button>
+                    <button
+                      onClick={() => deleteClinic(c.id, c.name)}
+                      className="flex-1 min-h-[44px] text-sm font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      O'chir
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <table className="w-full text-sm hidden md:table">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">Klinika</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">Modullar</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500">Filialar</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500">Shifokorlar</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500">Bronlar</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500">Holat</th>
+                  <th className="text-right px-5 py-3 font-medium text-gray-500">Amallar</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {clinics.map((c) => (
+                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <ClinicLogo src={c.logoUrl} name={c.name} size={44} />
+                        <div className="min-w-0">
+                          <Link
+                            href={`/admin/super/clinics/${c.id}`}
+                            className="font-medium text-gray-900 hover:text-indigo-600 transition-colors"
+                          >
+                            {c.name}
+                          </Link>
+                          {c.city && <div className="text-xs text-gray-400 mt-0.5">📍 {c.city}</div>}
+                          {c.phone && <div className="text-xs text-gray-400 mt-0.5">{c.phone}</div>}
+                          <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 font-medium ${
+                            c.subscriptionStatus === "active"   ? "bg-green-100 text-green-700"  :
+                            c.subscriptionStatus === "trial"    ? "bg-amber-100 text-amber-700"  :
+                            c.subscriptionStatus === "past_due" ? "bg-orange-100 text-orange-700" :
+                            "bg-red-100 text-red-700"
+                          }`}>
+                            {c.subscriptionPlan} / {c.subscriptionStatus}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        <TogglePill on={c.settings?.enableBot ?? true} label="Bot" />
+                        <TogglePill on={c.settings?.enableWebapp ?? true} label="WebApp" />
+                        <TogglePill on={c.settings?.enableQueue ?? true} label="Navbat" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-center text-gray-700">{c._count.branches}</td>
+                    <td className="px-4 py-4 text-center text-gray-700">{c._count.doctors}</td>
+                    <td className="px-4 py-4 text-center text-gray-700">{c._count.appointments}</td>
+                    <td className="px-4 py-4 text-center">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${
                           c.isActive
-                            ? "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
-                            : "text-green-600 hover:text-green-800 hover:bg-green-50"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500"
                         }`}
                       >
-                        {c.isActive ? "To'xtat" : "Yoq"}
-                      </button>
-                      <button
-                        onClick={() => deleteClinic(c.id, c.name)}
-                        className="text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        O'chir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${c.isActive ? "bg-green-500" : "bg-gray-400"}`}
+                        />
+                        {c.isActive ? "Faol" : "Nofaol"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/admin/super/clinics/${c.id}/edit`}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          Tahrirlash
+                        </Link>
+                        <Link
+                          href={`/admin/super/clinics/${c.id}`}
+                          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                        >
+                          Sozla
+                        </Link>
+                        <button
+                          onClick={() => toggleActive(c.id, c)}
+                          className={`text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
+                            c.isActive
+                              ? "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                              : "text-green-600 hover:text-green-800 hover:bg-green-50"
+                          }`}
+                        >
+                          {c.isActive ? "To'xtat" : "Yoq"}
+                        </button>
+                        <button
+                          onClick={() => deleteClinic(c.id, c.name)}
+                          className="text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          O'chir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
     </div>

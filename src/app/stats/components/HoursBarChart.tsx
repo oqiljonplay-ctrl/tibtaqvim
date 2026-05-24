@@ -21,7 +21,7 @@ interface Props {
 
 export default function HoursBarChart({ data }: Props) {
   return (
-    <ResponsiveContainer width="100%" height={240}>
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
         <XAxis

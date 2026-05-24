@@ -10,6 +10,7 @@ interface Props {
   empty?: boolean;
   emptyMessage?: string;
   fullWidth?: boolean;
+  dynamicHeight?: boolean;
 }
 
 export default function ChartCard({
@@ -21,6 +22,7 @@ export default function ChartCard({
   empty = false,
   emptyMessage = "Ma'lumot yo'q",
   fullWidth = false,
+  dynamicHeight = false,
 }: Props) {
   return (
     <div
@@ -40,7 +42,11 @@ export default function ChartCard({
         </div>
       </div>
 
-      <div className="relative" style={{ minHeight: 240 }}>
+      <div
+        className={`relative ${
+          dynamicHeight ? "min-h-[240px]" : "h-[240px] sm:h-[300px]"
+        }`}
+      >
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm rounded-lg z-10">
             <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -48,7 +54,7 @@ export default function ChartCard({
         )}
 
         {empty && !loading ? (
-          <div className="flex items-center justify-center h-60 text-sm text-gray-400">
+          <div className="flex items-center justify-center h-full text-sm text-gray-400">
             {emptyMessage}
           </div>
         ) : (

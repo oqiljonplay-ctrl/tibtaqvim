@@ -56,7 +56,7 @@ export default function DonutChart({ data }: Props) {
   const total = data.reduce((sum, d) => sum + d.value, 0);
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height="100%">
       <PieChart>
         <Pie
           data={data}

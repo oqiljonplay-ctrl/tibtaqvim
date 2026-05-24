@@ -153,6 +153,7 @@ export default function ChartsSection() {
           empty={hasData && data.doctors.length === 0}
           emptyMessage="Bu davrda shifokorlarga bron yo'q"
           fullWidth
+          dynamicHeight
         >
           {data && <DoctorsBarChart data={data.doctors} />}
         </ChartCard>

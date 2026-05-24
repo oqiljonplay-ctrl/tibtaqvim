@@ -86,7 +86,7 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <StatsButton />
       </div>
@@ -105,50 +105,83 @@ export default function AdminDashboard() {
         {stats.recentAppointments.length === 0 ? (
           <p className="text-gray-400 text-sm">Bugun hali qayd yo'q</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 font-medium text-gray-500">Sana</th>
-                  <th className="text-left py-2 font-medium text-gray-500">Bemor</th>
-                  <th className="text-left py-2 font-medium text-gray-500">Xizmat</th>
-                  <th className="text-left py-2 font-medium text-gray-500">Shifokor</th>
-                  <th className="text-left py-2 font-medium text-gray-500">№</th>
-                  <th className="text-left py-2 font-medium text-gray-500">Holat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recentAppointments.map((a) => (
-                  <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-2 text-xs text-gray-500 whitespace-nowrap">
-                      {new Date(a.createdAt).toLocaleDateString("uz-UZ", { day: "numeric", month: "short" })}
-                    </td>
-                    <td className="py-2">
-                      <div>{a.patientName}</div>
-                      <div className="text-xs text-gray-400">{a.patientPhone}</div>
-                      <TelegramChatButton
-                        telegramId={a.user?.telegramId}
-                        patientName={a.patientName}
-                        appointmentId={a.id}
-                        phone={a.patientPhone}
-                        variant="compact"
-                      />
-                    </td>
-                    <td className="py-2 text-gray-700">{a.service.name}</td>
-                    <td className="py-2 text-gray-700">
-                      {a.doctor ? `${a.doctor.firstName} ${a.doctor.lastName}` : "—"}
-                    </td>
-                    <td className="py-2 text-gray-700">{a.queueNumber ?? "—"}</td>
-                    <td className="py-2">
-                      <span className={statusColors[a.status]}>
-                        {statusLabels[a.status] ?? a.status}
-                      </span>
-                    </td>
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden -mx-1 space-y-2">
+              {stats.recentAppointments.map((a) => (
+                <div key={a.id} className="border border-gray-100 rounded-xl p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="font-medium text-gray-900 text-sm">{a.patientName}</div>
+                    <span className={`${statusColors[a.status]} flex-shrink-0`}>
+                      {statusLabels[a.status] ?? a.status}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400 mb-1">{a.patientPhone}</div>
+                  <TelegramChatButton
+                    telegramId={a.user?.telegramId}
+                    patientName={a.patientName}
+                    appointmentId={a.id}
+                    phone={a.patientPhone}
+                    variant="compact"
+                  />
+                  <div className="text-xs text-gray-600 mt-1.5">
+                    🏷 {a.service.name}
+                    {a.doctor && <span> · 👨‍⚕️ {a.doctor.firstName} {a.doctor.lastName}</span>}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {new Date(a.createdAt).toLocaleDateString("uz-UZ", { day: "numeric", month: "short" })}
+                    {a.queueNumber != null && ` · №${a.queueNumber}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-2 font-medium text-gray-500">Sana</th>
+                    <th className="text-left py-2 font-medium text-gray-500">Bemor</th>
+                    <th className="text-left py-2 font-medium text-gray-500">Xizmat</th>
+                    <th className="text-left py-2 font-medium text-gray-500">Shifokor</th>
+                    <th className="text-left py-2 font-medium text-gray-500">№</th>
+                    <th className="text-left py-2 font-medium text-gray-500">Holat</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {stats.recentAppointments.map((a) => (
+                    <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="py-2 text-xs text-gray-500 whitespace-nowrap">
+                        {new Date(a.createdAt).toLocaleDateString("uz-UZ", { day: "numeric", month: "short" })}
+                      </td>
+                      <td className="py-2">
+                        <div>{a.patientName}</div>
+                        <div className="text-xs text-gray-400">{a.patientPhone}</div>
+                        <TelegramChatButton
+                          telegramId={a.user?.telegramId}
+                          patientName={a.patientName}
+                          appointmentId={a.id}
+                          phone={a.patientPhone}
+                          variant="compact"
+                        />
+                      </td>
+                      <td className="py-2 text-gray-700">{a.service.name}</td>
+                      <td className="py-2 text-gray-700">
+                        {a.doctor ? `${a.doctor.firstName} ${a.doctor.lastName}` : "—"}
+                      </td>
+                      <td className="py-2 text-gray-700">{a.queueNumber ?? "—"}</td>
+                      <td className="py-2">
+                        <span className={statusColors[a.status]}>
+                          {statusLabels[a.status] ?? a.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

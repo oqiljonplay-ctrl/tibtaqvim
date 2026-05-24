@@ -163,9 +163,9 @@ export default function AdminServicesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Xizmatlar</h1>
-        <button onClick={openNew} className="btn-primary">+ Yangi xizmat</button>
+        <button onClick={openNew} className="btn-primary min-h-[44px]">+ Yangi xizmat</button>
       </div>
 
       {showForm && (
@@ -270,69 +270,127 @@ export default function AdminServicesPage() {
       {loading ? (
         <div className="text-gray-400 text-sm text-center py-12">Yuklanmoqda...</div>
       ) : (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left py-2 font-medium text-gray-500">Xizmat</th>
-                <th className="text-left py-2 font-medium text-gray-500">Turi</th>
-                <th className="text-left py-2 font-medium text-gray-500">Narxi</th>
-                <th className="text-left py-2 font-medium text-gray-500">Shifokorlar</th>
-                <th className="text-left py-2 font-medium text-gray-500">Kunlik limit</th>
-                <th className="text-left py-2 font-medium text-gray-500">Xususiyatlar</th>
-                <th className="text-left py-2 font-medium text-gray-500">Amal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {services.map((s) => (
-                <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="py-2 font-medium">{s.name}</td>
-                  <td className="py-2">
-                    <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">
-                      {typeLabels[s.type] ?? s.type}
-                    </span>
-                  </td>
-                  <td className="py-2 whitespace-nowrap">{s.price.toLocaleString()} so&apos;m</td>
-                  <td className="py-2">
-                    {s.doctors.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {s.doctors.slice(0, 2).map((d) => (
-                          <span key={d.id} className="text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
-                            {d.lastName} {d.firstName[0]}.
-                          </span>
-                        ))}
-                        {s.doctors.length > 2 && (
-                          <span className="text-xs text-gray-400">+{s.doctors.length - 2}</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
+        <div className="card">
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {services.map((s) => (
+              <div key={s.id} className="border border-gray-100 rounded-xl p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="font-medium text-gray-900">{s.name}</div>
+                  <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
+                    {typeLabels[s.type] ?? s.type}
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-blue-600 mb-2">{s.price.toLocaleString()} so&apos;m</div>
+                {s.doctors.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {s.doctors.slice(0, 2).map((d) => (
+                      <span key={d.id} className="text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
+                        {d.lastName} {d.firstName[0]}.
+                      </span>
+                    ))}
+                    {s.doctors.length > 2 && (
+                      <span className="text-xs text-gray-400">+{s.doctors.length - 2}</span>
                     )}
-                  </td>
-                  <td className="py-2">
-                    <input
-                      type="number"
-                      className="input w-20 text-center"
-                      defaultValue={s.dailyLimit ?? ""}
-                      placeholder="∞"
-                      onBlur={(e) => updateLimit(s.id, e.target.value)}
-                    />
-                  </td>
-                  <td className="py-2">
-                    <div className="flex gap-1 flex-wrap">
-                      {/* TODO: Bosqich 2 - slot tizimi yoqilganda qaytariladi: {s.requiresSlot && <span>Uyacha</span>} */}
-                      {s.requiresAddress && <span className="bg-orange-50 text-orange-700 text-xs px-2 py-0.5 rounded">Manzil</span>}
-                      {s.requiresPrePayment && <span className="bg-yellow-50 text-yellow-700 text-xs px-2 py-0.5 rounded">Oldindan to&apos;lov</span>}
-                    </div>
-                  </td>
-                  <td className="py-2">
-                    <button onClick={() => startEdit(s)} className="text-blue-600 hover:underline text-xs mr-3">Tahrirlash</button>
-                    <button onClick={() => handleDeleteService(s)} className="text-red-600 hover:text-red-700 text-xs font-medium">O&apos;chirish</button>
-                  </td>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-gray-500">Kunlik limit:</span>
+                  <input
+                    type="number"
+                    className="input w-20 text-center"
+                    defaultValue={s.dailyLimit ?? ""}
+                    placeholder="∞"
+                    onBlur={(e) => updateLimit(s.id, e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-1 flex-wrap mb-3">
+                  {s.requiresAddress && <span className="bg-orange-50 text-orange-700 text-xs px-2 py-0.5 rounded">Manzil</span>}
+                  {s.requiresPrePayment && <span className="bg-yellow-50 text-yellow-700 text-xs px-2 py-0.5 rounded">Oldindan to&apos;lov</span>}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => startEdit(s)}
+                    className="flex-1 min-h-[44px] text-sm font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    Tahrirlash
+                  </button>
+                  <button
+                    onClick={() => handleDeleteService(s)}
+                    className="flex-1 min-h-[44px] text-sm font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    O&apos;chirish
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-2 font-medium text-gray-500">Xizmat</th>
+                  <th className="text-left py-2 font-medium text-gray-500">Turi</th>
+                  <th className="text-left py-2 font-medium text-gray-500">Narxi</th>
+                  <th className="text-left py-2 font-medium text-gray-500">Shifokorlar</th>
+                  <th className="text-left py-2 font-medium text-gray-500">Kunlik limit</th>
+                  <th className="text-left py-2 font-medium text-gray-500">Xususiyatlar</th>
+                  <th className="text-left py-2 font-medium text-gray-500">Amal</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {services.map((s) => (
+                  <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="py-2 font-medium">{s.name}</td>
+                    <td className="py-2">
+                      <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">
+                        {typeLabels[s.type] ?? s.type}
+                      </span>
+                    </td>
+                    <td className="py-2 whitespace-nowrap">{s.price.toLocaleString()} so&apos;m</td>
+                    <td className="py-2">
+                      {s.doctors.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {s.doctors.slice(0, 2).map((d) => (
+                            <span key={d.id} className="text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
+                              {d.lastName} {d.firstName[0]}.
+                            </span>
+                          ))}
+                          {s.doctors.length > 2 && (
+                            <span className="text-xs text-gray-400">+{s.doctors.length - 2}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="py-2">
+                      <input
+                        type="number"
+                        className="input w-20 text-center"
+                        defaultValue={s.dailyLimit ?? ""}
+                        placeholder="∞"
+                        onBlur={(e) => updateLimit(s.id, e.target.value)}
+                      />
+                    </td>
+                    <td className="py-2">
+                      <div className="flex gap-1 flex-wrap">
+                        {/* TODO: Bosqich 2 - slot tizimi yoqilganda qaytariladi: {s.requiresSlot && <span>Uyacha</span>} */}
+                        {s.requiresAddress && <span className="bg-orange-50 text-orange-700 text-xs px-2 py-0.5 rounded">Manzil</span>}
+                        {s.requiresPrePayment && <span className="bg-yellow-50 text-yellow-700 text-xs px-2 py-0.5 rounded">Oldindan to&apos;lov</span>}
+                      </div>
+                    </td>
+                    <td className="py-2">
+                      <button onClick={() => startEdit(s)} className="text-blue-600 hover:underline text-xs mr-3">Tahrirlash</button>
+                      <button onClick={() => handleDeleteService(s)} className="text-red-600 hover:text-red-700 text-xs font-medium">O&apos;chirish</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

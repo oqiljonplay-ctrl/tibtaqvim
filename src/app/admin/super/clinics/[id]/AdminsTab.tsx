@@ -48,14 +48,14 @@ export function AdminsTab({ clinicId }: { clinicId: string }) {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Adminlar ({admins.length})</h2>
           <p className="text-sm text-gray-500">Klinikani boshqaradigan foydalanuvchilar</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+          className="px-4 py-2 min-h-[44px] bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
         >
           + Admin qo&apos;shish
         </button>
@@ -69,7 +69,48 @@ export function AdminsTab({ clinicId }: { clinicId: string }) {
         </div>
       ) : (
         <div className="border border-gray-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {admins.map((admin) => (
+              <div key={admin.id} className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div>
+                    <div className="font-mono text-xs text-gray-700 font-medium">{admin.username}</div>
+                    <div className="text-sm text-gray-900">{admin.firstName} {admin.lastName ?? ""}</div>
+                    <div className="text-xs text-gray-400">{admin.phone ?? "—"}</div>
+                  </div>
+                  {admin.isActive ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium flex-shrink-0">Faol</span>
+                  ) : (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full font-medium flex-shrink-0">Nofaol</span>
+                  )}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => setResetTarget(admin)}
+                    className="flex-1 min-h-[44px] text-sm font-medium bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors"
+                  >
+                    Parol
+                  </button>
+                  <button
+                    onClick={() => handleToggleActive(admin)}
+                    className="flex-1 min-h-[44px] text-sm font-medium bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    {admin.isActive ? "O'chirish" : "Yoqish"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(admin)}
+                    className="flex-1 min-h-[44px] text-sm font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    O&apos;chir
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <table className="w-full text-sm hidden md:table">
             <thead className="bg-gray-50 text-left text-gray-600">
               <tr>
                 <th className="px-4 py-3 font-medium">Login</th>
