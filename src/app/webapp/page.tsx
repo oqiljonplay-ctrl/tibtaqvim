@@ -584,7 +584,7 @@ export default function WebApp() {
           }
         </div>
 
-        <div className="flex-1 -mt-3 pb-24">
+        <div className="flex-1 -mt-3 pb-[calc(96px+env(safe-area-inset-bottom))]">
           <Stack gap={4}>
 
           {/* Clinic switcher */}
@@ -747,7 +747,7 @@ export default function WebApp() {
         </div>
 
         {/* Sticky bottom bar */}
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 pb-5 pt-3 bg-gray-50 border-t border-gray-100">
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 bg-gray-50 border-t border-gray-100">
           <div className="flex gap-2">
             <button
               onClick={() => {
