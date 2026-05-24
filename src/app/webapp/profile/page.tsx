@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Container, Stack } from "@/components/layout";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
 
@@ -121,14 +122,14 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm px-4 py-3 sticky top-0 z-10 flex items-center gap-3">
+    <Container size="sm" className="min-h-[100dvh] bg-gray-50">
+      <div className="bg-white shadow-sm py-3 sticky top-0 z-10 flex items-center gap-3">
         <button onClick={() => router.back()} className="text-blue-600 text-sm">←</button>
         <h1 className="text-lg font-bold flex-1">Mening profilim</h1>
         {profile.tibId && <span className="text-xs font-mono bg-blue-50 text-blue-600 px-2 py-1 rounded">{profile.tibId}</span>}
       </div>
 
-      <div className="p-4 space-y-4">
+      <Stack gap={4} className="py-4">
         {err && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2">
             <span className="text-red-500">⚠️</span>
@@ -226,7 +227,7 @@ export default function ProfilePage() {
             </button>
           )}
         </div>
-      </div>
-    </div>
+      </Stack>
+    </Container>
   );
 }

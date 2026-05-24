@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useClinic, type Clinic } from '@/lib/clinic-context'
 import { ClinicLogo } from '@/components/ClinicLogo'
+import { Container, ResponsiveGrid } from '@/components/layout'
 
 type ClinicListItem = Clinic & {
   description?: string | null
@@ -59,21 +60,21 @@ export default function SelectClinicPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-blue-600 text-white px-4 pt-5 pb-6">
+    <Container size="sm" className="min-h-[100dvh] bg-gray-50">
+      <div className="bg-blue-600 text-white pt-5 pb-6">
         <h1 className="font-bold text-xl">🏥 Klinikani tanlang</h1>
         <p className="text-blue-200 text-sm mt-0.5">
           Davolanmoqchi bo'lgan klinikani tanlang
         </p>
       </div>
 
-      <div className="max-w-md mx-auto p-4 space-y-3">
+      <div className="py-4 space-y-3">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Klinika nomi yoki shahar..."
-          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[44px]"
         />
 
         {loading ? (
@@ -97,7 +98,7 @@ export default function SelectClinicPage() {
         ) : (
           <>
             <p className="text-xs text-gray-400">{clinics.length} ta klinika</p>
-            <div className="space-y-3">
+            <ResponsiveGrid cols={{ base: 1, sm: 2 }} gap={3}>
               {clinics.map((c) => (
                 <button
                   key={c.id}
@@ -142,10 +143,10 @@ export default function SelectClinicPage() {
                   )}
                 </button>
               ))}
-            </div>
+            </ResponsiveGrid>
           </>
         )}
       </div>
-    </div>
+    </Container>
   )
 }

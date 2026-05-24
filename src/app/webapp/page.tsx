@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/Calendar";
+import { Container, Stack } from "@/components/layout";
 import { formatDateLabel } from "@/lib/calendar";
 import { useClinic } from "@/lib/clinic-context";
 import { ClinicSwitcher } from "@/components/webapp/ClinicSwitcher";
@@ -544,7 +545,7 @@ export default function WebApp() {
 
   if (appMode === "loading") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3">🏥</div>
           <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
@@ -561,9 +562,9 @@ export default function WebApp() {
     const historyAppts = appointments.filter((a) => !isFuture(a.date) || a.status === "cancelled" || a.status === "arrived" || a.status === "missed");
 
     return (
-      <div className="min-h-screen bg-gray-50 max-w-md mx-auto flex flex-col">
+      <Container size="sm" className="min-h-[100dvh] bg-gray-50 flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white px-4 pt-5 pb-7">
+        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-blue-200 text-xs mb-0.5">{headerDate}</p>
@@ -583,7 +584,8 @@ export default function WebApp() {
           }
         </div>
 
-        <div className="flex-1 px-4 -mt-3 pb-24 space-y-4">
+        <div className="flex-1 -mt-3 pb-24">
+          <Stack gap={4}>
 
           {/* Clinic switcher */}
           {activeClinic && (
@@ -741,10 +743,11 @@ export default function WebApp() {
               <p className="text-gray-400 text-xs mt-1">Bot orqali yangi bron qiling</p>
             </div>
           )}
+          </Stack>
         </div>
 
         {/* Sticky bottom bar */}
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pb-5 pt-3 bg-gray-50 border-t border-gray-100">
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 pb-5 pt-3 bg-gray-50 border-t border-gray-100">
           <div className="flex gap-2">
             <button
               onClick={() => {
@@ -774,7 +777,7 @@ export default function WebApp() {
             </button>
           </div>
         </div>
-      </div>
+      </Container>
     );
   }
 
@@ -787,9 +790,9 @@ export default function WebApp() {
     step === "slots" ? 55 : 35;
 
   return (
-    <div className="min-h-screen bg-gray-50 max-w-md mx-auto flex flex-col">
+    <Container size="sm" className="min-h-[100dvh] bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="bg-blue-600 text-white px-4 pt-4 pb-6">
+      <div className="bg-blue-600 text-white pt-4 pb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Back to dashboard for any Telegram user */}
@@ -820,7 +823,7 @@ export default function WebApp() {
         )}
       </div>
 
-      <div className="flex-1 p-4">
+      <div className="flex-1 pt-4 pb-4">
 
         {/* Error */}
         {errorMsg && (
@@ -1140,7 +1143,7 @@ export default function WebApp() {
         )}
 
       </div>
-    </div>
+    </Container>
   );
 }
 

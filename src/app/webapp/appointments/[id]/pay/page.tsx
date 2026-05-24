@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Container, Stack } from "@/components/layout";
 
 interface AppointmentInfo {
   id: string;
@@ -81,23 +82,26 @@ export default function PayPage() {
 
   if (info.paymentStatus === "paid") {
     return (
-      <div className="p-4 space-y-4">
-        <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl text-center">
-          <div className="text-2xl mb-2">✅</div>
-          <p className="font-medium">To&apos;lov amalga oshirilgan</p>
-        </div>
-        <a
-          href="/webapp"
-          className="block text-center text-cyan-600 underline text-sm"
-        >
-          Bosh sahifaga qaytish
-        </a>
-      </div>
+      <Container size="sm" className="py-4">
+        <Stack gap={4}>
+          <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl text-center">
+            <div className="text-2xl mb-2">✅</div>
+            <p className="font-medium">To&apos;lov amalga oshirilgan</p>
+          </div>
+          <a
+            href="/webapp"
+            className="block text-center text-cyan-600 underline text-sm"
+          >
+            Bosh sahifaga qaytish
+          </a>
+        </Stack>
+      </Container>
     );
   }
 
   return (
-    <div className="p-4 space-y-4 pb-8">
+    <Container size="sm" className="py-4 pb-8">
+      <Stack gap={4}>
       {/* Appointment info */}
       <div className="bg-gray-50 p-4 rounded-xl space-y-2">
         <div className="text-xs text-gray-500">Xizmat</div>
@@ -165,6 +169,7 @@ export default function PayPage() {
       <p className="text-xs text-gray-400 text-center pt-2">
         To&apos;lovdan keyin avtomatik bu sahifaga qaytasiz
       </p>
-    </div>
+      </Stack>
+    </Container>
   );
 }

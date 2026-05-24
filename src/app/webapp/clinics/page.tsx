@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { Container, ResponsiveGrid } from "@/components/layout";
 
 interface ClinicItem {
   id: string;
@@ -46,19 +47,19 @@ export default function ClinicsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 max-w-md mx-auto">
-      <div className="bg-blue-600 text-white px-4 pt-5 pb-6">
+    <Container size="sm" className="min-h-[100dvh] bg-gray-50">
+      <div className="bg-blue-600 text-white pt-5 pb-6">
         <h1 className="font-bold text-xl">🏥 TibTaqvim</h1>
         <p className="text-blue-200 text-sm mt-0.5">Klinikani tanlang</p>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="py-4 space-y-3">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Klinika qidirish..."
-          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[44px]"
         />
 
         {loading ? (
@@ -66,8 +67,9 @@ export default function ClinicsPage() {
         ) : clinics.length === 0 ? (
           <div className="text-center py-12 text-gray-400 text-sm">Klinikalar topilmadi</div>
         ) : (
-          <div className="space-y-3">
+          <>
             <p className="text-xs text-gray-400">{clinics.length} ta klinika</p>
+            <ResponsiveGrid cols={{ base: 1, sm: 2 }} gap={3}>
             {clinics.map((c) => (
               <button
                 key={c.id}
@@ -109,9 +111,10 @@ export default function ClinicsPage() {
                 </div>
               </button>
             ))}
-          </div>
+            </ResponsiveGrid>
+          </>
         )}
       </div>
-    </div>
+    </Container>
   );
 }

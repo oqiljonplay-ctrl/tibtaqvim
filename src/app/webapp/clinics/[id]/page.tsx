@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { Container } from "@/components/layout";
 
 interface BranchItem {
   id: string;
@@ -65,7 +66,7 @@ export default function ClinicDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
         <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
       </div>
     );
@@ -73,7 +74,7 @@ export default function ClinicDetailPage() {
 
   if (!clinic) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center flex-col gap-3">
+      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center flex-col gap-3">
         <p className="text-gray-500">Klinika topilmadi</p>
         <Link href="/webapp/clinics" className="text-blue-600 text-sm">← Orqaga</Link>
       </div>
@@ -83,15 +84,15 @@ export default function ClinicDetailPage() {
   // 1 ta filial bo'lsa redirecting ko'rsatamiz
   if (clinic.branches.length === 1) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
         <p className="text-gray-400 text-sm animate-pulse">Yo&apos;naltirilmoqda...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 max-w-md mx-auto">
-      <div className="bg-blue-600 text-white px-4 pt-5 pb-6">
+    <Container size="sm" className="min-h-[100dvh] bg-gray-50">
+      <div className="bg-blue-600 text-white pt-5 pb-6">
         <Link href="/webapp/clinics" className="text-blue-200 text-sm mb-2 block">← Klinikalar</Link>
         <h1 className="font-bold text-xl">{clinic.name}</h1>
         {clinic.workingHours && (
@@ -99,7 +100,7 @@ export default function ClinicDetailPage() {
         )}
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="py-4 space-y-3">
         {clinic.description && (
           <div className="bg-white rounded-xl p-4 shadow-sm text-sm text-gray-700">
             {clinic.description}
@@ -132,6 +133,6 @@ export default function ClinicDetailPage() {
           </button>
         ))}
       </div>
-    </div>
+    </Container>
   );
 }

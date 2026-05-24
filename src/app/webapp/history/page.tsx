@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useClinic } from '@/lib/clinic-context'
 import { AppointmentCard, type HistoryAppointment } from '@/components/webapp/AppointmentCard'
 import { HistoryFilters, type FilterState } from './HistoryFilters'
+import { Container, ResponsiveGrid } from '@/components/layout'
 
 type Scope = 'current' | 'all'
 
@@ -109,7 +110,7 @@ export default function HistoryPage() {
 
   if (!clinic) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
         <div className="text-center p-6 text-gray-500">
           <div className="text-3xl mb-2">🏥</div>
           <p>Klinika tanlanmagan</p>
@@ -119,8 +120,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="max-w-md mx-auto p-4">
+    <Container size="sm" className="min-h-[100dvh] bg-gray-50 pb-24 py-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <button
@@ -188,7 +188,7 @@ export default function HistoryPage() {
           </div>
         ) : (
           <>
-            <div className="space-y-3">
+            <ResponsiveGrid cols={{ base: 1, sm: 2 }} gap={3}>
               {appointments.map((a) => (
                 <AppointmentCard
                   key={a.id}
@@ -196,7 +196,7 @@ export default function HistoryPage() {
                   showClinic={scope === 'all'}
                 />
               ))}
-            </div>
+            </ResponsiveGrid>
 
             {nextCursor && (
               <button
@@ -209,8 +209,7 @@ export default function HistoryPage() {
             )}
           </>
         )}
-      </div>
-    </div>
+      </Container>
   )
 }
 
