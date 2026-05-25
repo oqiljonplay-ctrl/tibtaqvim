@@ -10,19 +10,15 @@ interface NavItem {
   label: string;
 }
 
-function getRoleNavItems(role: string): NavItem[] {
-  const reception: NavItem = { href: "/reception", label: "💰 Qabulxona" };
-  const doctor: NavItem    = { href: "/doctor",    label: "👨‍⚕️ Navbat" };
-  const admin: NavItem     = { href: "/admin",     label: "📊 Boshqaruv" };
-  const superA: NavItem    = { href: "/admin/super", label: "👑 SuperAdmin" };
-
+function getRoleExtraItems(role: string): NavItem[] {
+  const reception: NavItem = { href: "/reception", label: "Qabulxona" };
+  const doctor: NavItem    = { href: "/doctor",    label: "Navbat" };
   switch (role) {
-    case "receptionist":  return [reception];
-    case "doctor":        return [doctor];
-    case "clinic_admin":  return [admin, reception, doctor];
-    case "branch_admin":  return [admin, reception, doctor];
-    case "super_admin":   return [superA, admin, reception, doctor];
-    default:              return [];
+    case "clinic_admin":
+    case "branch_admin":
+      return [reception, doctor];
+    default:
+      return [];
   }
 }
 
@@ -49,7 +45,11 @@ export default function Navbar({ items, title }: { items: NavItem[]; title: stri
 
   const roleMeta = user ? getRoleMeta(user.role) : null;
   // Rol bo'yicha dinamik navlar; user yuklanmaguncha layout items'ni ko'rsat
-  const navItems: NavItem[] = user ? getRoleNavItems(user.role) : items;
+  const navItems: NavItem[] = (user && items.length > 0)
+    ? [...items, ...getRoleExtraItems(user.role).filter(
+        (extra) => !items.some((it) => it.href === extra.href)
+      )]
+    : items;
   const clinicLabel =
     !user ? title
     : user.role === "super_admin" ? "Barcha klinikalar"
@@ -178,6 +178,16 @@ export default function Navbar({ items, title }: { items: NavItem[]; title: stri
                       </>
                     )}
                   </div>
+
+                  {/* Profil havolasi */}
+                  <Link
+                    href="/profile"
+                    onClick={() => setMenuOpen(false)}
+                    className="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
+                  >
+                    <span>👤</span>
+                    <span>Profilim</span>
+                  </Link>
 
                   {/* Chiqish */}
                   <button
