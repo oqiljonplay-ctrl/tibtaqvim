@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { comparePassword, signToken } from "@/lib/auth";
+
 import { error, unauthorized } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
 import { normalizePhone } from "@/lib/utils/phone";
@@ -43,7 +44,30 @@ export async function POST(req: NextRequest) {
     }
 
     const valid = await comparePassword(password, user.passwordHash);
-    if (!valid) return unauthorized("Invalid credentials");
+    if (!valid) {
+      try {
+        await prisma.auditLog.create({
+          data: {
+            actorId: user.id,
+            action: "auth.login_failed",
+            payload: { role: user.role },
+            clinicId: user.clinicId,
+          },
+        });
+      } catch {}
+      return unauthorized("Invalid credentials");
+    }
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "auth.login",
+          payload: { role: user.role, clinicId: user.clinicId ?? null },
+          clinicId: user.clinicId,
+        },
+      });
+    } catch {}
 
     const token = signToken({
       userId: user.id,

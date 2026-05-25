@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { processBooking } from "@/lib/services/booking.service";
 import { validateBookingInput } from "@/lib/validators/booking";
 import { ok, error } from "@/lib/api-response";
@@ -32,6 +33,23 @@ export async function POST(req: NextRequest) {
     }
 
     logger.info("POST /api/book success", { reqId, appointmentId: result.data.id, tibId: result.tibId });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: result.data.userId ?? "booking-api",
+          action: "appointment.create",
+          payload: {
+            appointmentId: result.data.id,
+            serviceId: result.data.serviceId,
+            clinicId: result.data.clinicId,
+            queueMode: result.data.queueMode,
+          },
+          clinicId: result.data.clinicId,
+        },
+      });
+    } catch {}
+
     return ok({ ...result.data, tibId: result.tibId ?? null }, 201);
   } catch (err) {
     logger.error("POST /api/book error", { reqId, error: String(err) });

@@ -90,6 +90,23 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: auth.userId,
+          action: "patient.update",
+          payload: {
+            patientId: auth.userId,
+            changedFields: [
+              "firstName",
+              ...(lastName !== undefined ? ["lastName"] : []),
+            ],
+          },
+          clinicId: auth.clinicId ?? null,
+        },
+      });
+    } catch {}
+
     return ok(updated);
   } catch (err) {
     console.error("[PATCH /api/me] error:", err);

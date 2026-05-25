@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { ok, error } from "@/lib/api-response";
+import { prisma } from "@/lib/prisma";
 import { markAsPaid, markAsUnpaid, cancelAppointment } from "@/lib/workflow/appointment-workflow";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +33,30 @@ export async function PATCH(
       case "unpaid":
         result = await markAsUnpaid(params.id, actorClinicId);
         break;
-      case "cancel":
+      case "cancel": {
+        const prev = await prisma.appointment.findUnique({
+          where: { id: params.id },
+          select: { status: true, clinicId: true },
+        });
         result = await cancelAppointment(params.id, actorClinicId);
+        if (result.success) {
+          try {
+            await prisma.auditLog.create({
+              data: {
+                actorId: auth.userId,
+                action: "appointment.cancel",
+                payload: {
+                  appointmentId: params.id,
+                  previousStatus: prev?.status ?? null,
+                  newStatus: "cancelled",
+                },
+                clinicId: prev?.clinicId ?? auth.clinicId ?? null,
+              },
+            });
+          } catch {}
+        }
         break;
+      }
       default:
         return error("Noto'g'ri amal (paid/unpaid/cancel)", 400);
     }

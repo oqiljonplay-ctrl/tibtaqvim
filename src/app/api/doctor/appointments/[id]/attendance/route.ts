@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { ok, error } from "@/lib/api-response";
+import { prisma } from "@/lib/prisma";
 import { markAsArrived, markAsMissed, resetToBooked } from "@/lib/workflow/appointment-workflow";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,11 @@ export async function PATCH(
     const action = body.action as string;
     const actorClinicId = auth.role === "super_admin" ? null : auth.clinicId;
 
+    const prevAppt = await prisma.appointment.findUnique({
+      where: { id: params.id },
+      select: { status: true, clinicId: true },
+    });
+
     let result;
     switch (action) {
       case "arrived":
@@ -40,6 +46,22 @@ export async function PATCH(
     }
 
     if (!result.success) return error(result.error || "Amal bajarilmadi", 400);
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: auth.userId,
+          action: "appointment.status_change",
+          payload: {
+            appointmentId: params.id,
+            previousStatus: prevAppt?.status ?? null,
+            newStatus: action === "reset" ? "booked" : action,
+          },
+          clinicId: prevAppt?.clinicId ?? auth.clinicId ?? null,
+        },
+      });
+    } catch {}
+
     return ok({ appointment: result.appointment });
   } catch (err: any) {
     console.error("[PATCH /api/doctor/appointments/[id]/attendance]", err);

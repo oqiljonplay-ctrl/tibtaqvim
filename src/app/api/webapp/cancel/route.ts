@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     const appointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      select: { id: true, status: true, patientPhone: true, userId: true },
+      select: { id: true, status: true, patientPhone: true, userId: true, clinicId: true },
     });
 
     if (!appointment) return error("Bron topilmadi", 404);
@@ -41,6 +41,22 @@ export async function POST(req: NextRequest) {
       where: { id: appointmentId },
       data: { status: "cancelled" },
     });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "appointment.cancel",
+          payload: {
+            appointmentId,
+            previousStatus: appointment.status,
+            newStatus: "cancelled",
+            source: "patient-webapp",
+          },
+          clinicId: appointment.clinicId,
+        },
+      });
+    } catch {}
 
     return ok({ cancelled: true });
   } catch {
