@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { DoctorCard } from "@/components/DoctorCard";
 
 type QueueMode = "live" | "online" | "slot";
+type StaffRole = "doctor" | "receptionist";
 
 interface ServiceItem {
   id: string;
@@ -25,8 +26,15 @@ interface Doctor {
   services: ServiceItem[];
 }
 
+interface Credentials {
+  phone: string;
+  password: string;
+  name: string;
+}
+
 const emptyForm = {
   firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "",
+  role: "doctor" as StaffRole,
 };
 
 function QueueModeSelector({
@@ -170,6 +178,7 @@ export default function AdminDoctorsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [credentials, setCredentials] = useState<Credentials | null>(null);
 
   useEffect(() => {
     fetchDoctors();
@@ -207,28 +216,41 @@ export default function AdminDoctorsPage() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/admin/doctors", {
+      const payload: Record<string, unknown> = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phone: form.phone,
+        role: form.role,
+      };
+
+      if (form.role === "doctor") {
+        payload.specialty = form.specialty;
+        payload.photoUrl = form.photoUrl || null;
+        payload.serviceIds = (() => {
+          const ids = [...selectedServiceIds];
+          const matched = services.find((s) => s.name === form.specialty);
+          if (matched && !ids.includes(matched.id)) ids.push(matched.id);
+          return ids;
+        })();
+      }
+
+      const res = await fetch("/api/admin/staff", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          photoUrl: form.photoUrl || null,
-          phone: form.phone || null,
-          serviceIds: (() => {
-            const ids = [...selectedServiceIds];
-            const matched = services.find((s) => s.name === form.specialty);
-            if (matched && !ids.includes(matched.id)) ids.push(matched.id);
-            return ids;
-          })(),
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (json.success) {
         setShowForm(false);
         setForm(emptyForm);
         setSelectedServiceIds([]);
-        fetchDoctors();
+        setCredentials({
+          phone: json.data.phone,
+          password: json.data.generatedPassword,
+          name: `${form.firstName} ${form.lastName}`.trim(),
+        });
+        if (form.role === "doctor") fetchDoctors();
       } else {
         alert(json.error?.message || "Saqlashda xatolik");
       }
@@ -268,79 +290,123 @@ export default function AdminDoctorsPage() {
           onClick={() => { setForm(emptyForm); setSelectedServiceIds([]); setShowForm(true); }}
           className="btn-primary"
         >
-          + Yangi shifokor
+          + Yangi xodim
         </button>
       </div>
 
       {showForm && (
         <div className="card mb-6">
-          <h2 className="text-lg font-semibold mb-4">Yangi shifokor qo&apos;shish</h2>
+          <h2 className="text-lg font-semibold mb-4">Yangi xodim qo&apos;shish</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            {/* Rol tanlash */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol *</label>
+              <div className="flex gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="role"
+                    value="doctor"
+                    checked={form.role === "doctor"}
+                    onChange={() => setForm({ ...form, role: "doctor", specialty: "" })}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm">👨‍⚕️ Shifokor</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="role"
+                    value="receptionist"
+                    checked={form.role === "receptionist"}
+                    onChange={() => setForm({ ...form, role: "receptionist", specialty: "", photoUrl: "" })}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm">🏥 Qabulxona</span>
+                </label>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ism *</label>
               <input className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Familya *</label>
-              <input className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Familya</label>
+              <input className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mutaxassislik *</label>
-              <select
-                className="input"
-                value={form.specialty}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setForm({ ...form, specialty: val });
-                  if (val) {
-                    const matched = services.find((s) => s.name === val);
-                    if (matched && !selectedServiceIds.includes(matched.id)) {
-                      setSelectedServiceIds((prev) => [...prev, matched.id]);
-                    }
-                  }
-                }}
-                required
-              >
-                <option value="">-- Mutaxassislikni tanlang --</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.name}>{s.name}</option>
-                ))}
-              </select>
-              {services.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
-                  ⚠️ Hech qanday xizmat topilmadi.{" "}
-                  <a href="/admin/services" className="underline">Xizmatlar sahifasida</a> xizmat qo&apos;shing.
-                </p>
-              )}
-              {form.specialty && (
-                <p className="mt-1 text-xs text-gray-500">
-                  &quot;{form.specialty}&quot; xizmati avtomatik biriktiriladi.
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-              <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+998 90 000 00 00" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Foto URL (ixtiyoriy)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon (login) *</label>
               <input
                 className="input"
-                type="url"
-                value={form.photoUrl}
-                onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
-                placeholder="https://example.com/photo.jpg"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="+998 90 000 00 00"
+                required
               />
-              {form.photoUrl && (
-                <img
-                  src={form.photoUrl}
-                  alt="preview"
-                  className="w-16 h-16 rounded-full object-cover mt-2 border"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                />
-              )}
             </div>
-            {services.length > 0 && (
+
+            {form.role === "doctor" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mutaxassislik *</label>
+                <select
+                  className="input"
+                  value={form.specialty}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm({ ...form, specialty: val });
+                    if (val) {
+                      const matched = services.find((s) => s.name === val);
+                      if (matched && !selectedServiceIds.includes(matched.id)) {
+                        setSelectedServiceIds((prev) => [...prev, matched.id]);
+                      }
+                    }
+                  }}
+                  required
+                >
+                  <option value="">-- Mutaxassislikni tanlang --</option>
+                  {services.map((s) => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+                {services.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    ⚠️ Hech qanday xizmat topilmadi.{" "}
+                    <a href="/admin/services" className="underline">Xizmatlar sahifasida</a> xizmat qo&apos;shing.
+                  </p>
+                )}
+                {form.specialty && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    &quot;{form.specialty}&quot; xizmati avtomatik biriktiriladi.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {form.role === "doctor" && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Foto URL (ixtiyoriy)</label>
+                <input
+                  className="input"
+                  type="url"
+                  value={form.photoUrl}
+                  onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
+                  placeholder="https://example.com/photo.jpg"
+                />
+                {form.photoUrl && (
+                  <img
+                    src={form.photoUrl}
+                    alt="preview"
+                    className="w-16 h-16 rounded-full object-cover mt-2 border"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                )}
+              </div>
+            )}
+
+            {form.role === "doctor" && services.length > 0 && (
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Qatnashadigan xizmatlar</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3 bg-gray-50">
@@ -357,6 +423,13 @@ export default function AdminDoctorsPage() {
                 </div>
               </div>
             )}
+
+            <div className="md:col-span-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <p className="text-xs text-blue-700">
+                🔑 Login uchun parol avtomatik generatsiya qilinadi va qo&apos;shishdan so&apos;ng bir marta ko&apos;rsatiladi.
+              </p>
+            </div>
+
             <div className="md:col-span-2 flex gap-3">
               <button type="submit" disabled={submitting} className="btn-primary disabled:opacity-50">
                 {submitting ? "Saqlanmoqda..." : "Qo'shish"}
@@ -404,6 +477,7 @@ export default function AdminDoctorsPage() {
             ))}
           </div>
 
+          {/* Shifokor o'chirish modali */}
           {confirmDeleteId && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
@@ -435,6 +509,43 @@ export default function AdminDoctorsPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Credentials modali — bir marta ko'rsatiladi */}
+      {credentials && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-2xl">✅</span>
+              <h3 className="font-semibold text-lg">Xodim qo&apos;shildi</h3>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">{credentials.name}</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 font-mono text-sm mb-3 select-all">
+              <div className="mb-1">Login: <span className="font-bold text-gray-900">{credentials.phone}</span></div>
+              <div>Parol: <span className="font-bold text-gray-900">{credentials.password}</span></div>
+            </div>
+            <div className="flex items-start gap-2 mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <span className="flex-shrink-0">⚠️</span>
+              <p className="text-amber-800 text-xs">Bu parol qayta ko&apos;rsatilmaydi. Hoziroq saqlab qo&apos;ying.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`Login: ${credentials.phone}\nParol: ${credentials.password}`);
+                }}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+              >
+                Nusxalash
+              </button>
+              <button
+                onClick={() => setCredentials(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+              >
+                Yopish
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
