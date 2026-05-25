@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth } from "@/lib/auth";
 import { ok, error } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
@@ -11,7 +12,30 @@ export const dynamic = "force-dynamic";
  *
  * Shifokor uchun bronlar — FAQAT to'langan (paid/not_required).
  * Xizmat (service) bo'yicha guruhlangan — har xizmat alohida "orolcha".
+ *
+ * role=doctor → faqat o'z doctorId bronlari (clinicId izolyatsiyasi saqlangan)
+ * clinic_admin / branch_admin / super_admin → klinikadagi barcha bronlar
  */
+
+interface PatientEntry {
+  id: string;
+  patientName: string;
+  patientPhone: string | null;
+  queueNumber: number | null;
+  status: string;
+  paymentStatus: string;
+  notes: string | null;
+}
+
+interface ServiceGroup {
+  serviceId: string;
+  serviceName: string;
+  serviceType: string | null;
+  doctorName: string | null;
+  specialty: string | null;
+  patients: PatientEntry[];
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req);
   if (!auth) return error("Unauthorized", 401);
@@ -22,16 +46,34 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const dateParam = searchParams.get("date");
-    const date = dateParam ? new Date(dateParam + "T00:00:00.000Z") : new Date(new Date().toLocaleDateString("sv-SE") + "T00:00:00.000Z");
+    const date = dateParam
+      ? new Date(dateParam + "T00:00:00.000Z")
+      : new Date(new Date().toLocaleDateString("sv-SE") + "T00:00:00.000Z");
 
     const scope = getBranchScope(auth);
-    const where: any = {
+    const where: Prisma.AppointmentWhereInput = {
       date,
       paymentStatus: { in: ["paid", "not_required"] },
       status: { not: "cancelled" },
     };
     if (scope.clinicId) where.clinicId = scope.clinicId;
     if (scope.branchId !== undefined) where.branchId = scope.branchId;
+
+    // role=doctor: faqat o'ziga biriktirilgan bronlar
+    if (auth.role === "doctor") {
+      const doctorRecord = await prisma.doctor.findFirst({
+        where: { userId: auth.userId },
+        select: { id: true },
+      });
+      if (!doctorRecord) {
+        return ok({
+          date: dateParam ?? new Date().toLocaleDateString("sv-SE"),
+          services: [],
+          counts: { total: 0, services: 0, arrived: 0, waiting: 0, missed: 0 },
+        });
+      }
+      where.doctorId = doctorRecord.id;
+    }
 
     const appointments = await prisma.appointment.findMany({
       where,
@@ -43,7 +85,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Xizmat bo'yicha guruhlash
-    const serviceMap = new Map<string, any>();
+    const serviceMap = new Map<string, ServiceGroup>();
     for (const a of appointments) {
       const serviceId = a.service?.id ?? "unknown";
       if (!serviceMap.has(serviceId)) {
@@ -51,12 +93,14 @@ export async function GET(req: NextRequest) {
           serviceId,
           serviceName: a.service?.name ?? "Noma'lum xizmat",
           serviceType: a.service?.type ?? null,
-          doctorName: a.doctor ? [a.doctor.lastName, a.doctor.firstName].filter(Boolean).join(" ") : null,
+          doctorName: a.doctor
+            ? [a.doctor.lastName, a.doctor.firstName].filter(Boolean).join(" ")
+            : null,
           specialty: a.doctor?.specialty ?? null,
           patients: [],
         });
       }
-      serviceMap.get(serviceId).patients.push({
+      serviceMap.get(serviceId)!.patients.push({
         id: a.id,
         patientName: a.patientName,
         patientPhone: a.patientPhone,
@@ -82,7 +126,7 @@ export async function GET(req: NextRequest) {
         missed: appointments.filter((a) => a.status === "missed").length,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[GET /api/doctor/appointments]", err);
     return error("Server xatosi", 500);
   }
