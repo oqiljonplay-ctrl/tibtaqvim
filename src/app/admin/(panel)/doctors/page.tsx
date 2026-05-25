@@ -27,7 +27,7 @@ interface Doctor {
 }
 
 interface Credentials {
-  phone: string;
+  phone: string | null;
   password: string;
   name: string;
 }
@@ -179,6 +179,7 @@ export default function AdminDoctorsPage() {
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDoctors();
@@ -258,6 +259,30 @@ export default function AdminDoctorsPage() {
       alert("Server bilan bog'lanishda xatolik");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleResetPassword(doctorId: string, doctorName: string) {
+    setResettingId(doctorId);
+    try {
+      const res = await fetch(`/api/admin/doctors/${doctorId}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setCredentials({
+          phone: json.data.phone,
+          password: json.data.newPassword,
+          name: json.data.name || doctorName,
+        });
+      } else {
+        alert(json.error?.message || "Parolni tiklashda xatolik");
+      }
+    } catch {
+      alert("Server bilan bog'lanishda xatolik");
+    } finally {
+      setResettingId(null);
     }
   }
 
@@ -449,6 +474,14 @@ export default function AdminDoctorsPage() {
               <div key={d.id} className="card relative">
                 <div className="absolute top-3 right-3 flex gap-1">
                   <button
+                    onClick={() => handleResetPassword(d.id, `${d.lastName} ${d.firstName}`)}
+                    disabled={resettingId === d.id}
+                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-40"
+                    title="Parolni tiklash"
+                  >
+                    🔑
+                  </button>
+                  <button
                     onClick={() => router.push(`/admin/doctors/${d.id}/edit`)}
                     className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
                     title="Tahrirlash"
@@ -511,17 +544,21 @@ export default function AdminDoctorsPage() {
         </>
       )}
 
-      {/* Credentials modali — bir marta ko'rsatiladi */}
+      {/* Credentials modali — yangi xodim yoki parol tiklash */}
       {credentials && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-2xl">✅</span>
-              <h3 className="font-semibold text-lg">Xodim qo&apos;shildi</h3>
+              <span className="text-2xl">🔑</span>
+              <h3 className="font-semibold text-lg">
+                {credentials.phone ? "Xodim qo’shildi" : "Parol tiklandi"}
+              </h3>
             </div>
             <p className="text-sm text-gray-500 mb-4">{credentials.name}</p>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 font-mono text-sm mb-3 select-all">
-              <div className="mb-1">Login: <span className="font-bold text-gray-900">{credentials.phone}</span></div>
+              {credentials.phone && (
+                <div className="mb-1">Login: <span className="font-bold text-gray-900">{credentials.phone}</span></div>
+              )}
               <div>Parol: <span className="font-bold text-gray-900">{credentials.password}</span></div>
             </div>
             <div className="flex items-start gap-2 mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
@@ -531,7 +568,10 @@ export default function AdminDoctorsPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`Login: ${credentials.phone}\nParol: ${credentials.password}`);
+                  const text = credentials.phone
+                    ? `Login: ${credentials.phone}\nParol: ${credentials.password}`
+                    : `Parol: ${credentials.password}`;
+                  navigator.clipboard.writeText(text);
                 }}
                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
               >
