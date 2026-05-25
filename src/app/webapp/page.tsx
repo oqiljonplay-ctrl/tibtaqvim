@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/Calendar";
-import { Container, Stack } from "@/components/layout";
+import { Stack } from "@/components/layout";
 import { formatDateLabel } from "@/lib/calendar";
 import { useClinic } from "@/lib/clinic-context";
 import { ClinicSwitcher } from "@/components/webapp/ClinicSwitcher";
@@ -562,9 +562,9 @@ export default function WebApp() {
     const historyAppts = appointments.filter((a) => !isFuture(a.date) || a.status === "cancelled" || a.status === "arrived" || a.status === "missed");
 
     return (
-      <Container size="sm" className="min-h-[100dvh] bg-gray-50 flex flex-col">
+      <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7">
+        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7 px-4">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-blue-200 text-xs mb-0.5">{headerDate}</p>
@@ -584,7 +584,7 @@ export default function WebApp() {
           }
         </div>
 
-        <div className="flex-1 -mt-3 pb-[calc(96px+env(safe-area-inset-bottom))]">
+        <div className="flex-1 -mt-3 pb-[calc(96px+env(safe-area-inset-bottom))] px-4">
           <Stack gap={4}>
 
           {/* Clinic switcher */}
@@ -747,7 +747,7 @@ export default function WebApp() {
         </div>
 
         {/* Sticky bottom bar */}
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 bg-gray-50 border-t border-gray-100">
+        <div className="fixed bottom-0 left-0 right-0 w-full px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 bg-gray-50 border-t border-gray-100">
           <div className="flex gap-2">
             <button
               onClick={() => {
@@ -777,7 +777,7 @@ export default function WebApp() {
             </button>
           </div>
         </div>
-      </Container>
+      </div>
     );
   }
 
@@ -790,9 +790,9 @@ export default function WebApp() {
     step === "slots" ? 55 : 35;
 
   return (
-    <Container size="sm" className="min-h-[100dvh] bg-gray-50 flex flex-col">
+    <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="bg-blue-600 text-white pt-4 pb-6">
+      <div className="bg-blue-600 text-white pt-4 pb-6 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Back to dashboard for any Telegram user */}
@@ -823,7 +823,7 @@ export default function WebApp() {
         )}
       </div>
 
-      <div className="flex-1 pt-4 pb-4">
+      <div className="flex-1 pt-4 pb-4 px-4">
 
         {/* Error */}
         {errorMsg && (
@@ -1143,7 +1143,7 @@ export default function WebApp() {
         )}
 
       </div>
-    </Container>
+    </div>
   );
 }
 

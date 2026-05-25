@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { Container } from "@/components/layout";
 
 interface BranchItem {
   id: string;
@@ -91,8 +90,8 @@ export default function ClinicDetailPage() {
   }
 
   return (
-    <Container size="sm" className="min-h-[100dvh] bg-gray-50">
-      <div className="bg-blue-600 text-white pt-5 pb-6">
+    <div className="w-full min-h-[100dvh] bg-gray-50">
+      <div className="bg-blue-600 text-white pt-5 pb-6 px-4">
         <Link href="/webapp/clinics" className="text-blue-200 text-sm mb-2 block">← Klinikalar</Link>
         <h1 className="font-bold text-xl">{clinic.name}</h1>
         {clinic.workingHours && (
@@ -100,7 +99,7 @@ export default function ClinicDetailPage() {
         )}
       </div>
 
-      <div className="py-4 space-y-3">
+      <div className="py-4 space-y-3 px-4">
         {clinic.description && (
           <div className="bg-white rounded-xl p-4 shadow-sm text-sm text-gray-700">
             {clinic.description}
@@ -133,6 +132,6 @@ export default function ClinicDetailPage() {
           </button>
         ))}
       </div>
-    </Container>
+    </div>
   );
 }

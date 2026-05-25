@@ -120,7 +120,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <Container size="sm" className="min-h-[100dvh] bg-gray-50 pb-24 py-4">
+    <Container size="full" className="min-h-[100dvh] bg-gray-50 pb-24 py-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <button

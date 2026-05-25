@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useClinic, type Clinic } from '@/lib/clinic-context'
 import { ClinicLogo } from '@/components/ClinicLogo'
-import { Container, ResponsiveGrid } from '@/components/layout'
+import { ResponsiveGrid } from '@/components/layout'
 
 type ClinicListItem = Clinic & {
   description?: string | null
@@ -60,15 +60,15 @@ export default function SelectClinicPage() {
   }
 
   return (
-    <Container size="sm" className="min-h-[100dvh] bg-gray-50">
-      <div className="bg-blue-600 text-white pt-5 pb-6">
+    <div className="w-full min-h-[100dvh] bg-gray-50">
+      <div className="bg-blue-600 text-white pt-5 pb-6 px-4">
         <h1 className="font-bold text-xl">🏥 Klinikani tanlang</h1>
         <p className="text-blue-200 text-sm mt-0.5">
           Davolanmoqchi bo'lgan klinikani tanlang
         </p>
       </div>
 
-      <div className="py-4 space-y-3">
+      <div className="py-4 space-y-3 px-4">
         <input
           type="text"
           value={query}
@@ -147,6 +147,6 @@ export default function SelectClinicPage() {
           </>
         )}
       </div>
-    </Container>
+    </div>
   )
 }

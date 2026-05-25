@@ -122,7 +122,7 @@ export default function ProfilePage() {
   );
 
   return (
-    <Container size="sm" className="min-h-[100dvh] bg-gray-50">
+    <Container size="full" className="min-h-[100dvh] bg-gray-50">
       <div className="bg-white shadow-sm py-3 sticky top-0 z-10 flex items-center gap-3">
         <button onClick={() => router.back()} className="text-blue-600 text-sm">←</button>
         <h1 className="text-lg font-bold flex-1">Mening profilim</h1>

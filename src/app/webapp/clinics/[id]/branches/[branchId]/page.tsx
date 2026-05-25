@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/Calendar";
 import { formatDateLabel } from "@/lib/calendar";
 import Link from "next/link";
-import { Container } from "@/components/layout";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
 
@@ -220,9 +219,9 @@ export default function BranchServicesPage() {
   const u = tgUser;
 
   return (
-    <Container size="sm" className="min-h-[100dvh] bg-gray-50 flex flex-col">
+    <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="bg-blue-600 text-white pt-4 pb-6">
+      <div className="bg-blue-600 text-white pt-4 pb-6 px-4">
         <div className="flex items-center gap-2 mb-1">
           {step !== "done" && (
             <button onClick={() => step === "services" ? router.push(`/webapp/clinics/${clinicId}`) : setStep("services")}
@@ -241,7 +240,7 @@ export default function BranchServicesPage() {
         )}
       </div>
 
-      <div className="flex-1 pt-4 pb-4">
+      <div className="flex-1 pt-4 pb-4 px-4">
         {err && (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
             <span className="text-red-500 shrink-0">⚠️</span>
@@ -516,7 +515,7 @@ export default function BranchServicesPage() {
           </div>
         )}
       </div>
-    </Container>
+    </div>
   );
 }
 

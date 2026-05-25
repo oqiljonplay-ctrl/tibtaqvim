@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Container, ResponsiveGrid } from "@/components/layout";
+import { ResponsiveGrid } from "@/components/layout";
 
 interface ClinicItem {
   id: string;
@@ -47,13 +47,13 @@ export default function ClinicsPage() {
   }
 
   return (
-    <Container size="sm" className="min-h-[100dvh] bg-gray-50">
-      <div className="bg-blue-600 text-white pt-5 pb-6">
+    <div className="w-full min-h-[100dvh] bg-gray-50">
+      <div className="bg-blue-600 text-white pt-5 pb-6 px-4">
         <h1 className="font-bold text-xl">🏥 TibTaqvim</h1>
         <p className="text-blue-200 text-sm mt-0.5">Klinikani tanlang</p>
       </div>
 
-      <div className="py-4 space-y-3">
+      <div className="py-4 space-y-3 px-4">
         <input
           type="text"
           value={search}
@@ -115,6 +115,6 @@ export default function ClinicsPage() {
           </>
         )}
       </div>
-    </Container>
+    </div>
   );
 }

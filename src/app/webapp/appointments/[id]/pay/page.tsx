@@ -82,7 +82,7 @@ export default function PayPage() {
 
   if (info.paymentStatus === "paid") {
     return (
-      <Container size="sm" className="py-4">
+      <Container size="full" className="py-4">
         <Stack gap={4}>
           <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl text-center">
             <div className="text-2xl mb-2">✅</div>
@@ -100,7 +100,7 @@ export default function PayPage() {
   }
 
   return (
-    <Container size="sm" className="py-4 pb-8">
+    <Container size="full" className="py-4 pb-8">
       <Stack gap={4}>
       {/* Appointment info */}
       <div className="bg-gray-50 p-4 rounded-xl space-y-2">
