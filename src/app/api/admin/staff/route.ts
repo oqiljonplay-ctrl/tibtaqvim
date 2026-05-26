@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, hashPassword, generateRandomPassword } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { normalizePhone } from "@/lib/utils/phone";
-import { getBranchScope, resolveBranchIdForCreate, canCreateAdmin } from "@/lib/branch-scope";
+import { getBranchScope, canCreateAdmin } from "@/lib/branch-scope";
 
 // POST /api/admin/staff — xodim akkaunt yaratish (receptionist, clinic_admin, doctor)
 // Parol backend tomonidan avtomatik generatsiya qilinadi va javobda qaytariladi (bir marta).
@@ -37,10 +37,23 @@ export async function POST(req: NextRequest) {
   const clinicId = auth.role === "super_admin" ? body.clinicId : auth.clinicId;
   if (!clinicId) return error("clinicId required");
 
+  // Mahalliy branchId hisoblash (resolveBranchIdForCreate ishlatilmaydi — boshqa joylar uchun saqlanadi)
+  let branchId: string | null = null;
+  if (auth.role === "super_admin") {
+    branchId = body.branchId ?? null;
+  } else if (auth.role === "clinic_admin") {
+    if (!body.branchId) return error("Filial tanlanishi shart", 400);
+    const branch = await prisma.branch.findFirst({
+      where: { id: body.branchId, isActive: true },
+      select: { clinicId: true },
+    });
+    if (!branch || branch.clinicId !== auth.clinicId) return forbidden();
+    branchId = body.branchId;
+  }
+
   const phone = normalizePhone(rawPhone);
   const generatedPassword = generateRandomPassword(12);
   const passwordHash = await hashPassword(generatedPassword);
-  const branchId = resolveBranchIdForCreate(auth, body.branchId);
 
   try {
     const user = await prisma.$transaction(async (tx) => {

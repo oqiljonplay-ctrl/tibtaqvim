@@ -32,9 +32,15 @@ interface Credentials {
   name: string;
 }
 
+interface Branch {
+  id: string;
+  name: string;
+}
+
 const emptyForm = {
   firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "",
   role: "doctor" as StaffRole,
+  branchId: "",
 };
 
 function QueueModeSelector({
@@ -171,6 +177,7 @@ export default function AdminDoctorsPage() {
   const router = useRouter();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -184,6 +191,7 @@ export default function AdminDoctorsPage() {
   useEffect(() => {
     fetchDoctors();
     fetchServices();
+    fetchBranches();
   }, []);
 
   async function fetchDoctors() {
@@ -206,6 +214,17 @@ export default function AdminDoctorsPage() {
     if (json.success) setServices(json.data);
   }
 
+  async function fetchBranches() {
+    const res = await fetch("/api/admin/branches", { credentials: "include" });
+    const json = await res.json();
+    if (json.success) {
+      setBranches(json.data);
+      if (json.data.length === 1) {
+        setForm((prev) => ({ ...prev, branchId: json.data[0].id }));
+      }
+    }
+  }
+
   function toggleService(id: string, checked: boolean) {
     setSelectedServiceIds((prev) =>
       checked ? [...prev, id] : prev.filter((x) => x !== id)
@@ -217,11 +236,17 @@ export default function AdminDoctorsPage() {
     if (submitting) return;
     setSubmitting(true);
     try {
+      if (!form.branchId) {
+        alert("Filialni tanlang");
+        return;
+      }
+
       const payload: Record<string, unknown> = {
         firstName: form.firstName,
         lastName: form.lastName,
         phone: form.phone,
         role: form.role,
+        branchId: form.branchId,
       };
 
       if (form.role === "doctor") {
@@ -244,7 +269,8 @@ export default function AdminDoctorsPage() {
       const json = await res.json();
       if (json.success) {
         setShowForm(false);
-        setForm(emptyForm);
+        const defaultBranchId = branches.length === 1 ? branches[0].id : "";
+        setForm({ ...emptyForm, branchId: defaultBranchId });
         setSelectedServiceIds([]);
         setCredentials({
           phone: json.data.phone,
@@ -312,7 +338,12 @@ export default function AdminDoctorsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Shifokorlar</h1>
         <button
-          onClick={() => { setForm(emptyForm); setSelectedServiceIds([]); setShowForm(true); }}
+          onClick={() => {
+            const defaultBranchId = branches.length === 1 ? branches[0].id : "";
+            setForm({ ...emptyForm, branchId: defaultBranchId });
+            setSelectedServiceIds([]);
+            setShowForm(true);
+          }}
           className="btn-primary"
         >
           + Yangi xodim
@@ -351,6 +382,25 @@ export default function AdminDoctorsPage() {
                   <span className="text-sm">🏥 Qabulxona</span>
                 </label>
               </div>
+            </div>
+
+            {/* Filial tanlash */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Filial *</label>
+              <select
+                className="input"
+                value={form.branchId}
+                onChange={(e) => setForm({ ...form, branchId: e.target.value })}
+                required
+              >
+                {branches.length !== 1 && <option value="">-- Filialni tanlang --</option>}
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              {branches.length === 0 && (
+                <p className="mt-1 text-xs text-red-600">⚠️ Hali filial qo'shilmagan.</p>
+              )}
             </div>
 
             <div>
@@ -456,7 +506,7 @@ export default function AdminDoctorsPage() {
             </div>
 
             <div className="md:col-span-2 flex gap-3">
-              <button type="submit" disabled={submitting} className="btn-primary disabled:opacity-50">
+              <button type="submit" disabled={submitting || !form.branchId} className="btn-primary disabled:opacity-50">
                 {submitting ? "Saqlanmoqda..." : "Qo'shish"}
               </button>
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Bekor</button>
