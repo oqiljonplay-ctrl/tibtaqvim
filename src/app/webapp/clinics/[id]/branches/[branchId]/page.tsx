@@ -224,7 +224,7 @@ export default function BranchServicesPage() {
       <div className="bg-blue-600 text-white pt-4 pb-6 px-4">
         <div className="flex items-center gap-2 mb-1">
           {step !== "done" && (
-            <button onClick={() => step === "services" ? router.push(`/webapp/clinics/${clinicId}`) : setStep("services")}
+            <button onClick={() => step === "services" ? router.push(`/webapp/clinics`) : setStep("services")}
               className="text-blue-200 hover:text-white text-sm">←</button>
           )}
           <h1 className="font-bold text-lg">🏥 Qabulga yozilish</h1>
