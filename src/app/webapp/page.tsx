@@ -753,16 +753,26 @@ export default function WebApp() {
               onClick={() => {
                 const cId = clinicIdRef.current;
                 if (cId) {
-                  // PatientSelector bor branches booking sahifasiga o'tish
                   window.location.href = `/webapp/clinics/${cId}`;
                 } else {
                   const qs = new URLSearchParams({ mode: "booking" });
                   window.location.href = `/webapp?${qs}`;
                 }
               }}
-              className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all"
+              className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm shadow-lg shadow-blue-200 active:scale-95 transition-all"
             >
               ➕ Yangi bron
+            </button>
+            <button
+              onClick={() => {
+                const qs = new URLSearchParams();
+                if (telegramId) qs.set("tgid", telegramId);
+                window.location.href = `/webapp/my-clinics?${qs}`;
+              }}
+              className="w-12 py-3.5 rounded-2xl bg-white border border-gray-200 text-gray-700 text-xl flex items-center justify-center active:scale-95 transition-all"
+              title="Klinikalarim"
+            >
+              🏥
             </button>
             <button
               onClick={() => {
@@ -770,7 +780,7 @@ export default function WebApp() {
                 if (telegramId) qs.set("tgid", telegramId);
                 window.location.href = `/webapp/history?${qs}`;
               }}
-              className="w-14 py-3.5 rounded-2xl bg-white border border-gray-200 text-gray-700 text-xl flex items-center justify-center active:scale-95 transition-all"
+              className="w-12 py-3.5 rounded-2xl bg-white border border-gray-200 text-gray-700 text-xl flex items-center justify-center active:scale-95 transition-all"
               title="Tarix"
             >
               📋

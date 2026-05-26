@@ -314,7 +314,7 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
     }
 
     if (result.success) {
-      linkUserToAppointment(result.data.id, input.patientPhone).catch(() => {});
+      linkUserToAppointment(result.data.id, input.patientPhone, input.patientName).catch(() => {});
 
       if (input.source !== "bot") {
         notifyPatientAsync(result.data, input.patientPhone);
@@ -346,17 +346,27 @@ async function resolveTibId(input: BookingInput): Promise<string | null> {
   }
 }
 
-async function linkUserToAppointment(appointmentId: string, phone: string): Promise<void> {
-  const user = await prisma.user.findFirst({
-    where: { phone: normalizePhone(phone) },
+async function linkUserToAppointment(
+  appointmentId: string,
+  phone: string,
+  patientName?: string,
+): Promise<void> {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return;
+
+  const user = await prisma.user.upsert({
+    where: { phone: normalized },
+    create: { phone: normalized, firstName: patientName?.trim() || 'Bemor', role: 'patient' },
+    update: {},
     select: { id: true },
   });
-  if (!user) return;
+
   const appt = await prisma.appointment.update({
     where: { id: appointmentId },
     data: { userId: user.id },
     select: { clinicId: true },
   });
+
   ensureUserClinic(user.id, appt.clinicId, 'patient').catch((e) => {
     logger.error('[linkUserToAppointment] ensureUserClinic failed', {
       userId: user.id,
