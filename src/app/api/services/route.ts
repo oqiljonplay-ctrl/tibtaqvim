@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const clinicId = searchParams.get("clinicId");
+    const branchId = searchParams.get("branchId");
     const type = searchParams.get("type") as string | null;
     const dateParam = searchParams.get("date");
 
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest) {
         clinicId,
         isActive: true,
         ...(type ? { type: type as any } : {}),
+        // branchId berilsa: o'sha filial xizmatlari + global (null) xizmatlar
+        ...(branchId ? { OR: [{ branchId }, { branchId: null }] } : {}),
       },
       include: {
         doctors: {

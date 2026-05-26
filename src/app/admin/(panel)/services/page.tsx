@@ -9,6 +9,11 @@ interface DoctorItem {
   photoUrl: string | null;
 }
 
+interface Branch {
+  id: string;
+  name: string;
+}
+
 interface Service {
   id: string;
   name: string;
@@ -33,11 +38,13 @@ const emptyForm = {
   name: "", type: "doctor_queue", price: "", dailyLimit: "",
   requiresSlot: false, requiresAddress: false, description: "",
   requiresPrePayment: false, prePaymentAmount: "",
+  branchId: "",
 };
 
 export default function AdminServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [doctors, setDoctors] = useState<DoctorItem[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -47,6 +54,7 @@ export default function AdminServicesPage() {
   useEffect(() => {
     fetchServices();
     fetchDoctors();
+    fetchBranches();
   }, []);
 
   async function fetchServices() {
@@ -65,6 +73,12 @@ export default function AdminServicesPage() {
     if (json.success) setDoctors(json.data);
   }
 
+  async function fetchBranches() {
+    const res = await fetch("/api/admin/branches", { credentials: "include" });
+    const json = await res.json();
+    if (json.success) setBranches(json.data);
+  }
+
   function toggleDoctor(id: string, checked: boolean) {
     setSelectedDoctorIds((prev) =>
       checked ? [...prev, id] : prev.filter((x) => x !== id)
@@ -73,14 +87,17 @@ export default function AdminServicesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payload = {
-      ...form,
+    const { branchId, ...rest } = form;
+    const payload: Record<string, unknown> = {
+      ...rest,
       price: parseFloat(form.price),
       dailyLimit: form.dailyLimit ? parseInt(form.dailyLimit) : null,
       prePaymentAmount: form.requiresPrePayment && form.prePaymentAmount
         ? parseFloat(form.prePaymentAmount)
         : null,
       doctorIds: selectedDoctorIds,
+      // Yangi xizmat uchun branchId (tahrirlashda o'zgartirilmaydi)
+      ...(!editId && { branchId: branchId || null }),
     };
 
     const url = editId ? `/api/admin/services/${editId}` : "/api/admin/services";
@@ -108,6 +125,7 @@ export default function AdminServicesPage() {
       description: "",
       requiresPrePayment: s.requiresPrePayment,
       prePaymentAmount: s.prePaymentAmount !== null ? String(s.prePaymentAmount) : "",
+      branchId: "",
     });
     setSelectedDoctorIds(s.doctors.map((d) => d.id));
     setEditId(s.id);
@@ -188,6 +206,26 @@ export default function AdminServicesPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Narxi (so&apos;m) *</label>
               <input className="input" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
             </div>
+
+            {/* Filial — faqat yangi xizmat qo'shganda, ixtiyoriy */}
+            {!editId && branches.length > 0 && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filial</label>
+                <select
+                  className="input"
+                  value={form.branchId}
+                  onChange={(e) => setForm({ ...form, branchId: e.target.value })}
+                >
+                  <option value="">Barcha filiallar (umumiy)</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  "Barcha filiallar" tanlanса xizmat klinikaning hamma filialida ko&apos;rinadi.
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Kunlik limit (bo&apos;sh = cheksiz)</label>
               <input className="input" type="number" value={form.dailyLimit} onChange={(e) => setForm({ ...form, dailyLimit: e.target.value })} placeholder="Masalan: 40" />

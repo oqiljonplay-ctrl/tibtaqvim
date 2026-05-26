@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
-import { getBranchScope, resolveBranchIdForCreate, canManageResources } from "@/lib/branch-scope";
+import { getBranchScope, canManageResources } from "@/lib/branch-scope";
 
 export async function GET(req: NextRequest) {
   try {
@@ -56,7 +56,23 @@ export async function POST(req: NextRequest) {
     const clinicId = auth.role === "super_admin" ? body.clinicId : auth.clinicId;
     if (!clinicId) return error("clinicId required");
 
-    const branchId = resolveBranchIdForCreate(auth, body.branchId);
+    // Mahalliy branchId hisoblash (resolveBranchIdForCreate tegmasdan)
+    let branchId: string | null = null;
+    if (auth.role === "super_admin") {
+      branchId = body.branchId ?? null;
+    } else if (auth.role === "clinic_admin") {
+      if (body.branchId) {
+        const branch = await prisma.branch.findFirst({
+          where: { id: body.branchId, isActive: true },
+          select: { clinicId: true },
+        });
+        if (!branch || branch.clinicId !== auth.clinicId) return forbidden();
+        branchId = body.branchId;
+      }
+      // body.branchId yo'q = global xizmat (null) — joiz
+    } else if (auth.role === "branch_admin") {
+      branchId = auth.branchId ?? null;
+    }
 
     const service = await prisma.service.create({
       data: {
