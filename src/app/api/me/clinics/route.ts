@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/me/clinics?tgid=<telegramId>
- * Foydalanuvchi bronlari orqali bog'liq klinikalar ro'yxati.
- * Auth yo'q — tgid URL param'dan olinadi (webapp pattern).
+ * user_clinics — yagona a'zolik haqiqat manbai.
+ * faqat isActive=true klinikalar qaytariladi.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -17,64 +17,61 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ clinics: [], lastClinicId: null })
     }
 
-    // Find user records by telegramId
-    const users = await prisma.user.findMany({
+    const user = await prisma.user.findFirst({
       where: { telegramId: tgId },
-      select: { id: true, clinicId: true },
+      select: { id: true },
     })
 
-    if (users.length === 0) {
+    if (!user) {
       return NextResponse.json({ clinics: [], lastClinicId: null })
     }
 
-    const clinicIdSet = new Set(
-      users.map((u) => u.clinicId).filter((id): id is string => !!id)
-    )
-
-    // Also check appointments to find all clinics user has booked at
-    const appts = await prisma.appointment.findMany({
-      where: { userId: { in: users.map((u) => u.id) } },
-      select: { clinicId: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+    // user_clinics — a'zolik manbai (appointments emas)
+    const userClinics = await prisma.userClinic.findMany({
+      where: { userId: user.id, isActive: true },
+      select: { clinicId: true },
     })
 
-    for (const a of appts) {
-      if (a.clinicId) clinicIdSet.add(a.clinicId)
-    }
-
-    const clinicIds = [...clinicIdSet]
-    if (clinicIds.length === 0) {
+    if (userClinics.length === 0) {
       return NextResponse.json({ clinics: [], lastClinicId: null })
     }
 
-    const clinics = await prisma.clinic.findMany({
-      where: { id: { in: clinicIds }, isActive: true, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        city: true,
-        logoUrl: true,
-        address: true,
-        phone: true,
-        rating: true,
-      },
-    })
+    const clinicIds = userClinics.map((uc) => uc.clinicId)
 
-    const lastClinicId = appts[0]?.clinicId ?? users[0]?.clinicId ?? null
+    const [clinicRows, lastAppt] = await Promise.all([
+      prisma.clinic.findMany({
+        where: { id: { in: clinicIds }, isActive: true, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          logoUrl: true,
+          address: true,
+          phone: true,
+          rating: true,
+        },
+      }),
+      // Oxirgi bron — UX tartiblash uchun (a'zolik emas)
+      prisma.appointment.findFirst({
+        where: { userId: user.id, clinicId: { in: clinicIds } },
+        orderBy: { createdAt: 'desc' },
+        select: { clinicId: true },
+      }),
+    ])
 
-    // Sort: last visited clinic first
+    const lastClinicId = lastAppt?.clinicId ?? clinicIds[0] ?? null
+
     const sorted = lastClinicId
       ? [
-          ...clinics.filter((c) => c.id === lastClinicId),
-          ...clinics.filter((c) => c.id !== lastClinicId),
+          ...clinicRows.filter((c) => c.id === lastClinicId),
+          ...clinicRows.filter((c) => c.id !== lastClinicId),
         ]
-      : clinics
+      : clinicRows
 
     return NextResponse.json({
       clinics: sorted.map((c) => ({
         ...c,
-        rating: c.rating !== null && c.rating !== undefined ? Number(c.rating) : null,
+        rating: typeof c.rating === 'number' ? c.rating : null,
       })),
       lastClinicId,
     })

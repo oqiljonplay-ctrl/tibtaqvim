@@ -357,7 +357,13 @@ async function linkUserToAppointment(appointmentId: string, phone: string): Prom
     data: { userId: user.id },
     select: { clinicId: true },
   });
-  ensureUserClinic(user.id, appt.clinicId, 'patient').catch(() => {});
+  ensureUserClinic(user.id, appt.clinicId, 'patient').catch((e) => {
+    logger.error('[linkUserToAppointment] ensureUserClinic failed', {
+      userId: user.id,
+      clinicId: appt.clinicId,
+      error: String(e),
+    });
+  });
 }
 
 async function notifyPatientAsync(
