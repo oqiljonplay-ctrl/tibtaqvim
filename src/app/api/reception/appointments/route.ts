@@ -80,5 +80,13 @@ function serialize(a: any) {
       : null,
     patientTelegramId: a.user?.telegramId ?? null,
     tibId: a.user?.tibId ?? null,
+    locationLat: a.locationLat ?? null,
+    locationLng: a.locationLng ?? null,
+    liveLat: a.liveLat ?? null,
+    liveLng: a.liveLng ?? null,
+    liveStartedAt: a.liveStartedAt ? a.liveStartedAt.toISOString() : null,
+    liveExpiresAt: a.liveExpiresAt ? a.liveExpiresAt.toISOString() : null,
+    liveLastUpdatedAt: a.liveLastUpdatedAt ? a.liveLastUpdatedAt.toISOString() : null,
+    liveStatus: a.liveStatus ?? null,
   };
 }

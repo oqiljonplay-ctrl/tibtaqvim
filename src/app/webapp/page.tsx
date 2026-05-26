@@ -769,10 +769,11 @@ export default function WebApp() {
                 if (telegramId) qs.set("tgid", telegramId);
                 window.location.href = `/webapp/my-clinics?${qs}`;
               }}
-              className="w-12 py-3.5 rounded-2xl bg-white border border-gray-200 text-gray-700 text-xl flex items-center justify-center active:scale-95 transition-all"
+              className="w-12 py-2 rounded-2xl bg-white border border-gray-200 text-gray-700 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all"
               title="Klinikalarim"
             >
-              🏥
+              <span className="text-xl leading-none">🏥</span>
+              <span className="text-[10px] text-gray-500 leading-none">Klinikalar</span>
             </button>
             <button
               onClick={() => {
@@ -780,10 +781,11 @@ export default function WebApp() {
                 if (telegramId) qs.set("tgid", telegramId);
                 window.location.href = `/webapp/history?${qs}`;
               }}
-              className="w-12 py-3.5 rounded-2xl bg-white border border-gray-200 text-gray-700 text-xl flex items-center justify-center active:scale-95 transition-all"
+              className="w-12 py-2 rounded-2xl bg-white border border-gray-200 text-gray-700 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all"
               title="Tarix"
             >
-              📋
+              <span className="text-xl leading-none">📋</span>
+              <span className="text-[10px] text-gray-500 leading-none">Tarix</span>
             </button>
           </div>
         </div>

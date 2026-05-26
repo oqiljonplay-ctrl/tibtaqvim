@@ -21,7 +21,7 @@ function getTelegramId(): string | null {
 }
 
 export default function HistoryPage() {
-  const { clinic, clinicId } = useClinic()
+  const { clinic, clinicId, loading: clinicLoading } = useClinic()
 
   const [scope, setScope] = useState<Scope>('current')
   const [appointments, setAppointments] = useState<HistoryAppointment[]>([])
@@ -107,6 +107,17 @@ export default function HistoryPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, clinicId, filters, telegramId])
+
+  if (clinicLoading) {
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
+        <div className="text-center p-6 text-gray-400">
+          <div className="text-4xl mb-3">🏥</div>
+          <p className="text-sm animate-pulse">Yuklanmoqda...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!clinic) {
     return (

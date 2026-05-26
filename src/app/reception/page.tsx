@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import TelegramChatButton from "@/components/shared/TelegramChatButton";
 import LocationButtons from "@/components/LocationButtons";
+import LiveLocationPanel from "@/components/LiveLocationPanel";
 import { Stack } from "@/components/layout";
 
 interface ReceptionAppointment {
@@ -20,6 +21,14 @@ interface ReceptionAppointment {
   service: { id: string; name: string; type: string; price: number } | null;
   doctor: { id: string; name: string; specialty: string | null } | null;
   patientTelegramId: string | null;
+  locationLat?: number | null;
+  locationLng?: number | null;
+  liveLat?: number | null;
+  liveLng?: number | null;
+  liveStartedAt?: string | null;
+  liveExpiresAt?: string | null;
+  liveLastUpdatedAt?: string | null;
+  liveStatus?: string | null;
 }
 
 interface ReceptionData {
@@ -265,9 +274,23 @@ function ReceptionCard({ appt, loading, section, onPaid, onUnpaid, onCancel }: C
               variant="compact"
             />
             {appt.service?.type === "home_service" && (
-              <LocationButtons locationLat={null} locationLng={null} address={appt.address} />
+              <LocationButtons locationLat={appt.locationLat} locationLng={appt.locationLng} address={appt.address} />
             )}
           </div>
+          {appt.service?.type === "home_service" &&
+            appt.liveLat != null && appt.liveLng != null &&
+            appt.liveStatus && appt.liveExpiresAt && appt.liveLastUpdatedAt && (
+            <LiveLocationPanel
+              appointmentId={appt.id}
+              patientName={appt.patientName}
+              liveLat={appt.liveLat}
+              liveLng={appt.liveLng}
+              liveStartedAt={appt.liveStartedAt ?? appt.liveLastUpdatedAt}
+              liveExpiresAt={appt.liveExpiresAt}
+              liveLastUpdatedAt={appt.liveLastUpdatedAt}
+              liveStatus={appt.liveStatus}
+            />
+          )}
         </div>
       </div>
 
