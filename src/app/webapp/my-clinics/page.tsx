@@ -71,7 +71,7 @@ export default function MyClinicsPage() {
               Birinchi broningizdan keyin klinika bu yerda ko'rinadi
             </p>
             <button
-              onClick={() => router.push('/webapp/select-clinic')}
+              onClick={() => router.push('/webapp/clinics')}
               className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-sm font-semibold active:scale-95 transition-all"
             >
               Klinika qo'shish
@@ -114,7 +114,7 @@ export default function MyClinicsPage() {
             })}
 
             <button
-              onClick={() => router.push('/webapp/select-clinic')}
+              onClick={() => router.push('/webapp/clinics')}
               className="w-full p-4 rounded-2xl border-2 border-dashed border-gray-300 text-gray-600 text-sm hover:bg-gray-50 hover:border-gray-400 transition active:scale-95"
             >
               + Boshqa klinika qo'shish

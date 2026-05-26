@@ -84,7 +84,7 @@ function ClinicSwitcherSheet({ onClose }: { onClose: () => void }) {
 
   const handleAddNew = () => {
     onClose()
-    router.push('/webapp/select-clinic')
+    router.push('/webapp/clinics')
   }
 
   return (

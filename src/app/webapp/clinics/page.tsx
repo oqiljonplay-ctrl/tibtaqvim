@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useClinic } from "@/lib/clinic-context";
+import { ClinicLogo } from "@/components/ClinicLogo";
 import { ResponsiveGrid } from "@/components/layout";
 
 interface ClinicItem {
@@ -21,9 +23,15 @@ interface ClinicItem {
 
 export default function ClinicsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { setClinic } = useClinic();
+
   const [clinics, setClinics] = useState<ClinicItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selecting, setSelecting] = useState<string | null>(null);
+
+  const nextPath = searchParams.get("next");
 
   const fetchClinics = useCallback(async () => {
     setLoading(true);
@@ -42,15 +50,34 @@ export default function ClinicsPage() {
     return () => clearTimeout(t);
   }, [fetchClinics]);
 
-  function handleSelect(clinicId: string) {
-    router.push(`/webapp/clinics/${clinicId}`);
+  function handleSelect(c: ClinicItem) {
+    setSelecting(c.id);
+    setClinic({
+      id: c.id,
+      name: c.name,
+      city: c.city,
+      logoUrl: c.logoUrl,
+      address: c.address,
+      phone: c.phone,
+      rating: c.rating,
+    });
+    if (nextPath) {
+      const target = nextPath.includes("?")
+        ? `${nextPath}&clinic=${c.id}`
+        : `${nextPath}?clinic=${c.id}`;
+      router.push(target);
+    } else {
+      router.push(`/webapp/clinics/${c.id}`);
+    }
   }
 
   return (
     <div className="w-full min-h-[100dvh] bg-gray-50">
       <div className="bg-blue-600 text-white pt-5 pb-6 px-4">
-        <h1 className="font-bold text-xl">🏥 TibTaqvim</h1>
-        <p className="text-blue-200 text-sm mt-0.5">Klinikani tanlang</p>
+        <h1 className="font-bold text-xl">🏥 Klinikani tanlang</h1>
+        <p className="text-blue-200 text-sm mt-0.5">
+          Davolanmoqchi bo&apos;lgan klinikani tanlang
+        </p>
       </div>
 
       <div className="py-4 space-y-3 px-4">
@@ -63,54 +90,75 @@ export default function ClinicsPage() {
         />
 
         {loading ? (
-          <div className="text-center py-12 text-gray-400 text-sm animate-pulse">Yuklanmoqda...</div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 bg-white rounded-2xl animate-pulse shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 rounded-xl bg-gray-200 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : clinics.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 text-sm">Klinikalar topilmadi</div>
+          <div className="text-center py-12 text-gray-400 text-sm">
+            {search ? "Topilmadi" : "Klinikalar topilmadi"}
+          </div>
         ) : (
           <>
             <p className="text-xs text-gray-400">{clinics.length} ta klinika</p>
             <ResponsiveGrid cols={{ base: 1, sm: 2 }} gap={3}>
-            {clinics.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => handleSelect(c.id)}
-                className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-left hover:shadow-md active:scale-[0.98] transition-all"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-2xl">
-                    {c.logoUrl
-                      ? <img src={c.logoUrl} alt="" className="w-14 h-14 rounded-xl object-cover" />
-                      : "🏥"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{c.name}</h3>
-                    {c.rating > 0 && (
-                      <p className="text-xs text-amber-600 mt-0.5">⭐ {c.rating.toFixed(1)} ({c.ratingCount})</p>
-                    )}
-                    {c.address && (
-                      <p className="text-xs text-gray-500 mt-1 truncate">📍 {c.address}</p>
-                    )}
-                    {c.workingHours && (
-                      <p className="text-xs text-gray-500 mt-0.5">🕐 {c.workingHours}</p>
-                    )}
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
-                        👨‍⚕️ {c.doctorCount} shifokor
-                      </span>
-                      <span className="text-xs px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full">
-                        🏷 {c.serviceCount} xizmat
-                      </span>
-                      {c.branchCount > 1 && (
-                        <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full">
-                          🏥 {c.branchCount} filial
-                        </span>
+              {clinics.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => handleSelect(c)}
+                  disabled={!!selecting}
+                  className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-left hover:shadow-md active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  <div className="flex items-start gap-3">
+                    <ClinicLogo src={c.logoUrl} name={c.name} size={56} className="rounded-xl" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">{c.name}</h3>
+                      {c.rating > 0 && (
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          ⭐ {c.rating.toFixed(1)} ({c.ratingCount})
+                        </p>
                       )}
+                      {c.address && (
+                        <p className="text-xs text-gray-500 mt-1 truncate">📍 {c.address}</p>
+                      )}
+                      {c.workingHours && (
+                        <p className="text-xs text-gray-500 mt-0.5">🕐 {c.workingHours}</p>
+                      )}
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {c.doctorCount > 0 && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
+                            👨‍⚕️ {c.doctorCount} shifokor
+                          </span>
+                        )}
+                        {c.serviceCount > 0 && (
+                          <span className="text-xs px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full">
+                            🏷 {c.serviceCount} xizmat
+                          </span>
+                        )}
+                        {c.branchCount > 1 && (
+                          <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full">
+                            🏥 {c.branchCount} filial
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    {selecting === c.id ? (
+                      <div className="text-blue-500 text-sm animate-pulse mt-1 shrink-0">...</div>
+                    ) : (
+                      <span className="text-gray-300 mt-1 shrink-0">→</span>
+                    )}
                   </div>
-                  <span className="text-gray-300 mt-1">→</span>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))}
             </ResponsiveGrid>
           </>
         )}

@@ -4,7 +4,7 @@ import { useClinic } from '@/lib/clinic-context'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
-const PUBLIC_PATHS = ['/webapp/select-clinic', '/webapp/clinics']
+const PUBLIC_PATHS = ['/webapp/clinics', '/webapp/select-clinic']
 
 export function ClinicGuard({ children }: { children: React.ReactNode }) {
   const { clinic, loading } = useClinic()
@@ -16,7 +16,7 @@ export function ClinicGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return
     if (!clinic && !isPublicPath) {
-      router.replace('/webapp/select-clinic')
+      router.replace('/webapp/clinics')
     }
   }, [clinic, loading, isPublicPath, router])
 
