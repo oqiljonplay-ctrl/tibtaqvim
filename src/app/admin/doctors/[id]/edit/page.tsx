@@ -9,8 +9,13 @@ interface ServiceItem {
   type: string;
 }
 
+interface Branch {
+  id: string;
+  name: string;
+}
+
 const emptyForm = {
-  firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "",
+  firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "", branchId: "",
 };
 
 export default function EditDoctorPage() {
@@ -20,6 +25,7 @@ export default function EditDoctorPage() {
 
   const [form, setForm] = useState(emptyForm);
   const [services, setServices] = useState<ServiceItem[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,7 +36,8 @@ export default function EditDoctorPage() {
     Promise.all([
       fetch(`/api/admin/doctors/${doctorId}`, { credentials: "include" }).then((r) => r.json()),
       fetch(`/api/admin/services${clinicId ? `?clinicId=${clinicId}` : ""}`, { credentials: "include" }).then((r) => r.json()),
-    ]).then(([doctorJson, servicesJson]) => {
+      fetch("/api/admin/branches", { credentials: "include" }).then((r) => r.json()),
+    ]).then(([doctorJson, servicesJson, branchesJson]) => {
       if (doctorJson.success) {
         const d = doctorJson.data;
         setForm({
@@ -39,12 +46,14 @@ export default function EditDoctorPage() {
           specialty: d.specialty,
           phone: d.phone ?? "",
           photoUrl: d.photoUrl ?? "",
+          branchId: d.branchId ?? "",
         });
         setSelectedServiceIds(d.services.map((s: ServiceItem) => s.id));
       } else {
         setError("Shifokor ma'lumotlari topilmadi");
       }
       if (servicesJson.success) setServices(servicesJson.data);
+      if (branchesJson.success) setBranches(branchesJson.data);
       setLoading(false);
     }).catch(() => {
       setError("Ma'lumotlarni yuklashda xatolik");
@@ -74,6 +83,7 @@ export default function EditDoctorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          branchId: form.branchId || null,
           photoUrl: form.photoUrl || null,
           phone: form.phone || null,
           serviceIds: finalServiceIds,
@@ -136,6 +146,21 @@ export default function EditDoctorPage() {
               required
             />
           </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Filial</label>
+            <select
+              className="input"
+              value={form.branchId}
+              onChange={(e) => setForm((p) => ({ ...p, branchId: e.target.value }))}
+            >
+              <option value="">-- Filial yo&apos;q --</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Mutaxassislik *</label>
             <select

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, notFound } from "@/lib/api-response";
 import { canManageResources } from "@/lib/branch-scope";
+import { createAuditLog } from "@/lib/services/config.service";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -19,6 +20,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const { doctorIds, ...rest } = data;
 
+    // clinic_admin faqat o'z klinikasining filialini belgilashi mumkin
+    if (rest.branchId !== undefined && rest.branchId !== null && auth.role === "clinic_admin") {
+      const branch = await prisma.branch.findFirst({
+        where: { id: rest.branchId, isActive: true },
+        select: { clinicId: true },
+      });
+      if (!branch || branch.clinicId !== auth.clinicId) return forbidden();
+    }
+
     const updated = await prisma.service.update({
       where: { id: params.id },
       data: {
@@ -32,6 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         ...(rest.description !== undefined && { description: rest.description }),
         ...(rest.sortOrder !== undefined && { sortOrder: rest.sortOrder }),
         ...(rest.isActive !== undefined && { isActive: rest.isActive }),
+        ...(rest.branchId !== undefined && { branchId: rest.branchId }),
         ...(Array.isArray(doctorIds)
           ? {
               doctors: {
@@ -51,6 +62,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         },
       },
     });
+
+    if (rest.branchId !== undefined && service.branchId !== rest.branchId) {
+      await createAuditLog(
+        auth.userId,
+        "service.branch_change",
+        { serviceId: params.id, oldBranchId: service.branchId, newBranchId: rest.branchId },
+        service.clinicId
+      ).catch(() => {});
+    }
 
     return ok({
       ...updated,

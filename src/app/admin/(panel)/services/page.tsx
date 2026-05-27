@@ -19,6 +19,7 @@ interface Service {
   name: string;
   type: string;
   price: number;
+  branchId: string | null;
   requiresSlot: boolean;
   requiresAddress: boolean;
   requiresPrePayment: boolean;
@@ -96,8 +97,7 @@ export default function AdminServicesPage() {
         ? parseFloat(form.prePaymentAmount)
         : null,
       doctorIds: selectedDoctorIds,
-      // Yangi xizmat uchun branchId (tahrirlashda o'zgartirilmaydi)
-      ...(!editId && { branchId: branchId || null }),
+      branchId: branchId || null,
     };
 
     const url = editId ? `/api/admin/services/${editId}` : "/api/admin/services";
@@ -125,7 +125,7 @@ export default function AdminServicesPage() {
       description: "",
       requiresPrePayment: s.requiresPrePayment,
       prePaymentAmount: s.prePaymentAmount !== null ? String(s.prePaymentAmount) : "",
-      branchId: "",
+      branchId: s.branchId ?? "",
     });
     setSelectedDoctorIds(s.doctors.map((d) => d.id));
     setEditId(s.id);
@@ -207,8 +207,8 @@ export default function AdminServicesPage() {
               <input className="input" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
             </div>
 
-            {/* Filial — faqat yangi xizmat qo'shganda, ixtiyoriy */}
-            {!editId && branches.length > 0 && (
+            {/* Filial dropdown (ham yangi, ham tahrirlashda) */}
+            {branches.length > 0 && (
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Filial</label>
                 <select
