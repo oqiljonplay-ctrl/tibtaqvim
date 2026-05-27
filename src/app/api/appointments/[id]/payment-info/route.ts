@@ -6,18 +6,26 @@ import { decimalSumToTiyin, formatSum } from "@/lib/payment/money";
 export const runtime = "nodejs";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const tgid = new URL(req.url).searchParams.get("tgid");
+
   const appointment = await prisma.appointment.findUnique({
     where: { id: params.id },
     include: {
       service: true,
       clinic: { select: { paymentConfig: true } },
+      user: { select: { telegramId: true } },
     },
   });
   if (!appointment) {
     return NextResponse.json({ error: "Topilmadi" }, { status: 404 });
+  }
+
+  // Ownership tekshiruvi: bemor faqat o'z bronini ko'radi
+  if (!tgid || appointment.user?.telegramId !== tgid) {
+    return NextResponse.json({ error: "Ruxsat yo'q" }, { status: 403 });
   }
 
   const amountTiyin = decimalSumToTiyin(appointment.service.prePaymentAmount);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Container, Stack } from "@/components/layout";
 
 interface AppointmentInfo {
@@ -20,13 +20,19 @@ interface AppointmentInfo {
 
 export default function PayPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const [info, setInfo] = useState<AppointmentInfo | null>(null);
   const [loading, setLoading] = useState<"payme" | "click" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/appointments/${params.id}/payment-info`)
+    const tgid = searchParams.get("tgid")
+      ?? (typeof window !== "undefined" ? sessionStorage.getItem("tgid") : null);
+    const url = tgid
+      ? `/api/appointments/${params.id}/payment-info?tgid=${tgid}`
+      : `/api/appointments/${params.id}/payment-info`;
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) setFetchError(data.error);

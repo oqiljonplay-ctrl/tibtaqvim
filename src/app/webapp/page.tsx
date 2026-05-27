@@ -195,9 +195,6 @@ export default function WebApp() {
         tg.setHeaderColor?.("#2563eb");
       }
 
-      // STEP 1 — Telegram context log
-      console.log("[WebApp] initDataUnsafe:", tg?.initDataUnsafe);
-
       // tgId: SDK → URL tgid param fallback (bot har doim yuboradi)
       let tgId = getTelegramId(tg);
       if (!tgId) {
@@ -205,9 +202,6 @@ export default function WebApp() {
         if (paramTgId) tgId = paramTgId;
       }
       const tgFirstName = getTelegramFirstName(tg);
-
-      // STEP 2 — telegramId log
-      console.log("[WebApp] telegramId:", tgId);
 
       setTelegramId(tgId);
       // tgId sessionStorage'da saqlash — boshqa sahifalarda URL/initData yo'q bo'lsa ishlatadi
@@ -292,10 +286,6 @@ export default function WebApp() {
             setTgUser(user);
           }
         }
-
-        // STEP 2 — user log
-        console.log("[WebApp] user:", user);
-        console.log("[WebApp] user.phone:", user?.phone);
 
         // user mavjud bo'lsa → har doim dashboard
         if (user) {

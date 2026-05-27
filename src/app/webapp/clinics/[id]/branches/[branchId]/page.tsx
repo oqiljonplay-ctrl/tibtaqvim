@@ -3,6 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/Calendar";
 import { formatDateLabel } from "@/lib/calendar";
+import { Container } from "@/components/layout";
 import Link from "next/link";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
@@ -219,7 +220,7 @@ export default function BranchServicesPage() {
   const u = tgUser;
 
   return (
-    <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
+    <Container size="sm" className="min-h-[100dvh] bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="bg-blue-600 text-white pt-4 pb-6 px-4">
         <div className="flex items-center gap-2 mb-1">
@@ -515,7 +516,7 @@ export default function BranchServicesPage() {
           </div>
         )}
       </div>
-    </div>
+    </Container>
   );
 }
 
