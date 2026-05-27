@@ -73,6 +73,24 @@ enum RefundState {
   failed
 }
 
+enum AdChannelScope {
+  clinic
+  platform
+}
+
+enum AdCampaignStatus {
+  draft
+  scheduled
+  active
+  completed
+  cancelled
+}
+
+enum AdTargetType {
+  own
+  platform
+}
+
 // ─── CORE MODELS ─────────────────────────────────────────────────────────────
 
 model Clinic {
@@ -111,6 +129,8 @@ model Clinic {
   moduleConfigs ModuleConfig[]
   userClinics   UserClinic[]
   payments      Payment[]
+  adChannels    AdChannel[]
+  adCampaigns   AdCampaign[]
 
   @@index([isActive, city])
   @@index([subscriptionStatus])
@@ -562,4 +582,91 @@ model TelegramRelayLog {
   @@index([openedAt(sort: Desc)])
   @@index([kind])
   @@map("telegram_relay_log")
+}
+
+// ─── AD BROADCAST MODELS ──────────────────────────────────────────────────────
+
+model AdChannel {
+  id          String         @id @default(cuid())
+  title       String
+  chatId      String         @unique
+  type        String
+  username    String?
+  memberCount Int?
+
+  scope       AdChannelScope @default(clinic)
+  clinicId    String?
+  addedById   String
+
+  isActive    Boolean        @default(true)
+  addedAt     DateTime       @default(now())
+
+  clinic      Clinic?        @relation(fields: [clinicId], references: [id])
+  posts       AdPost[]
+  campaigns   AdCampaignChannel[]
+
+  @@index([scope])
+  @@index([clinicId])
+  @@map("ad_channels")
+}
+
+model AdCampaign {
+  id          String           @id @default(cuid())
+  clinicId    String
+  title       String
+  adText      String           @db.Text
+  imageUrl    String?
+  buttonText  String?
+  buttonUrl   String?
+
+  targetType  AdTargetType     @default(own)
+
+  startDate   DateTime
+  endDate     DateTime
+  frequency   String           @default("daily")
+
+  status      AdCampaignStatus @default(scheduled)
+  priority    Int              @default(0)
+
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  clinic      Clinic           @relation(fields: [clinicId], references: [id])
+  posts       AdPost[]
+  channels    AdCampaignChannel[]
+
+  @@index([clinicId])
+  @@index([status, startDate])
+  @@index([targetType, status])
+  @@map("ad_campaigns")
+}
+
+model AdCampaignChannel {
+  id         String     @id @default(cuid())
+  campaignId String
+  channelId  String
+
+  campaign   AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  channel    AdChannel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, channelId])
+  @@map("ad_campaign_channels")
+}
+
+model AdPost {
+  id         String     @id @default(cuid())
+  campaignId String
+  channelId  String
+  messageId  String?
+  status     String
+  errorText  String?
+  sentAt     DateTime   @default(now())
+
+  campaign   AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  channel    AdChannel  @relation(fields: [channelId], references: [id])
+
+  @@index([campaignId])
+  @@index([sentAt])
+  @@map("ad_posts")
 }
