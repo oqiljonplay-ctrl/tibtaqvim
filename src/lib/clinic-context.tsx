@@ -137,6 +137,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   // Sync clinic.id into URL `?clinic=` param
   useEffect(() => {
     if (!clinic || typeof window === 'undefined') return
+    if (pathname === '/webapp/my-clinics') return
     const currentParam = searchParams.get(URL_PARAM)
     if (currentParam !== clinic.id) {
       const newParams = new URLSearchParams(searchParams.toString())
