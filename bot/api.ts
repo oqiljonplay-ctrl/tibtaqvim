@@ -8,11 +8,13 @@ const API_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export async function fetchServices(
   clinicId: string,
-  date?: string
+  date?: string,
+  branchId?: string
 ): Promise<{ services: any[]; enableWebapp: boolean }> {
   const url = new URL(`${API_URL}/api/services`);
   url.searchParams.set("clinicId", clinicId);
   if (date) url.searchParams.set("date", date);
+  if (branchId) url.searchParams.set("branchId", branchId);
 
   const res = await fetch(url.toString());
   const json = await res.json();

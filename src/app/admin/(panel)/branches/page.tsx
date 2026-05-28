@@ -130,7 +130,7 @@ export default function BranchesPage() {
             </h2>
             <div className="space-y-3">
               {[
-                { label: "Nomi *", key: "name", placeholder: "Asosiy filial" },
+                { label: "Nomi *", key: "name", placeholder: "Bosh filial" },
                 { label: "Manzil", key: "address", placeholder: "Ko'cha, uy" },
                 { label: "Telefon", key: "phone", placeholder: "+998 90 000 00 00" },
                 { label: "Ish vaqti", key: "workingHours", placeholder: "08:00-20:00" },

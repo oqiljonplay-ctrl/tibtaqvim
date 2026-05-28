@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     await tx.branch.create({
       data: {
         clinicId:     clinic.id,
-        name:         "Asosiy filial",
+        name:         "Bosh filial",
         address:      address?.trim() || null,
         phone:        phone?.trim()   || null,
         workingHours: workingHours?.trim() || "08:00-20:00",

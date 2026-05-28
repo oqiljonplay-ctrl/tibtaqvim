@@ -207,23 +207,32 @@ export default function AdminServicesPage() {
               <input className="input" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
             </div>
 
-            {/* Filial dropdown (ham yangi, ham tahrirlashda) */}
+            {/* Filial dropdown */}
             {branches.length > 0 && (
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filial</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Filial {!editId && <span className="text-red-500">*</span>}
+                </label>
                 <select
                   className="input"
                   value={form.branchId}
                   onChange={(e) => setForm({ ...form, branchId: e.target.value })}
+                  required={!editId}
                 >
-                  <option value="">Barcha filiallar (umumiy)</option>
+                  {!editId ? (
+                    <option value="" disabled>— Filial tanlang —</option>
+                  ) : (
+                    <option value="">— Filial tanlanmagan (bemor uchun ko&apos;rinmaydi) —</option>
+                  )}
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  "Barcha filiallar" tanlanса xizmat klinikaning hamma filialida ko&apos;rinadi.
-                </p>
+                {!editId ? (
+                  <p className="text-xs text-gray-400 mt-1">Filial majburiy — tanlangan filialda ko&apos;rinadi.</p>
+                ) : (
+                  <p className="text-xs text-amber-500 mt-1">Filial tanlanmasa xizmat botda ko&apos;rinmaydi.</p>
+                )}
               </div>
             )}
             <div>

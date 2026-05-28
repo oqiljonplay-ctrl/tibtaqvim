@@ -69,7 +69,7 @@ export async function showServiceSelection(
   const state = await userState.get(chatId) ?? {};
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
 
-  const { services } = await fetchServices(clinicId, today);
+  const { services } = await fetchServices(clinicId, today, branchId);
 
   if (!services.length) {
     await bot.sendMessage(chatId, "⚠️ Bu klinikada hozirda xizmatlar yo'q. Keyinroq urinib ko'ring.");

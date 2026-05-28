@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
         clinicId,
         isActive: true,
         ...(type ? { type: type as any } : {}),
-        // branchId berilsa: o'sha filial xizmatlari + global (null) xizmatlar
-        ...(branchId ? { OR: [{ branchId }, { branchId: null }] } : {}),
+        // branchId berilsa: FAQAT o'sha filialga bog'langan xizmatlar (null = ko'rsatilmaydi)
+        ...(branchId ? { branchId } : {}),
       },
       include: {
         doctors: {
