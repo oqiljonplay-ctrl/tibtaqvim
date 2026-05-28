@@ -512,6 +512,32 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ---
 
+### 2026-05-28 — FLIP-CARD-02: BookingFlipCard — barcha bronlarda flip tuzatish
+
+**Maqsad:** FLIP-CARD-01 da yaratinan FlipCard komponentidagi balandlik muammosini tuzatish va barcha bron turlarida bir xil sifatli flip animatsiyani ta'minlash.
+
+**Muammolar tuzatildi:**
+- `absolute inset-0` + `minHeight: 220px` → tugmalar kesilishi (`overflow: hidden` klipi) → Variant A: old tomon `relative` (oqimda, balandlik belgilaydi), orqa `absolute inset-0 overflow-y-auto`
+- `overflow-hidden` wrapper div o'chirildi — 3D flip CSS perspektiv klip bo'lmasin
+- Flip tugmasi FAQAT `hasBackData` bo'lganda emas, shifokor bo'lsa HAR DOIM ko'rsatiladi
+- Bo'sh profil uchun chiroyli placeholder: "📋 Shifokor hali ma'lumot kiritmagan"
+- Mutaxassisliklar va qabul yo'nalishlari chip/tag formatida (vergul emas)
+
+**Yangi fayl:**
+- `src/components/webapp/BookingFlipCard.tsx` — reusable komponent, `BookingAppt` interface export, `Avatar`, `BackField`, `ChipList` ichki komponentlar
+
+**O'zgartirilgan fayllar:**
+- `src/app/webapp/page.tsx` — `BookingFlipCard` import, `todayAppts` + `upcomingAppts` ikkalasi ham yangi komponent, eski inline `FlipCard`/`DoctorPhoto`/`BackRow` olib tashlandi, `AppointmentCard` non-compact → `BookingFlipCard`
+
+**Tekshiruv:**
+- `tsc --noEmit`: exit 0
+- `npm run build`: exit 0
+- Deploy commit: `983907a`
+
+**Commit:** `983907a` — 2 fayl, +383/-235. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-05-28 — SERVICE-BRANCH-01: Xizmat-filial qat'iy bog'lash
 
 **Maqsad:** Admin "yo'q" deydi, bot "bor" deydi — noizchillikni bartaraf etish. "Bir manba, bir haqiqat" qoidasi.
@@ -1139,6 +1165,7 @@ Scope: `super_admin`=barcha; `clinic_admin`=branchId=null; `branch_admin`=o'z fi
 | 12 | Branch Isolation S1-S4 (services.branchId, scope) | ⭐⭐⭐ | ✅ Tugallandi (f22c9fb) |
 | 13 | Payment Workflow: Qabulxona/Shifokor ajratish | ⭐⭐⭐ | ✅ Tugallandi (a86df8a) |
 | 14 | FLIP-CARD-01: Shifokor profil flip card | ⭐⭐⭐ | ✅ Tugallandi (a2b1588) |
+| 15 | FLIP-CARD-02: BookingFlipCard barcha bronlarda | ⭐⭐⭐ | ✅ Tugallandi (983907a) |
 
 **Keyingi prioritetlar:** Click sandbox test → Uy xizmati natijalari → Doctor /stats grafiklar
 
