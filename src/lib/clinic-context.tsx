@@ -84,7 +84,72 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const initClinic = useCallback(async () => {
     setLoading(true)
 
-    // 1. URL param — bot deeplink yoki to'g'ridan link
+    const tgId = getTgId()
+
+    // ── TELEGRAM USER: DB yagona haqiqat manbai ─────────────────────────────
+    if (tgId) {
+      try {
+        const res = await fetch(`/api/me/clinics?tgid=${encodeURIComponent(tgId)}`)
+        if (res.ok) {
+          const data = await res.json()
+          const currentId: string | null = data?.currentClinicId ?? null
+          const clinics: { id: string }[] = data?.clinics ?? []
+
+          // 1. BEMOR TANLOVI USTUN: DB'da isCurrent=true bor
+          //    Bot deeplink (?clinic=...) ni E'TIBORGA OLMA — u har bot xabarida bor
+          if (currentId) {
+            const loaded = await loadClinic(currentId)
+            if (loaded) {
+              setClinicState(loaded)
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(STORAGE_KEY, loaded.id)
+              }
+              setLoading(false)
+              return
+            }
+          }
+
+          // 2. DB'da currentClinicId yo'q (yangi user, hech qachon tanlamagan)
+          //    URL param bor va u membership'da → uni ishlatib DB'ga yoz
+          const urlClinicId = searchParams.get(URL_PARAM) || searchParams.get('clinicId')
+          if (urlClinicId && clinics.find((c) => c.id === urlClinicId)) {
+            const loaded = await loadClinic(urlClinicId)
+            if (loaded) {
+              setClinicState(loaded)
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(STORAGE_KEY, loaded.id)
+              }
+              persistToDb(loaded.id)
+              setLoading(false)
+              return
+            }
+          }
+
+          // 3. Birinchi membership klinikasi default
+          if (clinics.length > 0) {
+            const loaded = await loadClinic(clinics[0].id)
+            if (loaded) {
+              setClinicState(loaded)
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(STORAGE_KEY, loaded.id)
+              }
+              persistToDb(loaded.id)
+              setLoading(false)
+              return
+            }
+          }
+
+          // 4. Membership yo'q — klinika tanlash sahifasiga
+          setClinicState(null)
+          setLoading(false)
+          return
+        }
+      } catch {}
+    }
+
+    // ── TELEGRAM ID YO'Q (brauzerda to'g'ridan kirgan) ──────────────────────
+    // URL param → localStorage tartibida
+
     const urlClinicId = searchParams.get(URL_PARAM) || searchParams.get('clinicId')
     if (urlClinicId) {
       const loaded = await loadClinic(urlClinicId)
@@ -92,20 +157,17 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         setClinicState(loaded)
         if (typeof window !== 'undefined') {
           localStorage.setItem(STORAGE_KEY, loaded.id)
-          // Bot deeplink — DB'ga ham saqlash (isCurrent)
-          persistToDb(loaded.id)
         }
         setLoading(false)
         return
       }
-      // Inactive / not found — URL paramni tozalash
+      // Topilmadi — URL'ni tozala
       const newParams = new URLSearchParams(searchParams.toString())
       newParams.delete(URL_PARAM)
       newParams.delete('clinicId')
       router.replace(`${pathname}?${newParams.toString()}`)
     }
 
-    // 2. localStorage
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
@@ -119,30 +181,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // 3. DB — isCurrent=true klinika (sessionlar orasida saqlanadi)
-    try {
-      const tgId = getTgId()
-      const url = tgId ? `/api/me/clinics?tgid=${tgId}` : '/api/me/clinics'
-      const res = await fetch(url)
-      if (res.ok) {
-        const data = await res.json()
-        // currentClinicId (yangi) yoki lastClinicId (eski — backward compat)
-        const targetId = data?.currentClinicId ?? data?.lastClinicId
-        if (targetId) {
-          const loaded = await loadClinic(targetId)
-          if (loaded) {
-            setClinicState(loaded)
-            if (typeof window !== 'undefined') {
-              localStorage.setItem(STORAGE_KEY, loaded.id)
-            }
-            setLoading(false)
-            return
-          }
-        }
-      }
-    } catch {}
-
-    // 4. Hech narsa topilmadi
     setClinicState(null)
     setLoading(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
