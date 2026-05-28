@@ -274,7 +274,7 @@ export default function BranchServicesPage() {
                         <div className="text-sm font-bold text-blue-600">{s.price.toLocaleString()} so&apos;m</div>
                         {s.dailyLimit && (
                           <div className={`text-xs mt-0.5 ${s.isAvailable ? "text-green-600" : "text-red-500"}`}>
-                            {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To&apos;ldi"}
+                            {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To'ldi"}
                           </div>
                         )}
                       </div>

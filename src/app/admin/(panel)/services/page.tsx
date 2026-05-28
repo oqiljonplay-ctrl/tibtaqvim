@@ -273,7 +273,7 @@ export default function AdminServicesPage() {
                     type="number"
                     value={form.prePaymentAmount}
                     onChange={(e) => setForm({ ...form, prePaymentAmount: e.target.value })}
-                    placeholder="Bo&apos;sh = 100%"
+                    placeholder="Bo'sh = 100%"
                     min="0"
                   />
                   <p className="text-xs text-gray-400 mt-1">Bo&apos;sh qoldirilsa, to&apos;liq narx talab qilinadi</p>
@@ -307,7 +307,7 @@ export default function AdminServicesPage() {
             )}
 
             <div className="md:col-span-2 flex gap-3">
-              <button type="submit" className="btn-primary">{editId ? "Saqlash" : "Qo&apos;shish"}</button>
+              <button type="submit" className="btn-primary">{editId ? "Saqlash" : "Qo'shish"}</button>
               <button type="button" className="btn-secondary" onClick={() => { setShowForm(false); setEditId(null); }}>Bekor</button>
             </div>
           </form>

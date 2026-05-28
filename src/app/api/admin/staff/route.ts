@@ -10,7 +10,7 @@ import { getBranchScope, canCreateAdmin } from "@/lib/branch-scope";
 export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if (!auth) return unauthorized();
-  if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+  if (!["super_admin", "clinic_admin", "branch_admin"].includes(auth.role)) return forbidden();
 
   const body = await req.json();
   const { firstName, lastName, phone: rawPhone, role, specialty, photoUrl, serviceIds } = body;
@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
     });
     if (!branch || branch.clinicId !== auth.clinicId) return forbidden();
     branchId = body.branchId;
+  } else if (auth.role === "branch_admin") {
+    branchId = auth.branchId ?? null;
   }
 
   const phone = normalizePhone(rawPhone);

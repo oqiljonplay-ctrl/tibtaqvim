@@ -471,6 +471,28 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-05-28 — SERVICE-BRANCH-01: Xizmat-filial qat'iy bog'lash
+
+**Maqsad:** Admin "yo'q" deydi, bot "bor" deydi — noizchillikni bartaraf etish. "Bir manba, bir haqiqat" qoidasi.
+
+**O'zgartirilgan fayllar:**
+- `bot/api.ts` — `fetchServices(clinicId, date?, branchId?)` — branchId parametr qo'shildi, URLga set qilinadi
+- `bot/handlers/clinicFlow.ts:72` — `fetchServices(clinicId, today, branchId)` — filial tanlangach branchId uzatiladi
+- `src/app/api/services/route.ts` — `OR [{branchId}, {branchId:null}]` → faqat `{branchId}` (null/global xizmatlar botda ko'rinmaydi)
+- `src/app/admin/(panel)/services/page.tsx` — yangi xizmat yaratishda filial dropdown MAJBURIY (`required`, "— Filial tanlang —" placeholder); tahrirlashda bo'sh qoldirishga ruxsat lekin amber ogohlantirish
+- `src/app/admin/(panel)/branches/page.tsx` — placeholder: "Asosiy filial" → "Bosh filial"
+- `src/app/api/admin/super/clinics/route.ts` — yangi klinika yaratilganda default branch nomi: "Asosiy filial" → "Bosh filial"
+
+**Qoida (o'zgarmas):**
+- `branchId=NULL` xizmatlar DB da saqlanib qoladi — admin qo'lda filialga bog'laydi
+- Bot NULL xizmatlarni KO'RSATMAYDI (branchId filteri strict)
+- Admin filial bog'langach bot darhol ko'rsatadi
+- Login/auth/bron logikasi tegilmadi
+
+**Commit:** `e8a3666` — 6 fayl. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-05-19 — Faza 5: Appointment History + UserClinic M2M
 
 **Maqsad:** Bemor o'z bron tarixini ko'ra olishi — "Shu klinika" va "Barcha klinikalar" tablari bilan.

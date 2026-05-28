@@ -873,7 +873,7 @@ export default function WebApp() {
                         )}
                         {s.dailyLimit && (
                           <div className={`text-xs mt-0.5 ${s.isAvailable ? "text-green-600" : "text-red-500"}`}>
-                            {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To&apos;ldi"}
+                            {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To'ldi"}
                           </div>
                         )}
                       </div>

@@ -187,6 +187,7 @@ export default function AdminDoctorsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [credentials, setCredentials] = useState<Credentials | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
+  const [isBranchAdmin, setIsBranchAdmin] = useState(false);
 
   useEffect(() => {
     fetchDoctors();
@@ -215,6 +216,13 @@ export default function AdminDoctorsPage() {
   }
 
   async function fetchBranches() {
+    const role = localStorage.getItem("user_role");
+    const myBranchId = localStorage.getItem("branchId");
+    if (role === "branch_admin" && myBranchId) {
+      setIsBranchAdmin(true);
+      setForm((prev) => ({ ...prev, branchId: myBranchId }));
+      return;
+    }
     const res = await fetch("/api/admin/branches", { credentials: "include" });
     const json = await res.json();
     if (json.success) {
@@ -269,7 +277,9 @@ export default function AdminDoctorsPage() {
       const json = await res.json();
       if (json.success) {
         setShowForm(false);
-        const defaultBranchId = branches.length === 1 ? branches[0].id : "";
+        const defaultBranchId = isBranchAdmin
+          ? (localStorage.getItem("branchId") || "")
+          : branches.length === 1 ? branches[0].id : "";
         setForm({ ...emptyForm, branchId: defaultBranchId });
         setSelectedServiceIds([]);
         setCredentials({
@@ -339,7 +349,9 @@ export default function AdminDoctorsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Shifokorlar</h1>
         <button
           onClick={() => {
-            const defaultBranchId = branches.length === 1 ? branches[0].id : "";
+            const defaultBranchId = isBranchAdmin
+              ? (localStorage.getItem("branchId") || "")
+              : branches.length === 1 ? branches[0].id : "";
             setForm({ ...emptyForm, branchId: defaultBranchId });
             setSelectedServiceIds([]);
             setShowForm(true);
@@ -384,24 +396,26 @@ export default function AdminDoctorsPage() {
               </div>
             </div>
 
-            {/* Filial tanlash */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Filial *</label>
-              <select
-                className="input"
-                value={form.branchId}
-                onChange={(e) => setForm({ ...form, branchId: e.target.value })}
-                required
-              >
-                {branches.length !== 1 && <option value="">-- Filialni tanlang --</option>}
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-              {branches.length === 0 && (
-                <p className="mt-1 text-xs text-red-600">⚠️ Hali filial qo'shilmagan.</p>
-              )}
-            </div>
+            {/* Filial tanlash — branch_admin uchun yashiriladi (avtomatik o'z filiali) */}
+            {!isBranchAdmin && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filial *</label>
+                <select
+                  className="input"
+                  value={form.branchId}
+                  onChange={(e) => setForm({ ...form, branchId: e.target.value })}
+                  required
+                >
+                  {branches.length !== 1 && <option value="">-- Filialni tanlang --</option>}
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                {branches.length === 0 && (
+                  <p className="mt-1 text-xs text-red-600">⚠️ Hali filial qo&apos;shilmagan.</p>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ism *</label>
@@ -506,7 +520,7 @@ export default function AdminDoctorsPage() {
             </div>
 
             <div className="md:col-span-2 flex gap-3">
-              <button type="submit" disabled={submitting || !form.branchId} className="btn-primary disabled:opacity-50">
+              <button type="submit" disabled={submitting || (!isBranchAdmin && !form.branchId)} className="btn-primary disabled:opacity-50">
                 {submitting ? "Saqlanmoqda..." : "Qo'shish"}
               </button>
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Bekor</button>
