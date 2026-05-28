@@ -199,27 +199,85 @@ model Service {
 }
 
 model Doctor {
-  id           String   @id @default(cuid())
-  clinicId     String
-  branchId     String?
-  userId       String?  @unique
-  firstName    String
-  lastName     String
-  specialty    String
-  phone        String?
-  photoUrl     String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  clinicId        String
+  branchId        String?
+  userId          String?  @unique
+  firstName       String
+  lastName        String
+  specialty       String
+  phone           String?
+  photoUrl        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  clinic       Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  branch       Branch?         @relation(fields: [branchId], references: [id])
-  user         User?           @relation(fields: [userId], references: [id])
-  appointments Appointment[]
-  services     ServiceDoctor[]
+  // FLIP-CARD-01 yangi maydonlar
+  education       String?
+  position        String?
+  department      String?
+  workSchedule    String?
+  operationsCount Int      @default(0)
+  bio             String?  @db.Text
+
+  clinic          Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  branch          Branch?           @relation(fields: [branchId], references: [id])
+  user            User?             @relation(fields: [userId], references: [id])
+  appointments    Appointment[]
+  services        ServiceDoctor[]
+  specialties     DoctorSpecialty[]
+  directions      DoctorDirection[]
+  experiences     DoctorExperience[]
+  workplaces      DoctorWorkplace[]
 
   @@index([clinicId])
   @@map("doctors")
+}
+
+model DoctorSpecialty {
+  id        String  @id @default(cuid())
+  doctorId  String
+  name      String
+  sortOrder Int     @default(0)
+  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@map("doctor_specialties")
+}
+
+model DoctorDirection {
+  id        String  @id @default(cuid())
+  doctorId  String
+  name      String
+  sortOrder Int     @default(0)
+  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@map("doctor_directions")
+}
+
+model DoctorExperience {
+  id        String  @id @default(cuid())
+  doctorId  String
+  place     String
+  startYear Int
+  endYear   Int?
+  sortOrder Int     @default(0)
+  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@map("doctor_experiences")
+}
+
+model DoctorWorkplace {
+  id        String  @id @default(cuid())
+  doctorId  String
+  place     String
+  sortOrder Int     @default(0)
+  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@map("doctor_workplaces")
 }
 
 model ServiceDoctor {

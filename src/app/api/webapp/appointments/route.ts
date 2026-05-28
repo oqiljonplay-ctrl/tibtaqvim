@@ -47,6 +47,12 @@ export async function GET(req: NextRequest) {
           select: {
             id: true, firstName: true, lastName: true,
             specialty: true, photoUrl: true,
+            education: true, position: true, department: true,
+            workSchedule: true, operationsCount: true, bio: true,
+            specialties: { select: { name: true }, orderBy: { sortOrder: "asc" } },
+            directions:  { select: { name: true }, orderBy: { sortOrder: "asc" } },
+            experiences: { select: { place: true, startYear: true, endYear: true }, orderBy: { sortOrder: "asc" } },
+            workplaces:  { select: { place: true }, orderBy: { sortOrder: "asc" } },
           },
         },
       },

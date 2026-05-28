@@ -35,6 +35,17 @@ interface AppointmentDoctor {
   lastName: string;
   specialty: string;
   photoUrl: string | null;
+  // Flip card profil maydonlari
+  education?: string | null;
+  position?: string | null;
+  department?: string | null;
+  workSchedule?: string | null;
+  operationsCount?: number;
+  bio?: string | null;
+  specialties?: { name: string }[];
+  directions?: { name: string }[];
+  experiences?: { place: string; startYear: number; endYear: number | null }[];
+  workplaces?: { place: string }[];
 }
 
 interface AppointmentItem {
@@ -603,83 +614,18 @@ export default function WebApp() {
           ) : todayAppts.length > 0 ? (
             <div className="mt-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📍 Bugungi qabul</p>
-              {todayAppts.map((a) => (
-                <div key={a.id} className="bg-white rounded-2xl shadow-sm border-2 border-blue-100 p-4 mb-3">
-                  {/* Yuqori: emoji + nom + sana */}
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <span className="text-2xl shrink-0">{typeEmojis[a.service.type] ?? "🏥"}</span>
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm leading-tight">{a.service.name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(a.date)}</p>
-                    </div>
+              <div className="space-y-3">
+                {todayAppts.map((a) => (
+                  <div key={a.id} className="border-2 border-blue-100 rounded-2xl overflow-hidden">
+                    <FlipCard
+                      appt={a}
+                      onCancel={cancelAppointment}
+                      onRebook={startRebook}
+                      cancellingId={cancellingId}
+                    />
                   </div>
-
-                  {/* Navbat raqami — markazda */}
-                  {a.queueNumber && (
-                    <div className="bg-blue-50 rounded-xl px-4 py-3 text-center mb-4">
-                      <p className="text-xs text-blue-500 mb-0.5">Navbat raqami</p>
-                      <p className="text-3xl font-bold text-blue-600">#{a.queueNumber}</p>
-                    </div>
-                  )}
-                  {a.slot && (
-                    <p className="text-xs text-gray-500 text-center mb-4">
-                      🕐 {a.slot.startTime} — {a.slot.endTime}
-                    </p>
-                  )}
-
-                  {/* Pastki: doctor foto chapda + status & tugmalar o'ngda tag-matag */}
-                  <div className="flex items-start gap-4">
-                    {/* Chap: shifokor foto 96px */}
-                    <div className="shrink-0">
-                      {a.doctor?.photoUrl ? (
-                        <img
-                          src={a.doctor.photoUrl}
-                          alt=""
-                          className="w-24 h-24 rounded-xl object-cover border border-gray-200"
-                        />
-                      ) : a.doctor ? (
-                        <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
-                          <span className="text-white text-2xl font-semibold">
-                            {a.doctor.firstName[0]}{a.doctor.lastName[0]}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="w-24 h-24 rounded-xl bg-gray-100 flex items-center justify-center">
-                          <span className="text-3xl">{typeEmojis[a.service.type] ?? "🏥"}</span>
-                        </div>
-                      )}
-                      {a.doctor && (
-                        <div className="mt-1.5 w-24 text-center">
-                          <p className="text-xs text-gray-700 font-medium leading-tight truncate">{a.doctor.specialty}</p>
-                          <p className="text-xs text-gray-500 leading-tight truncate">{a.doctor.lastName} {a.doctor.firstName}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* O'ng: status + tugmalar (tag-matag) */}
-                    <div className="flex-1 flex flex-col gap-2">
-                      <span className={`px-3 py-2 rounded-lg text-xs font-medium text-center ${statusStyle[a.status]}`}>
-                        {statusLabels[a.status]}
-                      </span>
-                      <button
-                        onClick={() => startRebook(a.serviceId)}
-                        className="w-full py-2.5 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all"
-                      >
-                        🔁 Qayta bron
-                      </button>
-                      {a.status === "booked" && (
-                        <button
-                          onClick={() => cancelAppointment(a.id)}
-                          disabled={cancellingId === a.id}
-                          className="w-full py-2.5 rounded-xl text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
-                        >
-                          {cancellingId === a.id ? "..." : "❌ Bekor qilish"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ) : (
             <div className="mt-3 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
@@ -1151,6 +1097,230 @@ export default function WebApp() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function DoctorPhoto({ doctor, size = 96 }: { doctor: AppointmentDoctor; size?: number }) {
+  const cls = `rounded-xl object-cover border border-gray-200`;
+  const style = { width: size, height: size };
+  if (doctor.photoUrl) {
+    return <img src={doctor.photoUrl} alt="" className={cls} style={style} />;
+  }
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center" style={style}>
+      <span className="text-white text-2xl font-semibold">
+        {doctor.firstName[0]}{doctor.lastName[0]}
+      </span>
+    </div>
+  );
+}
+
+function FlipCard({
+  appt, onCancel, onRebook, cancellingId,
+}: {
+  appt: AppointmentItem;
+  onCancel: (id: string) => void;
+  onRebook: (serviceId: string) => void;
+  cancellingId: string | null;
+}) {
+  const [flipped, setFlipped] = useState(false);
+  const doc = appt.doctor;
+
+  const hasBackData = doc && (
+    doc.education || doc.position || doc.department || doc.bio ||
+    (doc.specialties?.length ?? 0) > 0 ||
+    (doc.directions?.length ?? 0) > 0 ||
+    (doc.experiences?.length ?? 0) > 0 ||
+    (doc.workplaces?.length ?? 0) > 0 ||
+    (doc.operationsCount ?? 0) > 0
+  );
+
+  return (
+    <div style={{ perspective: "1000px" }} className="w-full">
+      <div
+        style={{
+          position: "relative",
+          transformStyle: "preserve-3d",
+          transition: "transform 0.55s ease",
+          transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          minHeight: "220px",
+        }}
+      >
+        {/* OLD TOMON */}
+        <div
+          style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
+          className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
+        >
+          {/* Flip tugmasi — faqat profil ma'lumoti bo'lsa */}
+          {hasBackData && (
+            <button
+              onClick={() => setFlipped(true)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-base hover:bg-blue-100 active:scale-95 transition-all z-10"
+              title="Shifokor ma'lumotlari"
+            >
+              ℹ
+            </button>
+          )}
+
+          {/* Xizmat nomi + sana */}
+          <div className="flex items-center gap-2.5 mb-3 pr-8">
+            <span className="text-xl shrink-0">{typeEmojis[appt.service.type] ?? "🏥"}</span>
+            <div>
+              <p className="font-semibold text-gray-900 text-sm">{appt.service.name}</p>
+              <p className="text-xs text-gray-400">{formatDate(appt.date)}</p>
+            </div>
+          </div>
+
+          {/* Ish vaqti (workSchedule) */}
+          {doc?.workSchedule && (
+            <p className="text-xs text-gray-500 mb-2">🕐 {doc.workSchedule}</p>
+          )}
+
+          {/* Navbat raqami */}
+          {appt.queueNumber && appt.queueMode !== "live" && (
+            <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-center mb-3">
+              <p className="text-xs text-blue-500 mb-0.5">Navbat raqami</p>
+              <p className="text-3xl font-bold text-blue-600">#{appt.queueNumber}</p>
+            </div>
+          )}
+          {appt.queueMode === "live" && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center mb-3">
+              <p className="text-xs font-semibold text-amber-800">💵 Kunlik ro'yxatga kirish</p>
+              <p className="text-xs text-amber-600 mt-0.5">Klinikada kassadan jonli navbat oling</p>
+            </div>
+          )}
+          {appt.slot && (
+            <p className="text-xs text-gray-500 text-center mb-3">🕐 {appt.slot.startTime} — {appt.slot.endTime}</p>
+          )}
+
+          {/* Shifokor foto + tugmalar */}
+          <div className="flex items-start gap-4">
+            <div className="shrink-0">
+              {doc ? (
+                <>
+                  <DoctorPhoto doctor={doc} size={96} />
+                  <div className="mt-1.5 w-24 text-center">
+                    <p className="text-xs text-gray-700 font-medium leading-tight truncate">{doc.specialty}</p>
+                    <p className="text-xs text-gray-500 leading-tight truncate">{doc.lastName} {doc.firstName}</p>
+                  </div>
+                </>
+              ) : (
+                <div className="w-24 h-24 rounded-xl bg-gray-100 flex items-center justify-center">
+                  <span className="text-3xl">{typeEmojis[appt.service.type] ?? "🏥"}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex-1 flex flex-col gap-2">
+              <span className={`px-3 py-2 rounded-lg text-xs font-medium text-center ${statusStyle[appt.status]}`}>
+                {statusLabels[appt.status]}
+              </span>
+              <button
+                onClick={() => onRebook(appt.serviceId)}
+                className="w-full py-2.5 rounded-xl text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all"
+              >
+                🔁 Qayta bron
+              </button>
+              {appt.status === "booked" && (
+                <button
+                  onClick={() => onCancel(appt.id)}
+                  disabled={cancellingId === appt.id}
+                  className="w-full py-2.5 rounded-xl text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {cancellingId === appt.id ? "..." : "❌ Bekor qilish"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ORQA TOMON */}
+        <div
+          style={{
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+          }}
+          className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-sm p-4 overflow-y-auto"
+        >
+          {/* Yuqori: orqaga tugma + ism */}
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={() => setFlipped(false)}
+              className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-sm hover:bg-white/30 transition-all shrink-0"
+            >
+              ←
+            </button>
+            {doc && (
+              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                <DoctorPhoto doctor={doc} size={44} />
+                <div className="min-w-0">
+                  <p className="text-white font-semibold text-sm truncate">{doc.lastName} {doc.firstName}</p>
+                  <p className="text-blue-200 text-xs truncate">{doc.specialty}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {doc ? (
+            <div className="space-y-3">
+              {doc.education && (
+                <BackRow icon="🎓" label="Ta'lim" value={doc.education} />
+              )}
+              {(doc.specialties?.length ?? 0) > 0 && (
+                <BackRow icon="⚕️" label="Mutaxassisliklar"
+                  value={doc.specialties!.map((s) => s.name).join(", ")} />
+              )}
+              {doc.position && (
+                <BackRow icon="🏅" label="Lavozimi" value={doc.position} />
+              )}
+              {(doc.directions?.length ?? 0) > 0 && (
+                <BackRow icon="🎯" label="Qabul yo'nalishlari"
+                  value={doc.directions!.map((d) => d.name).join(", ")} />
+              )}
+              {(doc.experiences?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-blue-200 text-xs mb-1.5">⏱ Tajriba</p>
+                  <div className="space-y-1">
+                    {doc.experiences!.map((exp, i) => (
+                      <p key={i} className="text-white text-xs bg-white/10 rounded-lg px-3 py-2">
+                        {exp.place} — {exp.startYear}–{exp.endYear ?? "hozir"}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(doc.workplaces?.length ?? 0) > 0 && (
+                <BackRow icon="🏥" label="Ish joylari"
+                  value={doc.workplaces!.map((w) => w.place).join(", ")} />
+              )}
+              {doc.department && (
+                <BackRow icon="🏢" label="Bo'limi" value={doc.department} />
+              )}
+              {(doc.operationsCount ?? 0) > 0 && (
+                <BackRow icon="✂️" label="Operatsiyalar" value={`${doc.operationsCount} ta`} />
+              )}
+              {doc.bio && (
+                <div className="bg-white/10 rounded-xl px-3 py-2.5">
+                  <p className="text-blue-200 text-xs mb-1">ℹ Bio</p>
+                  <p className="text-white text-xs leading-relaxed">{doc.bio}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-blue-200 text-sm text-center mt-8">Shifokor ma'lumotlari topilmadi</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BackRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <div className="bg-white/10 rounded-xl px-3 py-2.5">
+      <p className="text-blue-200 text-xs mb-0.5">{icon} {label}</p>
+      <p className="text-white text-sm font-medium leading-snug">{value}</p>
+    </div>
+  );
+}
+
 function AppointmentCard({
   appt, onCancel, onRebook, cancellingId, compact = false,
 }: {
@@ -1174,10 +1344,7 @@ function AppointmentCard({
           <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[appt.status]}`}>
             {statusLabels[appt.status]}
           </span>
-          <button
-            onClick={() => onRebook(appt.serviceId)}
-            className="text-xs text-blue-600 hover:underline"
-          >
+          <button onClick={() => onRebook(appt.serviceId)} className="text-xs text-blue-600 hover:underline">
             🔁
           </button>
         </div>
@@ -1185,90 +1352,7 @@ function AppointmentCard({
     );
   }
 
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-      {/* Yuqori: emoji + nom + sana */}
-      <div className="flex items-center gap-2.5 mb-3">
-        <span className="text-xl shrink-0">{typeEmojis[appt.service.type] ?? "🏥"}</span>
-        <div>
-          <p className="font-semibold text-gray-900 text-sm">{appt.service.name}</p>
-          <p className="text-xs text-gray-400">{formatDate(appt.date)}</p>
-        </div>
-      </div>
-
-      {/* Navbat raqami — markazda (online rejim) */}
-      {appt.queueNumber && appt.queueMode !== "live" && (
-        <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-center mb-3">
-          <p className="text-xs text-blue-500 mb-0.5">Navbat raqami</p>
-          <p className="text-3xl font-bold text-blue-600">#{appt.queueNumber}</p>
-        </div>
-      )}
-
-      {/* Live rejim badge */}
-      {appt.queueMode === "live" && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center mb-3">
-          <p className="text-xs font-semibold text-amber-800">💵 Kunlik ro&apos;yxatga kirish</p>
-          <p className="text-xs text-amber-600 mt-0.5">Klinikada kassadan jonli navbat oling</p>
-        </div>
-      )}
-
-      {appt.slot && (
-        <p className="text-xs text-gray-500 text-center mb-4">🕐 {appt.slot.startTime} — {appt.slot.endTime}</p>
-      )}
-
-      {/* Pastki: doctor foto chapda + status & tugmalar o'ngda tag-matag */}
-      <div className="flex items-start gap-4">
-        {/* Chap: shifokor foto 96px */}
-        <div className="shrink-0">
-          {appt.doctor?.photoUrl ? (
-            <img
-              src={appt.doctor.photoUrl}
-              alt=""
-              className="w-24 h-24 rounded-xl object-cover border border-gray-200"
-            />
-          ) : appt.doctor ? (
-            <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
-              <span className="text-white text-2xl font-semibold">
-                {appt.doctor.firstName[0]}{appt.doctor.lastName[0]}
-              </span>
-            </div>
-          ) : (
-            <div className="w-24 h-24 rounded-xl bg-gray-100 flex items-center justify-center">
-              <span className="text-3xl">{typeEmojis[appt.service.type] ?? "🏥"}</span>
-            </div>
-          )}
-          {appt.doctor && (
-            <div className="mt-1.5 w-24 text-center">
-              <p className="text-xs text-gray-700 font-medium leading-tight truncate">{appt.doctor.specialty}</p>
-              <p className="text-xs text-gray-500 leading-tight truncate">{appt.doctor.lastName} {appt.doctor.firstName}</p>
-            </div>
-          )}
-        </div>
-
-        {/* O'ng: status + tugmalar (tag-matag) */}
-        <div className="flex-1 flex flex-col gap-2">
-          <span className={`px-3 py-2 rounded-lg text-xs font-medium text-center ${statusStyle[appt.status]}`}>
-            {statusLabels[appt.status]}
-          </span>
-          <button
-            onClick={() => onRebook(appt.serviceId)}
-            className="w-full py-2.5 rounded-xl text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all"
-          >
-            🔁 Qayta bron
-          </button>
-          {appt.status === "booked" && (
-            <button
-              onClick={() => onCancel(appt.id)}
-              disabled={cancellingId === appt.id}
-              className="w-full py-2.5 rounded-xl text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
-            >
-              {cancellingId === appt.id ? "..." : "❌ Bekor qilish"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return <FlipCard appt={appt} onCancel={onCancel} onRebook={onRebook} cancellingId={cancellingId} />;
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
