@@ -538,6 +538,39 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ---
 
+### 2026-05-28 — FLIP-CARD-03: Barcha bo'limlarda flip + butun karta bosiladigan
+
+**Maqsad:** FLIP-CARD-02 da yaratilgan `BookingFlipCard` komponentini barcha bron bo'limlariga to'liq qo'llash va butun karta yuzasini bosiladigan qilish.
+
+**Muammolar tuzatildi:**
+1. **Tarix bo'limi flip yo'q edi:** `AppointmentCard compact` inline JSX → `BookingFlipCard` ga almashtirildi. Endi barcha 3 bo'lim (bugungi, yaqinlashayotgan, tarix) faqat bitta komponent.
+2. **Flip faqat ℹ️ tugmada edi:** Old yuz to'liq `onClick={() => setFlipped(true)}` — rasm, ism, sana, bo'sh joy hammasi bosilsa flip qiladi.
+3. **Orqa yuz ham butun yuza bosilganda yopiladi:** `onClick={() => setFlipped(false)}`.
+
+**O'zgartirilgan fayllar:**
+- `src/components/webapp/BookingFlipCard.tsx`:
+  - Old yuz div: `onClick={() => setFlipped(true)}` + `cursor-pointer active:scale-[0.99] transition-transform`
+  - Orqa yuz div: `onClick={() => setFlipped(false)}` + `cursor-pointer`
+  - Amal tugmalari `e.stopPropagation()` SAQLANDI — flip bo'lmaydi, tugma o'z funksiyasini bajaradi
+- `src/app/webapp/page.tsx`:
+  - Tarix bo'limi: `AppointmentCard compact` → `BookingFlipCard`
+  - `AppointmentCard` komponenti o'chirildi (to'liq unused)
+  - `statusLabels`, `statusStyle`, `formatDate` o'chirildi (unused)
+
+**Qoida (o'zgarmas):**
+- BITTA komponent (`BookingFlipCard`) — barcha bron bo'limlari, hamma vaqt
+- Kelajakda yangi bo'lim/klinika/shifokor qo'shilsa AVTOMATIK flip ishlaydi
+- Amal tugmasi (Qayta bron / Bekor qilish) bosilganda: flip YO'Q + tugma funksiyasi ishlaydi (e.stopPropagation)
+
+**Tekshiruv:**
+- `tsc --noEmit`: exit 0
+- `npm run build`: exit 0
+- `grep AppointmentCard|statusLabels|statusStyle|formatDate page.tsx` → faqat `formatDateLabel` (lib import) — inline kartochka qolmadi
+
+**Commit:** `742bf82` — 2 fayl, +6/-59. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-05-28 — SERVICE-BRANCH-01: Xizmat-filial qat'iy bog'lash
 
 **Maqsad:** Admin "yo'q" deydi, bot "bor" deydi — noizchillikni bartaraf etish. "Bir manba, bir haqiqat" qoidasi.
@@ -1166,6 +1199,7 @@ Scope: `super_admin`=barcha; `clinic_admin`=branchId=null; `branch_admin`=o'z fi
 | 13 | Payment Workflow: Qabulxona/Shifokor ajratish | ⭐⭐⭐ | ✅ Tugallandi (a86df8a) |
 | 14 | FLIP-CARD-01: Shifokor profil flip card | ⭐⭐⭐ | ✅ Tugallandi (a2b1588) |
 | 15 | FLIP-CARD-02: BookingFlipCard barcha bronlarda | ⭐⭐⭐ | ✅ Tugallandi (983907a) |
+| 16 | FLIP-CARD-03: Barcha bo'limlarda flip + butun karta bosiladigan | ⭐⭐⭐ | ✅ Tugallandi (742bf82) |
 
 **Keyingi prioritetlar:** Click sandbox test → Uy xizmati natijalari → Doctor /stats grafiklar
 
