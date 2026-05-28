@@ -71,15 +71,6 @@ const typeEmojis: Record<string, string> = {
 const typeLabels: Record<string, string> = {
   doctor_queue: "Shifokor navbati", diagnostic: "Diagnostika", home_service: "Uyga chiqish",
 };
-const statusLabels: Record<string, string> = {
-  booked: "Kutilmoqda", arrived: "Keldi", missed: "Kelmadi", cancelled: "Bekor",
-};
-const statusStyle: Record<string, string> = {
-  booked: "bg-blue-50 text-blue-700 border border-blue-200",
-  arrived: "bg-green-50 text-green-700 border border-green-200",
-  missed: "bg-red-50 text-red-700 border border-red-200",
-  cancelled: "bg-gray-100 text-gray-500 border border-gray-200",
-};
 
 // ─── Telegram helpers ─────────────────────────────────────────────────────────
 
@@ -121,10 +112,6 @@ function getTelegramFirstName(tg: any): string {
     } catch {}
   }
   return "";
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" });
 }
 
 function todayStr() {
@@ -659,13 +646,12 @@ export default function WebApp() {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📋 Tarix</p>
               <div className="space-y-2">
                 {historyAppts.slice(0, 5).map((a) => (
-                  <AppointmentCard
+                  <BookingFlipCard
                     key={a.id}
-                    appt={a}
+                    appointment={a}
                     onCancel={cancelAppointment}
                     onRebook={startRebook}
                     cancellingId={cancellingId}
-                    compact
                   />
                 ))}
               </div>
@@ -1096,47 +1082,6 @@ export default function WebApp() {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function AppointmentCard({
-  appt, onCancel, onRebook, cancellingId, compact = false,
-}: {
-  appt: AppointmentItem;
-  onCancel: (id: string) => void;
-  onRebook: (serviceId: string) => void;
-  cancellingId: string | null;
-  compact?: boolean;
-}) {
-  if (compact) {
-    return (
-      <div className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="text-lg shrink-0">{typeEmojis[appt.service.type] ?? "🏥"}</span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-800 truncate">{appt.service.name}</p>
-            <p className="text-xs text-gray-400">{formatDate(appt.date)}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[appt.status]}`}>
-            {statusLabels[appt.status]}
-          </span>
-          <button onClick={() => onRebook(appt.serviceId)} className="text-xs text-blue-600 hover:underline">
-            🔁
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <BookingFlipCard
-      appointment={appt}
-      onCancel={onCancel}
-      onRebook={onRebook}
-      cancellingId={cancellingId}
-    />
-  );
-}
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (

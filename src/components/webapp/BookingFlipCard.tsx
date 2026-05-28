@@ -156,7 +156,8 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
         {/* ── OLD TOMON: relative → container balandligini belgilaydi ── */}
         <div
           style={frontStyle}
-          className="relative bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
+          onClick={() => setFlipped(true)}
+          className="relative bg-white rounded-2xl shadow-sm border border-gray-100 p-4 cursor-pointer active:scale-[0.99] transition-transform"
         >
           {/* Flip tugmasi — shifokor bo'lsa har doim ko'rsatiladi */}
           {doc && (
@@ -259,7 +260,8 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
         {/* ── ORQA TOMON: absolute inset-0, overflow-y-auto ── */}
         <div
           style={backStyle}
-          className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-sm p-4"
+          onClick={() => setFlipped(false)}
+          className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-sm p-4 cursor-pointer"
         >
           {/* Header: orqaga tugma + shifokor mini info */}
           <div className="flex items-center gap-3 mb-4">
