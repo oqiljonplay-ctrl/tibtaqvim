@@ -7,6 +7,7 @@ import { useClinic } from "@/lib/clinic-context";
 import { ClinicSwitcher } from "@/components/webapp/ClinicSwitcher";
 import { ClinicLogo } from "@/components/ClinicLogo";
 import { BookingFlipCard } from "@/components/webapp/BookingFlipCard";
+import { ServicePicker } from "@/components/webapp/ServicePicker";
 
 declare global {
   interface Window { Telegram?: { WebApp?: any } }
@@ -774,62 +775,12 @@ export default function WebApp() {
             {userLoading && (
               <div className="text-xs text-center text-gray-400 mb-3 animate-pulse">⏳ Tekshirilmoqda...</div>
             )}
-            <h2 className="font-semibold text-gray-900 mb-4">Xizmatni tanlang</h2>
-            {bookingLoading ? (
-              <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Yuklanmoqda...</div>
-            ) : (
-              <div className="space-y-3">
-                {services.map((s) => (
-                  <button
-                    key={s.id}
-                    disabled={!s.isAvailable || userLoading}
-                    onClick={() => selectService(s)}
-                    className={`w-full text-left rounded-2xl border-2 p-4 transition-all ${
-                      s.isAvailable && !userLoading
-                        ? "bg-white border-transparent shadow-sm active:scale-95 hover:border-blue-100"
-                        : "bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{typeEmojis[s.type] ?? "🏥"}</span>
-                        <div>
-                          <div className="font-semibold text-gray-900 text-sm">{s.name}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">{typeLabels[s.type]}</div>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0 ml-2">
-                        <div className="text-sm font-bold text-blue-600">{s.price.toLocaleString()} so&apos;m</div>
-                        {s.requiresPrePayment && (
-                          <div className="text-xs mt-0.5 text-orange-600">Oldindan to&apos;lov</div>
-                        )}
-                        {s.dailyLimit && (
-                          <div className={`text-xs mt-0.5 ${s.isAvailable ? "text-green-600" : "text-red-500"}`}>
-                            {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To'ldi"}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {s.doctors && s.doctors.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-3">
-                        {s.doctors.map((doc) => (
-                          <div key={doc.id} className="flex items-center gap-2">
-                            {doc.photoUrl ? (
-                              <img src={doc.photoUrl} alt="" className="w-24 h-24 rounded-full object-cover flex-shrink-0" />
-                            ) : (
-                              <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                <span className="text-blue-600 text-2xl font-bold leading-none">{doc.firstName[0]}</span>
-                              </div>
-                            )}
-                            <span className="text-xs text-gray-500">{doc.specialty} — {doc.lastName} {doc.firstName}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
+            <ServicePicker
+              services={services}
+              loading={bookingLoading}
+              onSelect={selectService}
+              userLoading={userLoading}
+            />
           </div>
         )}
 

@@ -5,13 +5,13 @@ import { Calendar } from "@/components/Calendar";
 import { formatDateLabel } from "@/lib/calendar";
 import { Container } from "@/components/layout";
 import Link from "next/link";
+import { ServicePicker } from "@/components/webapp/ServicePicker";
+import type { Service } from "@/components/webapp/ServicePicker";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
 
 type BookingStep = "services" | "date" | "slots" | "patient" | "form" | "confirm" | "done";
 
-interface ServiceDoctor { id: string; firstName: string; lastName: string; specialty: string; photoUrl: string | null; queueMode?: string }
-interface Service { id: string; name: string; type: string; price: number; requiresSlot: boolean; requiresAddress: boolean; requiresPrePayment: boolean; dailyLimit: number | null; todayCount: number; isAvailable: boolean; defaultQueueMode?: string; doctors: ServiceDoctor[] }
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
 interface Dependent { id: string; firstName: string; lastName: string | null; phone: string | null; relation: string | null }
 interface TgUser { id: string; firstName: string; lastName: string | null; fullName: string; phone: string | null; tibId: string | null; hasPhone: boolean; dependents: Dependent[]; canAddDependent: boolean }
@@ -252,38 +252,11 @@ export default function BranchServicesPage() {
 
         {/* Services */}
         {step === "services" && (
-          <div>
-            <h2 className="font-semibold text-gray-900 mb-4">Xizmatni tanlang</h2>
-            {loading ? (
-              <div className="flex items-center justify-center h-32 text-gray-400 text-sm animate-pulse">Yuklanmoqda...</div>
-            ) : (
-              <div className="space-y-3">
-                {services.map((s) => (
-                  <button key={s.id} disabled={!s.isAvailable}
-                    onClick={() => { setSelSvc(s); setSelDate(""); setSelSlot(""); setStep("date"); }}
-                    className={`w-full text-left rounded-2xl border-2 p-4 transition-all ${s.isAvailable ? "bg-white border-transparent shadow-sm active:scale-95 hover:border-blue-100" : "bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed"}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{typeEmojis[s.type] ?? "🏥"}</span>
-                        <div>
-                          <div className="font-semibold text-gray-900 text-sm">{s.name}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">{typeLabels[s.type]}</div>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0 ml-2">
-                        <div className="text-sm font-bold text-blue-600">{s.price.toLocaleString()} so&apos;m</div>
-                        {s.dailyLimit && (
-                          <div className={`text-xs mt-0.5 ${s.isAvailable ? "text-green-600" : "text-red-500"}`}>
-                            {s.isAvailable ? `${s.dailyLimit - s.todayCount} joy` : "To'ldi"}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <ServicePicker
+            services={services}
+            loading={loading}
+            onSelect={(s) => { setSelSvc(s); setSelDate(""); setSelSlot(""); setStep("date"); }}
+          />
         )}
 
         {/* Date */}
