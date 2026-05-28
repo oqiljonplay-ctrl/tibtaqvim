@@ -11,11 +11,11 @@ export async function POST(
 ) {
   const auth = requireAuth(req);
   if (!auth) return unauthorized();
-  if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+  if (!["super_admin", "clinic_admin", "branch_admin"].includes(auth.role)) return forbidden();
 
   const doctor = await prisma.doctor.findUnique({
     where: { id: params.id },
-    select: { id: true, clinicId: true, userId: true, firstName: true, lastName: true },
+    select: { id: true, clinicId: true, branchId: true, userId: true, firstName: true, lastName: true },
   });
 
   if (!doctor) return notFound("Shifokor topilmadi");
@@ -31,6 +31,10 @@ export async function POST(
   if (auth.role === "clinic_admin") {
     if (doctor.clinicId !== auth.clinicId) return forbidden();
     if (targetUser.id === auth.userId) return forbidden();
+  }
+  if (auth.role === "branch_admin") {
+    if (doctor.clinicId !== auth.clinicId) return forbidden();
+    if (doctor.branchId !== auth.branchId) return forbidden();
   }
 
   const newPassword = generateRandomPassword(12);
