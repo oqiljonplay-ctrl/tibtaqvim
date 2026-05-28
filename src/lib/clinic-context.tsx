@@ -35,6 +35,23 @@ export function useClinic() {
   return ctx
 }
 
+function getTgId(): string | null {
+  if (typeof window === 'undefined') return null
+  return (
+    sessionStorage.getItem('tgid') ||
+    new URLSearchParams(window.location.search).get('tgid') ||
+    null
+  )
+}
+
+function persistToDb(clinicId: string) {
+  const tgId = getTgId()
+  if (!tgId) return
+  fetch(`/api/webapp/clinics/${clinicId}/select?tgid=${encodeURIComponent(tgId)}`, {
+    method: 'POST',
+  }).catch(() => {})
+}
+
 export function ClinicProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -48,7 +65,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       const res = await fetch(`/api/clinics/${id}`)
       if (!res.ok) return null
       const data = await res.json()
-      // /api/clinics/[id] wraps in { data: { id, name, ... } }
       const c = data?.data
       if (!c?.id) return null
       return {
@@ -68,7 +84,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const initClinic = useCallback(async () => {
     setLoading(true)
 
-    // 1. URL param — support both `clinic` and legacy `clinicId`
+    // 1. URL param — bot deeplink yoki to'g'ridan link
     const urlClinicId = searchParams.get(URL_PARAM) || searchParams.get('clinicId')
     if (urlClinicId) {
       const loaded = await loadClinic(urlClinicId)
@@ -76,11 +92,13 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         setClinicState(loaded)
         if (typeof window !== 'undefined') {
           localStorage.setItem(STORAGE_KEY, loaded.id)
+          // Bot deeplink — DB'ga ham saqlash (isCurrent)
+          persistToDb(loaded.id)
         }
         setLoading(false)
         return
       }
-      // Inactive / not found — clean URL param
+      // Inactive / not found — URL paramni tozalash
       const newParams = new URLSearchParams(searchParams.toString())
       newParams.delete(URL_PARAM)
       newParams.delete('clinicId')
@@ -101,18 +119,17 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // 3. API — last booked clinic (via telegramId from URL)
+    // 3. DB — isCurrent=true klinika (sessionlar orasida saqlanadi)
     try {
-      const tgId = typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('tgid')
-        : null
+      const tgId = getTgId()
       const url = tgId ? `/api/me/clinics?tgid=${tgId}` : '/api/me/clinics'
       const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
-        const lastId = data?.lastClinicId
-        if (lastId) {
-          const loaded = await loadClinic(lastId)
+        // currentClinicId (yangi) yoki lastClinicId (eski — backward compat)
+        const targetId = data?.currentClinicId ?? data?.lastClinicId
+        if (targetId) {
+          const loaded = await loadClinic(targetId)
           if (loaded) {
             setClinicState(loaded)
             if (typeof window !== 'undefined') {
@@ -125,7 +142,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
 
-    // 4. Nothing found
+    // 4. Hech narsa topilmadi
     setClinicState(null)
     setLoading(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -134,14 +151,14 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     initClinic()
   }, []) // mount-only
 
-  // Sync clinic.id into URL `?clinic=` param
+  // Clinic.id ni URL `?clinic=` parametriga sync qilish
   useEffect(() => {
     if (!clinic || typeof window === 'undefined') return
     if (pathname === '/webapp/my-clinics') return
     const currentParam = searchParams.get(URL_PARAM)
     if (currentParam !== clinic.id) {
       const newParams = new URLSearchParams(searchParams.toString())
-      newParams.delete('clinicId') // remove legacy param
+      newParams.delete('clinicId')
       newParams.set(URL_PARAM, clinic.id)
       router.replace(`${pathname}?${newParams.toString()}`)
     }
@@ -151,9 +168,10 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     setClinicState(c)
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY, c.id)
-      // Clear any in-progress booking state
+      // DB'ga saqlash (fire-and-forget) — sessiyalar orasida saqlanadi
+      persistToDb(c.id)
       ;['booking_draft', 'cart', 'selected_service', 'selected_doctor', 'selected_slot'].forEach(
-        (k) => localStorage.removeItem(k)
+        (k) => localStorage.removeItem(k),
       )
     }
   }, [])

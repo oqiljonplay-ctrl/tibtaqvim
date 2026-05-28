@@ -370,12 +370,14 @@ model Dependent {
 }
 
 model UserClinic {
-  id        String   @id @default(cuid())
-  userId    String
-  clinicId  String
-  role      UserRole @default(patient)
-  joinedAt  DateTime @default(now())
-  isActive  Boolean  @default(true)
+  id             String    @id @default(cuid())
+  userId         String
+  clinicId       String
+  role           UserRole  @default(patient)
+  joinedAt       DateTime  @default(now())
+  isActive       Boolean   @default(true)
+  isCurrent      Boolean   @default(false)
+  lastSelectedAt DateTime?
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
@@ -383,6 +385,7 @@ model UserClinic {
   @@unique([userId, clinicId])
   @@index([userId])
   @@index([clinicId])
+  @@index([userId, isCurrent])
   @@map("user_clinics")
 }
 
