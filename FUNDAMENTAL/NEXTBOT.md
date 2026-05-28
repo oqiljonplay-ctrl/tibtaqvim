@@ -601,6 +601,35 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ---
 
+### 2026-05-28 — CLINIC-CURRENT-02: Bot deeplink override tuzatildi (DB tanlovi ustun)
+
+**Muammo:** CLINIC-CURRENT-01 da frontend `initClinic()` URL param `?clinic=...` ni BIRINCHI tekshirardi. Bot HAR xabarga `?clinic=clinic-demo` qo'shadi → har ochilishda BUYUK TABIB ni DB'ga yozib, bemor tanlagan klinikani o'chirardi.
+
+**Root cause:** `initClinic` prioritet tartibi noto'g'ri edi:
+- Eski: 1) URL param → 2) localStorage → 3) DB
+- To'g'ri: 1) DB (currentClinicId) → 2) URL param faqat yangi user uchun → 3) localStorage
+
+**O'zgartirilgan fayl:** `src/lib/clinic-context.tsx` — faqat `initClinic()` funksiyasi qayta yozildi.
+
+**Yangi mantiq:**
+- tgId bor → avval DB'dan `currentClinicId` ol
+- `currentClinicId` bor → uni ishlat, URL param'ni butunlay e'tiborsiz qoldur
+- `currentClinicId` null (yangi user) → URL param membership'da bo'lsa ishlatib DB'ga yoz
+- Membership yo'q → `/webapp/clinics` sahifasiga yo'naltir
+- tgId yo'q (brauzerda to'g'ri kirgan) → URL param → localStorage
+
+**Diagnostik natija:** `GET /api/me/clinics?tgid=986660442` → `currentClinicId: "cmpay6dn80002l504rr8qez3t"` (Test klinika) ✅
+
+**Tekshiruv:**
+- `tsc --noEmit`: exit 0 ✅
+- `next build`: exit 0 ✅
+- API test real user 986660442: currentClinicId = Test klinika ✅
+- Vercel runtime errors: 0 ✅
+
+**Commit:** `c28e3b7` — 1 fayl: +67/-29. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-05-28 — CLINIC-CURRENT-01: Tanlangan klinikani DB'da doimiy saqlash
 
 **Maqsad:** Bemor "Mening klinikalarim"dan klinika tanlaganda, sessiya, qurilma, brauzer keshi o'zgarganda ham HALI HAM o'sha klinika ko'rinishi. Ilgari: tanlov faqat `localStorage`'da edi — boshqa qurilmada yo'qolardi.
