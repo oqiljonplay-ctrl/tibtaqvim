@@ -571,6 +571,76 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ---
 
+### 2026-05-28 — SERVICE-PICKER-01: Rasmli xizmat tanlash YAGONA komponent
+
+**Maqsad:** Webapp "Qabulga yozilish → Xizmatni tanlang" ekrani IKKI versiyada render bo'lardi — asosiy flow (page.tsx) rasmli, clinics/[id]/branches/[branchId] rasmsiz. Yagona `ServicePicker` komponentiga birlashtirildi.
+
+**Muammo:** Klassik "kod ikki nusxa" — xizmat tanlash ro'yxati ikki joyda inline JSX sifatida yozilgan edi. Biri (page.tsx) shifokor avatarlarini ko'rsatardi, ikkinchisi (branchId/page.tsx) ko'rsatmasdi.
+
+**Yechim:**
+1. `src/components/webapp/ServicePicker.tsx` — yangi YAGONA reusable komponent
+   - `Service`, `ServiceDoctor` tiplari export
+   - Props: `services`, `loading`, `onSelect`, `userLoading?`
+   - doctor.photoUrl bor → `<img class="w-8 h-8 rounded-full">` 
+   - doctor.photoUrl yo'q → `<div class="w-8 h-8 rounded-full bg-blue-100">` + ism bosh harfi
+   - Bir nechta shifokorli xizmat → hammasi ro'yxat (Mskt 2ta, Nevropatolog 2ta)
+2. `src/app/webapp/clinics/[id]/branches/[branchId]/page.tsx` — rasmsiz inline JSX → `<ServicePicker>` (Service type import qilindi, local interface o'chirildi)
+3. `src/app/webapp/page.tsx` — rasmli inline JSX → `<ServicePicker>` (userLoading prop bilan)
+
+**API:** `/api/services` allaqachon `doctors[].photoUrl` qaytaradi — o'zgarish yo'q.
+
+**Tekshiruv:**
+- `tsc --noEmit`: exit 0
+- `npm run build`: exit 0
+- Playwright Flow 2 (branchId): 11 photo + 2 fallback ✓
+- Playwright Flow 1 (page.tsx): 12 photo + 2 fallback ✓
+- LOR O'ktamov (photoUrl null) → "I" fallback (ko'k doira) ✓
+- Dietolog Qilichev (photoUrl null) → "R" fallback ✓
+
+**Commit:** `e8a6959` — 3 fayl: +130/-90. Deploy: tibtaqvim-f9yhkpix0-oqiljonplay-ctrls-projects.vercel.app ✅
+
+---
+
+### 2026-05-28 — CLINIC-CURRENT-01: Tanlangan klinikani DB'da doimiy saqlash
+
+**Maqsad:** Bemor "Mening klinikalarim"dan klinika tanlaganda, sessiya, qurilma, brauzer keshi o'zgarganda ham HALI HAM o'sha klinika ko'rinishi. Ilgari: tanlov faqat `localStorage`'da edi — boshqa qurilmada yo'qolardi.
+
+**Muammo:** `user_clinics` jadvalida "hozir aktiv qaysi klinika" tushunchasi yo'q edi. `setClinic` faqat `localStorage.setItem` qilardi — server-side hech narsa yo'q.
+
+**Yechim:**
+1. `prisma/schema.prisma` — `UserClinic` ga `isCurrent Boolean @default(false)` va `lastSelectedAt DateTime?` qo'shildi; `@@index([userId, isCurrent])`
+2. `prisma/migrations/20260528000002_user_clinic_is_current/migration.sql`:
+   - `ALTER TABLE "user_clinics" ADD COLUMN "isCurrent" / "lastSelectedAt"`
+   - `CREATE UNIQUE INDEX user_clinics_one_current_per_user ON user_clinics("userId") WHERE "isCurrent" = true` — DB kafolat
+   - Data migration: mavjud 12 user uchun `isCurrent=true` belgilandi
+3. `src/app/api/webapp/clinics/[id]/select/route.ts` — yangi endpoint:
+   - `POST /api/webapp/clinics/[id]/select?tgid=...`
+   - Transaction: `updateMany isCurrent=false` → `update isCurrent=true, lastSelectedAt=now()`
+   - User membership yo'q bo'lsa — `upsert` bilan yaratadi
+4. `src/app/api/me/clinics/route.ts` — `currentClinicId` qaytaradi (isCurrent=true dan); tartiblash: isCurrent → lastSelectedAt → joinedAt
+5. `src/lib/clinic-context.tsx`:
+   - `setClinic`: `persistToDb(id)` — fire-and-forget `/api/webapp/clinics/[id]/select` chaqiradi
+   - `initClinic` URL param path: bot deeplink ham `persistToDb` chaqiradi
+   - `initClinic` step 3: `currentClinicId` (yangi) → `lastClinicId` (backward compat)
+
+**Bot deeplink qoidasi:**
+- `?clinic=xxx` + tgId bor → DB'ga ham saqlaydi (intentional switch)
+- URL param yo'q → DB'dagi `isCurrent=true` ishlatiladi
+- Boshqa qurilma → DB'dan o'qiydi — HALI HAM o'sha klinika
+
+**Muddat siyosati:** `lastSelectedAt` ustuni tayyor — hozircha cheksiz saqlanadi. Kelajakda "6 oy o'tsa qayta so'rash" qo'shiladi.
+
+**Tekshiruv:**
+- Supabase migration: ✅ partial unique index + 12 ta data migration
+- `tsc --noEmit`: exit 0 ✅
+- `next build`: exit 0 ✅
+- `GET /api/me/clinics?tgid=1864788322` → `currentClinicId: "clinic-demo"` ✅
+- Vercel runtime errors: 0 ✅
+
+**Commit:** `5629d65` — 5 fayl: +146/-35. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-05-28 — SERVICE-BRANCH-01: Xizmat-filial qat'iy bog'lash
 
 **Maqsad:** Admin "yo'q" deydi, bot "bor" deydi — noizchillikni bartaraf etish. "Bir manba, bir haqiqat" qoidasi.
@@ -1200,6 +1270,8 @@ Scope: `super_admin`=barcha; `clinic_admin`=branchId=null; `branch_admin`=o'z fi
 | 14 | FLIP-CARD-01: Shifokor profil flip card | ⭐⭐⭐ | ✅ Tugallandi (a2b1588) |
 | 15 | FLIP-CARD-02: BookingFlipCard barcha bronlarda | ⭐⭐⭐ | ✅ Tugallandi (983907a) |
 | 16 | FLIP-CARD-03: Barcha bo'limlarda flip + butun karta bosiladigan | ⭐⭐⭐ | ✅ Tugallandi (742bf82) |
+| 17 | SERVICE-PICKER-01: Rasmli xizmat tanlash YAGONA komponent | ⭐⭐⭐ | ✅ Tugallandi (e8a6959) |
+| 18 | CLINIC-CURRENT-01: Tanlangan klinikani DB'da doimiy saqlash | ⭐⭐⭐⭐ | ✅ Tugallandi (5629d65) |
 
 **Keyingi prioritetlar:** Click sandbox test → Uy xizmati natijalari → Doctor /stats grafiklar
 
