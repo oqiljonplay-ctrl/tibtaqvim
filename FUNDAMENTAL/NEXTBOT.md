@@ -471,6 +471,47 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-05-28 — FLIP-CARD-01: Shifokor profil kartochkasi 3D flip
+
+**Maqsad:** Bemor webapp'da bron kartochkasini bossanda, kartochka 3D aylanib orqa tomonida shifokor to'liq profili ko'rinsin (MyGov Road pasport kabi).
+
+**DB (Supabase migration `flip_card_doctor_profile`):**
+- `doctors` jadvaliga 6 yangi ustun: `education`, `position`, `department`, `workSchedule`, `operationsCount`, `bio`
+- 4 yangi jadval (RLS enabled, Prisma service_role bypass):
+  - `doctor_specialties` (id, doctorId CASCADE, name, sortOrder)
+  - `doctor_directions` (id, doctorId CASCADE, name, sortOrder)
+  - `doctor_experiences` (id, doctorId CASCADE, place, startYear, endYear?, sortOrder)
+  - `doctor_workplaces` (id, doctorId CASCADE, place, sortOrder)
+- Prisma schema yangilandi + `prisma generate` qilindi
+
+**Yangi fayllar:**
+- `src/app/api/doctor/profile/route.ts` — `GET/PUT /api/doctor/profile` (shifokor o'z profili)
+- `src/app/api/admin/doctors/[id]/profile/route.ts` — `GET/PUT /api/admin/doctors/[id]/profile` (admin)
+- `src/app/api/patient/doctor/[id]/profile/route.ts` — `GET /api/patient/doctor/[id]/profile` (public, bemor)
+- `src/app/doctor/profile/page.tsx` — Shifokor kabineti profil sahifasi (8 maydon + dinamik ro'yxatlar)
+- `src/components/DoctorProfileFields.tsx` — Reusable profil maydonlar komponenti
+
+**O'zgartirilgan fayllar:**
+- `src/app/api/webapp/appointments/route.ts` — doctor select'ga profil maydonlari qo'shildi
+- `src/app/admin/doctors/[id]/edit/page.tsx` — 8 yangi maydon + DoctorProfileFields integratsiya
+- `src/app/doctor/layout.tsx` — "📋 Profil" nav elementi qo'shildi
+- `src/app/webapp/page.tsx` — `FlipCard` komponenti (CSS 3D rotateY, old/orqa), `AppointmentDoctor` tipiga profil maydonlar, `BackRow` komponent
+
+**Flip Card arxitekturasi:**
+- `FlipCard` komponenti: `perspective: 1000px` + `transform-style: preserve-3d` + `transition: 0.55s`
+- Old tomon: xizmat nomi, sana, workSchedule, navbat/slot, shifokor foto, status/tugmalar + ℹ flip tugmasi
+- Orqa tomon: gradient fon, shifokor foto (44px), ta'lim, mutaxassisliklar, lavozim, yo'nalishlar, tajriba, ish joylari, bo'lim, operatsiyalar soni, bio + ← orqaga tugmasi
+- Profil ma'lumoti yo'q bo'lsa ℹ tugmasi ko'rsatilmaydi
+
+**Qoidalar:**
+- `specialty` (String) eski ustun O'CHIRILMADI — yangi `specialties[]` QO'SHIMCHA
+- Bo'sh maydonlar orqa tomonda ko'rsatilmaydi
+- Tugmalar (Qayta bron, Bekor) faqat old tomonda — flip'da bosilmaydi
+
+**Commit:** `a2b1588` — 11 fayl, +1452/-370. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-05-28 — SERVICE-BRANCH-01: Xizmat-filial qat'iy bog'lash
 
 **Maqsad:** Admin "yo'q" deydi, bot "bor" deydi — noizchillikni bartaraf etish. "Bir manba, bir haqiqat" qoidasi.
@@ -1097,6 +1138,7 @@ Scope: `super_admin`=barcha; `clinic_admin`=branchId=null; `branch_admin`=o'z fi
 | 11 | Multi-clinic Bosqich 2 (ratings, filial xizmatlar) | ⭐ | Kutilmoqda |
 | 12 | Branch Isolation S1-S4 (services.branchId, scope) | ⭐⭐⭐ | ✅ Tugallandi (f22c9fb) |
 | 13 | Payment Workflow: Qabulxona/Shifokor ajratish | ⭐⭐⭐ | ✅ Tugallandi (a86df8a) |
+| 14 | FLIP-CARD-01: Shifokor profil flip card | ⭐⭐⭐ | ✅ Tugallandi (a2b1588) |
 
 **Keyingi prioritetlar:** Click sandbox test → Uy xizmati natijalari → Doctor /stats grafiklar
 
