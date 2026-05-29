@@ -81,8 +81,14 @@ export async function sendAdPost(
   }
 
   if (imageUrl) {
+    // base64 data URI → Buffer (Telegram HTTPS URL qabul qilmaydi)
+    const base64Match = /^data:image\/\w+;base64,(.+)$/.exec(imageUrl);
+    const photoSource: string | Buffer = base64Match
+      ? Buffer.from(base64Match[1], "base64")
+      : imageUrl;
+
     return sendWithRetry(() =>
-      bot.sendPhoto(chatIdNum, imageUrl, {
+      bot.sendPhoto(chatIdNum, photoSource, {
         caption:      adText,
         parse_mode:   "HTML",
         reply_markup: replyMarkup as TelegramBot.InlineKeyboardMarkup,
