@@ -15,6 +15,8 @@ const ALL_ADMIN_ITEMS: SidebarItem[] = [
   { href: "/admin/doctors",      label: "Shifokorlar" },
   { href: "/admin/branches",     label: "Filiallar",       roles: ["super_admin", "clinic_admin"] },
   { href: "/admin/promotions",   label: "Telegram postlar", roles: ["super_admin", "clinic_admin", "branch_admin"] },
+  { href: "/admin/broadcast",    label: "Broadcast",        roles: ["clinic_admin"] },
+  { href: "/admin/super/ads",    label: "Reklamalar",       roles: ["super_admin"] },
   { href: "/reception",          label: "Qabulxona",       roles: ["clinic_admin", "branch_admin"] },
   { href: "/doctor",             label: "Navbat",          roles: ["clinic_admin", "branch_admin"] },
 ];

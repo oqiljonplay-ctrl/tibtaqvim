@@ -6,9 +6,13 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
-  if (user.role !== "super_admin") return forbidden();
+
+  const isSuperAdmin = user.role === "super_admin";
+  const isClinicAdmin = user.role === "clinic_admin";
+  if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
   const channels = await prisma.adChannel.findMany({
+    where: isSuperAdmin ? {} : { clinicId: user.clinicId ?? undefined },
     orderBy: { addedAt: "desc" },
     include: {
       clinic: { select: { id: true, name: true } },
@@ -22,7 +26,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
-  if (user.role !== "super_admin") return forbidden();
+
+  const isSuperAdmin = user.role === "super_admin";
+  const isClinicAdmin = user.role === "clinic_admin";
+  if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
   const body = await req.json();
   const { title, chatId, type, username, memberCount, scope, clinicId } = body;
@@ -30,6 +37,27 @@ export async function POST(req: NextRequest) {
   if (!title?.trim()) return error("title majburiy");
   if (!chatId?.trim()) return error("chatId majburiy");
   if (!type || !["channel", "group"].includes(type)) return error("type: channel yoki group");
+
+  // clinic_admin: scope majburiy clinic, clinicId = o'z klinikasi
+  if (isClinicAdmin) {
+    if (!user.clinicId) return error("Klinika ID topilmadi");
+    const channel = await prisma.adChannel.create({
+      data: {
+        title:       title.trim(),
+        chatId:      chatId.trim(),
+        type,
+        username:    username?.trim() || null,
+        memberCount: memberCount ? Number(memberCount) : null,
+        scope:       "clinic",
+        clinicId:    user.clinicId,
+        addedById:   user.userId,
+        isActive:    false, // super_admin tasdiqlagunicha nofaol
+      },
+    });
+    return created(channel);
+  }
+
+  // super_admin
   if (!scope || !["clinic", "platform"].includes(scope)) return error("scope: clinic yoki platform");
   if (scope === "clinic" && !clinicId) return error("clinic scope uchun clinicId majburiy");
 

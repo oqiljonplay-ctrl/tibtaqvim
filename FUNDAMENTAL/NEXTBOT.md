@@ -471,6 +471,40 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-05-29 — BROADCAST: Kanal/guruhga broadcast to'liq tizim
+
+**Maqsad:** Bot orqali kanal va guruhlarga avtomatik reklama yuborish tizimini to'liq ishga tushirish. Har klinika o'z kanaliga reklama yuboradi, super_admin boshqaradi.
+
+**Muammo:** `ad_campaign_channels` bo'sh edi — kampaniya `targetType=own` edi lekin kanal `scope=platform` edi, moslashmadi. "Hozir yuborish" tugmasi yo'q edi. clinic_admin broadcast UI yo'q edi.
+
+**Yangi fayllar:**
+- `src/app/api/admin/ad-campaigns/[id]/send-now/route.ts` — `POST /api/admin/ad-campaigns/[id]/send-now` (super_admin JWT auth, darhol yuborish, ad_posts yozadi, bot admin tekshiruvi)
+- `src/app/admin/(panel)/broadcast/page.tsx` — clinic_admin broadcast sahifasi (2 tab: Kanallarim + Kampaniyalar, kanal ulash modal)
+
+**O'zgartirilgan fayllar:**
+- `src/app/admin/super/ads/page.tsx` — "Hozir Yuborish" yashil tugma har kampaniyada; ChannelEditModal (scope/clinicId/holat tahrirlash); bo'sh kanal ogohlantirishi (amber border); SendNowResult modal; kanal "Tahrir" tugmasi
+- `src/app/api/admin/ad-channels/route.ts` — clinic_admin ham o'z klinikasi kanallarini ko'ra/qo'sha oladi (scope=clinic, isActive=false — super_admin tasdiqlaydi)
+- `src/app/api/admin/ad-channels/[id]/route.ts` — GET endpoint qo'shildi; clinic_admin faqat o'z klinikasi kanalini o'zgartira oladi; super_admin scope/clinicId o'zgartira oladi
+- `src/app/api/admin/ad-campaigns/route.ts` — clinic_admin o'z klinikasi kampaniyalarini ko'ra oladi (read-only, GET)
+- `src/components/ui/AdminSidebar.tsx` — clinic_admin uchun "Broadcast" → /admin/broadcast; super_admin uchun "Reklamalar" → /admin/super/ads
+- `bot/handlers/myChatMember.ts` — Bot kanal/guruhga admin bo'lganda, telegram orqali qo'shgan foydalanuvchi clinic_admin bo'lsa → scope=clinic, clinicId=o'sha admin klinikasi; BOT_ID yo'q bo'lsa getMe() orqali dinamik oladi
+
+**Scope/targetType mantiq'i (muhim):**
+- `targetType=own` kampaniyasi → faqat `scope=clinic, clinicId=same clinic` kanallarni tanlaydi
+- `targetType=platform` kampaniyasi → faqat `scope=platform` kanallarni tanlaydi
+- Eski data muammosi: super_admin ads sahifasida kanal "Tahrir" → scope=clinic + clinicId belgilash orqali tuzatiladi
+- clinic_admin qo'shgan kanallar `isActive=false` bo'ladi — super_admin faollashtirishi kerak
+
+**Yangi klinikalar uchun:**
+1. Super_admin Reklamalar → Kanallar → "+ Kanal qo'shish" (scope=clinic, clinicId=yangi klinika)
+2. Super_admin Kampaniyalar → "+ Kampaniya" (klinika tanlash, kanal belgilash, targetType=own)
+3. Vercel cron 0 8 * * * → kuniga bir marta barcha active kampaniyalar yuboriladi
+4. "Hozir Yuborish" → darhol test yuborish mumkin
+
+**Commit:** Broadcast tizim — deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-05-28 — FLIP-CARD-01: Shifokor profil kartochkasi 3D flip
 
 **Maqsad:** Bemor webapp'da bron kartochkasini bossanda, kartochka 3D aylanib orqa tomonida shifokor to'liq profili ko'rinsin (MyGov Road pasport kabi).

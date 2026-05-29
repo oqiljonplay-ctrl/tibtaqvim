@@ -73,7 +73,7 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Bekor",
 };
 
-// ─── Channel Modal ────────────────────────────────────────────────────────────
+// ─── Channel Modal (Add) ───────────────────────────────────────────────────────
 
 function ChannelModal({
   clinics,
@@ -117,7 +117,7 @@ function ChannelModal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">Kanal qo'shish</h3>
+          <h3 className="font-semibold text-gray-900">Kanal qo&apos;shish</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
         </div>
         <form onSubmit={submit} className="px-6 py-4 space-y-3">
@@ -138,6 +138,7 @@ function ChannelModal({
               placeholder="-1001234567890"
               required
             />
+            <p className="text-xs text-gray-400 mt-1">Bot kanalnig/guruhning administratori bo&apos;lishi kerak</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -157,16 +158,17 @@ function ChannelModal({
                 value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value })}
               >
                 <option value="platform">Platform (umumiy)</option>
-                <option value="clinic">Klinika (o'z kanali)</option>
+                <option value="clinic">Klinika (o&apos;z kanali)</option>
               </select>
             </div>
           </div>
           {form.scope === "clinic" && (
             <div>
-              <label className="text-xs font-medium text-gray-600">Klinika</label>
+              <label className="text-xs font-medium text-gray-600">Klinika *</label>
               <select
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 value={form.clinicId} onChange={(e) => setForm({ ...form, clinicId: e.target.value })}
+                required
               >
                 <option value="">— tanlang —</option>
                 {clinics.map((c) => (
@@ -191,6 +193,146 @@ function ChannelModal({
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 value={form.memberCount} onChange={(e) => setForm({ ...form, memberCount: e.target.value })}
                 placeholder="5000"
+              />
+            </div>
+          </div>
+          {err && <p className="text-red-600 text-xs">{err}</p>}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              Bekor
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+              {saving ? "Saqlanmoqda..." : "Saqlash"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Channel Edit Modal ────────────────────────────────────────────────────────
+
+function ChannelEditModal({
+  channel,
+  clinics,
+  onClose,
+  onSaved,
+}: {
+  channel: AdChannel;
+  clinics: Clinic[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    title:       channel.title,
+    username:    channel.username ?? "",
+    memberCount: channel.memberCount ? String(channel.memberCount) : "",
+    scope:       channel.scope,
+    clinicId:    channel.clinicId ?? "",
+    isActive:    channel.isActive,
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setErr("");
+    try {
+      const r = await fetch(`/api/admin/ad-channels/${channel.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title:       form.title,
+          username:    form.username || null,
+          memberCount: form.memberCount ? Number(form.memberCount) : null,
+          scope:       form.scope,
+          clinicId:    form.scope === "clinic" ? form.clinicId || null : null,
+          isActive:    form.isActive,
+        }),
+      });
+      const j = await r.json();
+      if (j.success) { onSaved(); onClose(); }
+      else setErr(j.error?.message ?? "Xatolik");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Kanalni tahrirlash</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+        </div>
+        <form onSubmit={submit} className="px-6 py-4 space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600">Nomi</label>
+            <input
+              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+              required
+            />
+          </div>
+          <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+            Chat ID: <span className="font-mono text-gray-600">{channel.chatId}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600">Scope</label>
+              <select
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value as "clinic" | "platform" })}
+              >
+                <option value="platform">Platform (umumiy)</option>
+                <option value="clinic">Klinika (o&apos;z kanali)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Holat</label>
+              <select
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                value={form.isActive ? "1" : "0"} onChange={(e) => setForm({ ...form, isActive: e.target.value === "1" })}
+              >
+                <option value="1">Faol</option>
+                <option value="0">Nofaol</option>
+              </select>
+            </div>
+          </div>
+          {form.scope === "clinic" && (
+            <div>
+              <label className="text-xs font-medium text-gray-600">Klinika *</label>
+              <select
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                value={form.clinicId} onChange={(e) => setForm({ ...form, clinicId: e.target.value })}
+                required
+              >
+                <option value="">— tanlang —</option>
+                {clinics.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600">Username</label>
+              <input
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })}
+                placeholder="@kanalusername"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Obunachilar</label>
+              <input
+                type="number" min="0"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                value={form.memberCount} onChange={(e) => setForm({ ...form, memberCount: e.target.value })}
               />
             </div>
           </div>
@@ -247,7 +389,9 @@ function CampaignModal({
 
   const availableChannels = channels.filter((ch) =>
     ch.isActive &&
-    (form.targetType === "platform" ? ch.scope === "platform" : (ch.scope === "clinic" && ch.clinicId === form.clinicId))
+    (form.targetType === "platform"
+      ? ch.scope === "platform"
+      : (ch.scope === "clinic" && ch.clinicId === form.clinicId))
   );
 
   function toggleChannel(id: string) {
@@ -363,8 +507,8 @@ function CampaignModal({
                 value={form.targetType}
                 onChange={(e) => setForm({ ...form, targetType: e.target.value as "own" | "platform", channelIds: [] })}
               >
-                <option value="own">O'z kanali</option>
-                <option value="platform">Umumiy kanal (navbat)</option>
+                <option value="own">O&apos;z kanali (scope=clinic)</option>
+                <option value="platform">Umumiy kanal (scope=platform)</option>
               </select>
             </div>
             <div>
@@ -422,7 +566,7 @@ function CampaignModal({
           </div>
 
           {/* Kanallar */}
-          {availableChannels.length > 0 && (
+          {availableChannels.length > 0 ? (
             <div>
               <label className="text-xs font-medium text-gray-600">
                 Kanallar ({form.channelIds.length} tanlangan)
@@ -442,13 +586,21 @@ function CampaignModal({
                 ))}
               </div>
             </div>
-          )}
-          {availableChannels.length === 0 && form.clinicId && (
-            <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
-              {form.targetType === "platform"
-                ? "Faol platform kanallar yo'q. Avval kanal qo'shing."
-                : "Bu klinikaning faol kanali yo'q. Avval kanal qo'shing."}
-            </p>
+          ) : (
+            form.clinicId && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs">
+                <p className="text-amber-700 font-medium">
+                  {form.targetType === "platform"
+                    ? "Faol platform kanallar yo'q."
+                    : `Bu klinikaning scope=clinic kanali yo'q.`}
+                </p>
+                <p className="text-amber-600 mt-0.5">
+                  {form.targetType === "own"
+                    ? "Avval \"Kanallar\" tabida scope=clinic + ushbu klinika ID li kanal qo'shing."
+                    : "Avval scope=platform kanal qo'shing."}
+                </p>
+              </div>
+            )
           )}
 
           {err && <p className="text-red-600 text-xs">{err}</p>}
@@ -468,6 +620,63 @@ function CampaignModal({
   );
 }
 
+// ─── Send Now Result Modal ─────────────────────────────────────────────────────
+
+function SendNowResult({
+  result,
+  onClose,
+}: {
+  result: { sent: number; failed: number; warning?: string; results?: { channelTitle: string; status: string; error?: string }[] };
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Yuborish natijasi</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          {result.warning ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm text-amber-700">
+              {result.warning}
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-4">
+                <div className="flex-1 bg-green-50 rounded-lg px-3 py-3 text-center">
+                  <div className="text-2xl font-bold text-green-600">{result.sent}</div>
+                  <div className="text-xs text-green-500 mt-1">Yuborildi</div>
+                </div>
+                <div className="flex-1 bg-red-50 rounded-lg px-3 py-3 text-center">
+                  <div className="text-2xl font-bold text-red-500">{result.failed}</div>
+                  <div className="text-xs text-red-400 mt-1">Xatolik</div>
+                </div>
+              </div>
+              {result.results && result.results.length > 0 && (
+                <div className="border border-gray-100 rounded-lg divide-y divide-gray-50">
+                  {result.results.map((r, i) => (
+                    <div key={i} className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-sm text-gray-700 truncate">{r.channelTitle}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${r.status === "sent" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                        {r.status === "sent" ? "✓" : r.error ?? "xato"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+          <button onClick={onClose}
+            className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+            Yopish
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 type Tab = "stats" | "channels" | "campaigns";
@@ -481,8 +690,11 @@ export default function AdsPage() {
   const [loading, setLoading] = useState(true);
 
   const [showChannelModal, setShowChannelModal] = useState(false);
+  const [editingChannel, setEditingChannel] = useState<AdChannel | undefined>();
   const [editingCampaign, setEditingCampaign] = useState<AdCampaign | undefined>();
   const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sendResult, setSendResult] = useState<{ sent: number; failed: number; warning?: string; results?: { channelTitle: string; status: string; error?: string }[] } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -522,6 +734,21 @@ export default function AdsPage() {
     load();
   }
 
+  async function sendNow(c: AdCampaign) {
+    if (!confirm(`"${c.title}" kampaniyani HOZIR yuborasizmi?`)) return;
+    setSendingId(c.id);
+    try {
+      const r = await fetch(`/api/admin/ad-campaigns/${c.id}/send-now`, { method: "POST" });
+      const j = await r.json();
+      if (j.success) {
+        setSendResult(j.data);
+        load();
+      }
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: "stats", label: "Statistika", icon: "📊" },
     { key: "channels", label: "Kanallar", icon: "📡" },
@@ -542,7 +769,7 @@ export default function AdsPage() {
               onClick={() => setShowChannelModal(true)}
               className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700"
             >
-              + Kanal qo'shish
+              + Kanal qo&apos;shish
             </button>
           )}
           {tab === "campaigns" && (
@@ -582,7 +809,6 @@ export default function AdsPage() {
           {/* ── Stats tab ──────────────────────────────────────────────────── */}
           {tab === "stats" && stats && (
             <div className="space-y-6">
-              {/* Overview cards */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {[
                   { label: "Jami kanallar", value: stats.channels.total, icon: "📡", color: "bg-blue-50" },
@@ -603,25 +829,23 @@ export default function AdsPage() {
                 ))}
               </div>
 
-              {/* Failed posts warning */}
               {stats.posts.failed > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 flex items-center gap-3">
                   <span className="text-red-500 text-xl">⚠️</span>
                   <div>
                     <div className="text-sm font-medium text-red-700">{stats.posts.failed} ta post yuborilmadi</div>
-                    <div className="text-xs text-red-500">Bot kanaldan chiqarilgan bo'lishi mumkin</div>
+                    <div className="text-xs text-red-500">Bot kanaldan chiqarilgan yoki admin huquqi yo&apos;q bo&apos;lishi mumkin</div>
                   </div>
                 </div>
               )}
 
-              {/* Recent posts */}
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="px-5 py-4 border-b border-gray-100">
-                  <h2 className="font-semibold text-gray-900">So'nggi postlar</h2>
+                  <h2 className="font-semibold text-gray-900">So&apos;nggi postlar</h2>
                 </div>
                 <div className="divide-y divide-gray-50">
                   {stats.recentPosts.length === 0 && (
-                    <div className="px-5 py-8 text-center text-gray-400 text-sm">Hali postlar yo'q</div>
+                    <div className="px-5 py-8 text-center text-gray-400 text-sm">Hali postlar yo&apos;q</div>
                   )}
                   {stats.recentPosts.map((p) => (
                     <div key={p.id} className="px-5 py-3 flex items-center justify-between">
@@ -649,10 +873,16 @@ export default function AdsPage() {
           {/* ── Channels tab ───────────────────────────────────────────────── */}
           {tab === "channels" && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* Help text */}
+              <div className="px-5 py-3 bg-blue-50 border-b border-blue-100 text-xs text-blue-700">
+                <strong>scope=clinic</strong> → klinikaning o&apos;z kanali (faqat o&apos;sha klinika kampaniyalari). &nbsp;
+                <strong>scope=platform</strong> → umumiy platform kanali (barcha platform kampaniyalar).
+                Bot kanal/guruhga admin bo&apos;lishi shart.
+              </div>
               <div className="divide-y divide-gray-50">
                 {channels.length === 0 && (
                   <div className="px-5 py-12 text-center text-gray-400 text-sm">
-                    Hali kanallar yo'q. "Kanal qo'shish" tugmasini bosing.
+                    Hali kanallar yo&apos;q. &quot;Kanal qo&apos;shish&quot; tugmasini bosing.
                   </div>
                 )}
                 {channels.map((ch) => (
@@ -679,6 +909,12 @@ export default function AdsPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
+                        onClick={() => setEditingChannel(ch)}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                      >
+                        Tahrir
+                      </button>
+                      <button
                         onClick={() => toggleChannelActive(ch)}
                         className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
                           ch.isActive
@@ -686,13 +922,13 @@ export default function AdsPage() {
                             : "border-green-200 text-green-600 hover:bg-green-50"
                         }`}
                       >
-                        {ch.isActive ? "O'chirish" : "Yoqish"}
+                        {ch.isActive ? "O&apos;chir" : "Yoq"}
                       </button>
                       <button
                         onClick={() => deleteChannel(ch)}
                         className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
                       >
-                        O'chirish
+                        Del
                       </button>
                     </div>
                   </div>
@@ -706,11 +942,18 @@ export default function AdsPage() {
             <div className="space-y-3">
               {campaigns.length === 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 px-5 py-12 text-center text-gray-400 text-sm">
-                  Hali kampaniyalar yo'q.
+                  Hali kampaniyalar yo&apos;q.
                 </div>
               )}
               {campaigns.map((c) => (
-                <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-5">
+                <div key={c.id} className={`bg-white rounded-xl border p-5 ${c.channels.length === 0 && c.status !== "completed" && c.status !== "cancelled" ? "border-amber-200" : "border-gray-200"}`}>
+                  {/* Empty channel warning */}
+                  {c.channels.length === 0 && c.status !== "completed" && c.status !== "cancelled" && (
+                    <div className="mb-3 flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-700">
+                      <span>⚠️</span>
+                      <span>Kanal biriktirilmagan — cron yubormaydi. Tahrirlash orqali kanal tanlang.</span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -721,14 +964,14 @@ export default function AdsPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                           c.targetType === "platform" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                         }`}>
-                          {c.targetType === "platform" ? "Umumiy navbat" : "O'z kanali"}
+                          {c.targetType === "platform" ? "Platform" : "O'z kanali"}
                         </span>
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
                         {c.clinic.name} ({c.clinic.subscriptionPlan}) ·{" "}
                         {new Date(c.startDate).toLocaleDateString("uz-UZ")} →{" "}
                         {new Date(c.endDate).toLocaleDateString("uz-UZ")} ·{" "}
-                        {c.channels.length} kanal · {c._count.posts} post yuborilgan
+                        {c.channels.length} kanal · {c._count.posts} post
                       </div>
                       <div className="mt-2 text-xs text-gray-600 line-clamp-2 bg-gray-50 rounded-lg px-3 py-2">
                         {c.adText.slice(0, 150)}{c.adText.length > 150 ? "..." : ""}
@@ -746,20 +989,27 @@ export default function AdsPage() {
                     </div>
                     <div className="flex flex-col gap-1.5 flex-shrink-0">
                       {c.status !== "completed" && c.status !== "cancelled" && (
-                        <button
-                          onClick={() => { setEditingCampaign(c); setShowCampaignModal(true); }}
-                          className="text-xs px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
-                        >
-                          Tahrirlash
-                        </button>
-                      )}
-                      {c.status !== "completed" && c.status !== "cancelled" && (
-                        <button
-                          onClick={() => cancelCampaign(c)}
-                          className="text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
-                        >
-                          Bekor qilish
-                        </button>
+                        <>
+                          <button
+                            onClick={() => sendNow(c)}
+                            disabled={sendingId === c.id}
+                            className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+                          >
+                            {sendingId === c.id ? "Yuborilmoqda..." : "Hozir Yuborish"}
+                          </button>
+                          <button
+                            onClick={() => { setEditingCampaign(c); setShowCampaignModal(true); }}
+                            className="text-xs px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
+                          >
+                            Tahrirlash
+                          </button>
+                          <button
+                            onClick={() => cancelCampaign(c)}
+                            className="text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
+                          >
+                            Bekor qilish
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -778,6 +1028,14 @@ export default function AdsPage() {
           onSaved={load}
         />
       )}
+      {editingChannel && (
+        <ChannelEditModal
+          channel={editingChannel}
+          clinics={clinics}
+          onClose={() => setEditingChannel(undefined)}
+          onSaved={() => { setEditingChannel(undefined); load(); }}
+        />
+      )}
       {showCampaignModal && (
         <CampaignModal
           clinics={clinics}
@@ -785,6 +1043,12 @@ export default function AdsPage() {
           editing={editingCampaign}
           onClose={() => { setShowCampaignModal(false); setEditingCampaign(undefined); }}
           onSaved={load}
+        />
+      )}
+      {sendResult && (
+        <SendNowResult
+          result={sendResult}
+          onClose={() => setSendResult(null)}
         />
       )}
     </div>

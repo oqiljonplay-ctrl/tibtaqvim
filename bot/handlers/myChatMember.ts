@@ -11,45 +11,67 @@ export async function handleMyChatMember(
   bot: TelegramBot,
   update: MyChatMemberUpdate
 ): Promise<void> {
-  const { chat, new_chat_member } = update;
-  const botId = Number(process.env.BOT_ID || 0);
-  const isBot = new_chat_member.user.id === botId || !botId;
+  const { chat, new_chat_member, from } = update;
 
+  // Bot ID: process.env.BOT_ID yokHa getMe() orqali
+  let botId = Number(process.env.BOT_ID || 0);
+  if (!botId) {
+    try {
+      const me = await bot.getMe();
+      botId = me.id;
+    } catch {
+      botId = 0;
+    }
+  }
+
+  const isBot = botId ? new_chat_member.user.id === botId : true;
   if (!isBot) return;
 
   const status = new_chat_member.status;
+  const chatId = String(chat.id);
+  const type = chat.type === "channel" ? "channel" : "group";
 
   if (status === "administrator" || status === "member") {
-    // Bot admin qilingan — kanal ro'yxatda yo'q bo'lsa pending holatда qo'shish
-    // scope="platform" default; super_admin paneldan clinicId va scope sozlaydi
-    const chatId = String(chat.id);
-    const type = chat.type === "channel" ? "channel" : "group";
-
     const existing = await prisma.adChannel.findUnique({ where: { chatId } });
+
     if (!existing) {
+      // Kanalga qo'shgan foydalanuvchi clinic_admin bo'lsa → scope=clinic
+      let scope: "clinic" | "platform" = "platform";
+      let clinicId: string | null = null;
+
+      if (from?.id) {
+        const adminUser = await prisma.user.findFirst({
+          where: { telegramId: String(from.id), role: "clinic_admin" },
+          select: { clinicId: true },
+        });
+        if (adminUser?.clinicId) {
+          scope = "clinic";
+          clinicId = adminUser.clinicId;
+        }
+      }
+
       await prisma.adChannel.create({
         data: {
           title:     chat.title || chatId,
           chatId,
           type,
           username:  chat.username || null,
-          scope:     "platform",
+          scope,
+          clinicId,
           addedById: "auto",
-          isActive:  false, // super_admin tasdiqlagunicha nofaol
+          isActive:  false, // tasdiqlagunicha nofaol
         },
       });
-      console.log(`[myChatMember] Yangi kanal aniqlandi: ${chat.title} (${chatId})`);
+      console.log(`[myChatMember] Yangi kanal: ${chat.title} (${chatId}) scope=${scope}`);
     } else if (!existing.isActive && status === "administrator") {
-      // Bot qayta admin qilindi — faollashtirish
       await prisma.adChannel.update({ where: { chatId }, data: { isActive: true } });
+      console.log(`[myChatMember] Kanal faollashtirildi: ${chat.title}`);
     }
   } else if (status === "kicked" || status === "left") {
-    // Bot chiqarib yuborildi — deactivate
-    const chatId = String(chat.id);
     await prisma.adChannel.updateMany({
-      where:  { chatId },
-      data:   { isActive: false },
+      where: { chatId },
+      data:  { isActive: false },
     });
-    console.log(`[myChatMember] Bot kanaldan chiqarildi: ${chat.title} (${chatId})`);
+    console.log(`[myChatMember] Bot kanaldan chiqarildi: ${chat.title}`);
   }
 }

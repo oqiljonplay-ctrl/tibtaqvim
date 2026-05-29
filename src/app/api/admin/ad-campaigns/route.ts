@@ -6,15 +6,21 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
-  if (user.role !== "super_admin") return forbidden();
+
+  const isSuperAdmin = user.role === "super_admin";
+  const isClinicAdmin = user.role === "clinic_admin";
+  if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
   const { searchParams } = new URL(req.url);
   const clinicId = searchParams.get("clinicId");
   const status = searchParams.get("status");
 
+  // clinic_admin faqat o'z klinikasini ko'ra oladi
+  const effectiveClinicId = isSuperAdmin ? clinicId : user.clinicId;
+
   const campaigns = await prisma.adCampaign.findMany({
     where: {
-      ...(clinicId && { clinicId }),
+      ...(effectiveClinicId && { clinicId: effectiveClinicId }),
       ...(status && { status: status as never }),
     },
     orderBy: [{ priority: "asc" }, { startDate: "asc" }],
