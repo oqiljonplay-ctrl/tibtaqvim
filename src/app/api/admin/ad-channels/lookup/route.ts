@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     // A'zolar soni (kanallar uchun)
     let memberCount: number | null = null;
     try {
-      memberCount = await bot.getChatMembersCount(chat.id);
+      memberCount = await bot.getChatMemberCount(chat.id);
     } catch {
       memberCount = null;
     }
