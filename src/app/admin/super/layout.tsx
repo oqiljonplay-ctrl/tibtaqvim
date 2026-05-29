@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 const navItems = [
   { href: "/admin/super", label: "Dashboard", icon: "⬡" },
   { href: "/admin/super/clinics", label: "Klinikalar", icon: "🏥" },
+  { href: "/admin/super/promotions", label: "Telegram postlar", icon: "📣" },
   { href: "/admin/super/ads", label: "Reklamalar", icon: "📢" },
   { href: "/admin/super/audit", label: "Audit Log", icon: "📋" },
 ];

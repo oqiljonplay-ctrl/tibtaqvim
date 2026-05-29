@@ -10,12 +10,13 @@ interface SidebarItem {
 }
 
 const ALL_ADMIN_ITEMS: SidebarItem[] = [
-  { href: "/admin",          label: "Dashboard" },
-  { href: "/admin/services", label: "Xizmatlar" },
-  { href: "/admin/doctors",  label: "Shifokorlar" },
-  { href: "/admin/branches", label: "Filiallar",  roles: ["super_admin", "clinic_admin"] },
-  { href: "/reception",      label: "Qabulxona",  roles: ["clinic_admin", "branch_admin"] },
-  { href: "/doctor",         label: "Navbat",     roles: ["clinic_admin", "branch_admin"] },
+  { href: "/admin",              label: "Dashboard" },
+  { href: "/admin/services",     label: "Xizmatlar" },
+  { href: "/admin/doctors",      label: "Shifokorlar" },
+  { href: "/admin/branches",     label: "Filiallar",       roles: ["super_admin", "clinic_admin"] },
+  { href: "/admin/promotions",   label: "Telegram postlar", roles: ["super_admin", "clinic_admin", "branch_admin"] },
+  { href: "/reception",          label: "Qabulxona",       roles: ["clinic_admin", "branch_admin"] },
+  { href: "/doctor",             label: "Navbat",          roles: ["clinic_admin", "branch_admin"] },
 ];
 
 function isActive(itemHref: string, currentPath: string): boolean {

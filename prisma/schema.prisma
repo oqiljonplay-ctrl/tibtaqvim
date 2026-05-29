@@ -78,6 +78,18 @@ enum AdChannelScope {
   platform
 }
 
+enum PromotionType {
+  aksiya
+  yangilik
+  elon
+  umumiy
+}
+
+enum PromotionSource {
+  kanal
+  guruh
+}
+
 enum AdCampaignStatus {
   draft
   scheduled
@@ -111,6 +123,10 @@ model Clinic {
   rating       Float    @default(0) @db.Real
   ratingCount  Int      @default(0)
 
+  // ── Telegram kanallar ─────────────────────────────────────────────────────
+  telegramChannelUsername String?  // masalan "buyuktabib" (@ siz)
+  telegramGroupUsername   String?  // public guruh username (@ siz)
+
   // ── Kelajak: Bosqich 2 (to'lov) va Bosqich 3 (abonement) ─────────────────
   paymentConfig         Json?             @db.JsonB
   subscriptionPlan      SubscriptionPlan  @default(starter)
@@ -131,6 +147,7 @@ model Clinic {
   payments      Payment[]
   adChannels    AdChannel[]
   adCampaigns   AdCampaign[]
+  promotions    ClinicPromotion[]
 
   @@index([isActive, city])
   @@index([subscriptionStatus])
@@ -730,4 +747,26 @@ model AdPost {
   @@index([campaignId])
   @@index([sentAt])
   @@map("ad_posts")
+}
+
+model ClinicPromotion {
+  id                  String          @id @default(cuid())
+  clinicId            String
+  clinic              Clinic          @relation(fields: [clinicId], references: [id])
+  postUrl             String
+  embedId             String          // "kanal/123" — telegram-widget.js uchun
+  type                PromotionType   @default(umumiy)
+  source              PromotionSource @default(kanal)
+  title               String?
+  subscribeUsername   String?
+  showSubscribeButton Boolean         @default(true)
+  isActive            Boolean         @default(true)
+  sortOrder           Int             @default(0)
+  publishedAt         DateTime        @default(now())
+  createdById         String
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([clinicId, isActive])
+  @@map("clinic_promotions")
 }
