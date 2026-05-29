@@ -343,6 +343,9 @@ model User {
   username     String?  @unique
   firstName    String
   lastName     String?
+  fatherName   String?
+  region       String?
+  district     String?
   role         UserRole @default(patient)
   passwordHash String?
   isActive     Boolean  @default(true)

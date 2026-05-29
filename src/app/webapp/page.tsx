@@ -7,6 +7,7 @@ import { useClinic } from "@/lib/clinic-context";
 import { ClinicSwitcher } from "@/components/webapp/ClinicSwitcher";
 import { ClinicLogo } from "@/components/ClinicLogo";
 import { BookingFlipCard } from "@/components/webapp/BookingFlipCard";
+import { ProfileFlipCard } from "@/components/webapp/ProfileFlipCard";
 import { ServicePicker } from "@/components/webapp/ServicePicker";
 
 declare global {
@@ -30,7 +31,16 @@ interface Service {
   doctors: ServiceDoctor[];
 }
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
-interface TgUser { firstName: string; phone: string | null; tibId: string | null; hasPhone: boolean }
+interface TgUser {
+  firstName: string;
+  lastName: string | null;
+  fatherName: string | null;
+  region: string | null;
+  district: string | null;
+  phone: string | null;
+  tibId: string | null;
+  hasPhone: boolean;
+}
 interface AppointmentDoctor {
   id: string;
   firstName: string;
@@ -278,6 +288,10 @@ export default function WebApp() {
           if (regJson.success) {
             user = {
               firstName: tgFirstName || "Foydalanuvchi",
+              lastName: null,
+              fatherName: null,
+              region: null,
+              district: null,
               phone: null,
               tibId: regJson.data.tibId ?? null,
               hasPhone: false,
@@ -553,26 +567,30 @@ export default function WebApp() {
 
     return (
       <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
-        {/* Header */}
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7 px-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-blue-200 text-xs mb-0.5">{headerDate}</p>
-              <h1 className="font-bold text-xl">
-                Salom, {tgUser?.firstName || "Foydalanuvchi"}! 👋
-              </h1>
-            </div>
-            {displayTibId && (
-              <span className="text-xs bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-mono font-semibold shrink-0 mt-1">
-                🆔 {displayTibId}
-              </span>
-            )}
+        {/* Header — ProfileFlipCard */}
+        {tgUser && telegramId ? (
+          <ProfileFlipCard
+            profile={{
+              firstName: tgUser.firstName,
+              lastName: tgUser.lastName ?? null,
+              fatherName: tgUser.fatherName ?? null,
+              region: tgUser.region ?? null,
+              district: tgUser.district ?? null,
+              phone: tgUser.phone,
+              tibId: tgUser.tibId,
+            }}
+            telegramId={telegramId}
+            headerDate={headerDate}
+            onUpdated={(updated) =>
+              setTgUser((prev) => prev ? { ...prev, ...updated } : prev)
+            }
+          />
+        ) : (
+          <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7 px-4">
+            <p className="text-blue-200 text-xs mb-0.5">{headerDate}</p>
+            <h1 className="font-bold text-xl">Salom! 👋</h1>
           </div>
-          {tgUser?.phone
-            ? <p className="text-blue-200 text-xs mt-2">📞 {tgUser.phone}</p>
-            : <p className="text-blue-300 text-xs mt-2 italic">Telefon raqam kiritilmagan</p>
-          }
-        </div>
+        )}
 
         <div className="flex-1 -mt-3 pb-[calc(96px+env(safe-area-inset-bottom))] px-4">
           <Stack gap={4}>

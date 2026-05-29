@@ -367,13 +367,53 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     }
 
     if (target === "enter_name") {
+      // DB dan ism tekshirish — bor bo'lsa skip, yo'q bo'lsa so'raymiz
+      const savedUser = await fetchUserByTelegramId(chatId);
+      const hasName = savedUser?.firstName && savedUser.firstName.trim().length >= 2;
+      const hasPhone = !!(savedUser?.phone || state.patientPhone);
+
+      if (hasName && hasPhone) {
+        // Ism va telefon DB da bor — to'g'ridan confirm ga o'tish
+        const updatedState = {
+          ...state,
+          patientName: savedUser!.firstName,
+          patientPhone: state.patientPhone || savedUser!.phone,
+          step: "confirm",
+        };
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          mkConfirmText(updatedState),
+          mkConfirmKeyboard()
+        );
+        await userState.set(chatId, { ...updatedState, messageId: newMsgId });
+        return;
+      }
+
+      if (hasName && !hasPhone) {
+        // Ism bor lekin telefon yo'q — state ga ismni to'ldirish, share_contact ga
+        await userState.set(chatId, {
+          ...state,
+          patientName: savedUser!.firstName,
+          step: "share_contact",
+          address: undefined,
+        });
+        const newMsgId = await editOrSend(
+          bot, chatId, msgId,
+          `👤 Ism: *${savedUser!.firstName}*\n\n📱 Davom etish uchun kontaktingizni ulashing:`,
+          [[{ text: "⬅️ Orqaga", callback_data: `back:${state._nameBack || "select_date"}` }]]
+        );
+        await userState.set(chatId, { ...state, patientName: savedUser!.firstName, step: "share_contact", messageId: newMsgId });
+        return;
+      }
+
+      // Ism yo'q — odatdagi enter_name
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
         "👤 *Ismingizni kiriting:*\n\n_Pastga yozing_ 👇",
         mkNameKeyboard(state._nameBack || "select_date")
       );
       // patientPhone saqlab qolamiz — qaytib kelgan user kontaktni qayta ulashmasin
-      await userState.set(chatId,{
+      await userState.set(chatId, {
         ...state,
         step: "enter_name",
         messageId: newMsgId,
