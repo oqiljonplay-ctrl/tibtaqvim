@@ -11,8 +11,10 @@ export async function GET(req: NextRequest) {
   const isClinicAdmin = user.role === "clinic_admin";
   if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
+  if (isClinicAdmin && !user.clinicId) return forbidden("Klinika ID topilmadi");
+
   const channels = await prisma.adChannel.findMany({
-    where: isSuperAdmin ? {} : { clinicId: user.clinicId ?? undefined },
+    where: isSuperAdmin ? {} : { clinicId: user.clinicId! },
     orderBy: { addedAt: "desc" },
     include: {
       clinic: { select: { id: true, name: true } },

@@ -11,12 +11,14 @@ export async function GET(req: NextRequest) {
   const isClinicAdmin = user.role === "clinic_admin";
   if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
+  if (isClinicAdmin && !user.clinicId) return forbidden("Klinika ID topilmadi");
+
   const { searchParams } = new URL(req.url);
   const clinicId = searchParams.get("clinicId");
   const status = searchParams.get("status");
 
   // clinic_admin faqat o'z klinikasini ko'ra oladi
-  const effectiveClinicId = isSuperAdmin ? clinicId : user.clinicId;
+  const effectiveClinicId = isSuperAdmin ? clinicId : user.clinicId!;
 
   const campaigns = await prisma.adCampaign.findMany({
     where: {

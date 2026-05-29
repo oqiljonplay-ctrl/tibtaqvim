@@ -30,8 +30,16 @@ async function sendWithRetry(
       const msg = await fn();
       return { ok: true, messageId: String(msg.message_id) };
     } catch (err: unknown) {
-      const e = err as { code?: string; response?: { body?: string } };
-      const body = e?.response?.body ? JSON.parse(e.response.body) : {};
+      const e = err as { code?: string; response?: { body?: unknown } };
+      const rawBody = e?.response?.body;
+      let body: { description?: string; parameters?: { retry_after?: number } } = {};
+      try {
+        body = rawBody
+          ? (typeof rawBody === "string" ? JSON.parse(rawBody) : (rawBody as typeof body))
+          : {};
+      } catch {
+        body = {};
+      }
 
       if (body.parameters?.retry_after) {
         const wait = (body.parameters.retry_after + 1) * 1000;
@@ -40,7 +48,7 @@ async function sendWithRetry(
         continue;
       }
 
-      const msg = body.description || String(err);
+      const msg = body.description || (err instanceof Error ? err.message : String(err));
       return { ok: false, error: msg };
     }
   }
@@ -67,8 +75,9 @@ export async function sendAdPost(
     if (!["administrator", "creator"].includes(member.status)) {
       return { ok: false, error: "Bot admin emas" };
     }
-  } catch {
-    return { ok: false, error: "getChatMember xatolik" };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `getChatMember xatolik: ${msg}` };
   }
 
   if (imageUrl) {
