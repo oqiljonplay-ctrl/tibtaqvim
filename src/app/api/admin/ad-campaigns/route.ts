@@ -37,29 +37,47 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
-  if (user.role !== "super_admin") return forbidden();
+
+  const isSuperAdmin = user.role === "super_admin";
+  const isClinicAdmin = user.role === "clinic_admin";
+  if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
   const body = await req.json();
   const {
-    clinicId, title, adText, imageUrl, buttonText, buttonUrl,
-    targetType, startDate, endDate, frequency, status, priority, channelIds,
+    title, adText, imageUrl, buttonText, buttonUrl,
+    startDate, endDate, frequency, status, priority, channelIds,
   } = body;
 
-  if (!clinicId) return error("clinicId majburiy");
+  // clinic_admin: clinicId o'zidan, targetType="own" (avtomatik)
+  // super_admin: clinicId body'dan, targetType="platform" (avtomatik)
+  const effectiveClinicId = isSuperAdmin ? body.clinicId : user.clinicId;
+  const effectiveTargetType = isSuperAdmin ? "platform" : "own";
+
+  if (!effectiveClinicId) return error("clinicId majburiy");
   if (!title?.trim()) return error("title majburiy");
   if (!adText?.trim()) return error("adText majburiy");
   if (!startDate || !endDate) return error("startDate va endDate majburiy");
   if (new Date(startDate) > new Date(endDate)) return error("startDate endDate'dan oldin bo'lishi kerak");
 
+  // clinic_admin: faqat o'z klinikasining kanallarini ishlatishi mumkin
+  if (isClinicAdmin && channelIds?.length) {
+    const ownChannels = await prisma.adChannel.findMany({
+      where: { id: { in: channelIds as string[] }, clinicId: user.clinicId ?? undefined },
+    });
+    if (ownChannels.length !== (channelIds as string[]).length) {
+      return forbidden();
+    }
+  }
+
   const campaign = await prisma.adCampaign.create({
     data: {
-      clinicId,
+      clinicId:    effectiveClinicId,
       title:       title.trim(),
       adText:      adText.trim(),
       imageUrl:    imageUrl?.trim() || null,
       buttonText:  buttonText?.trim() || null,
       buttonUrl:   buttonUrl?.trim() || null,
-      targetType:  targetType || "own",
+      targetType:  effectiveTargetType,
       startDate:   new Date(startDate),
       endDate:     new Date(endDate),
       frequency:   frequency || "daily",

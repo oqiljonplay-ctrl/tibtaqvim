@@ -12,7 +12,10 @@ function sleep(ms: number) {
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
-  if (user.role !== "super_admin") return forbidden();
+
+  const isSuperAdmin = user.role === "super_admin";
+  const isClinicAdmin = user.role === "clinic_admin";
+  if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
   const campaign = await prisma.adCampaign.findUnique({
     where: { id: params.id },
@@ -25,6 +28,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 
   if (!campaign) return notFound("Kampaniya topilmadi");
+  // clinic_admin faqat o'z kampaniyasini yubora oladi
+  if (isClinicAdmin && campaign.clinicId !== user.clinicId) return forbidden();
+
   if (campaign.channels.length === 0) {
     return ok({ sent: 0, failed: 0, warning: "Kampaniyada faol kanal yo'q. Avval kanal biriktiring." });
   }

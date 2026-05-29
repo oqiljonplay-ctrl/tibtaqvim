@@ -6,7 +6,10 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
-  if (user.role !== "super_admin") return forbidden();
+
+  const isSuperAdmin = user.role === "super_admin";
+  const isClinicAdmin = user.role === "clinic_admin";
+  if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
   const campaign = await prisma.adCampaign.findUnique({
     where: { id: params.id },
@@ -18,16 +21,23 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   });
 
   if (!campaign) return notFound("Kampaniya topilmadi");
+  if (isClinicAdmin && campaign.clinicId !== user.clinicId) return forbidden();
   return ok(campaign);
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
-  if (user.role !== "super_admin") return forbidden();
+
+  const isSuperAdmin = user.role === "super_admin";
+  const isClinicAdmin = user.role === "clinic_admin";
+  if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
   const campaign = await prisma.adCampaign.findUnique({ where: { id: params.id } });
   if (!campaign) return notFound("Kampaniya topilmadi");
+
+  // clinic_admin faqat o'z kampaniyasini tahrirlay oladi
+  if (isClinicAdmin && campaign.clinicId !== user.clinicId) return forbidden();
 
   if (campaign.status === "completed" || campaign.status === "cancelled") {
     return error("Tugagan yoki bekor qilingan kampaniyani o'zgartirish mumkin emas");
@@ -39,10 +49,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     startDate, endDate, frequency, status, priority, channelIds,
   } = body;
 
+  // clinic_admin: faqat o'z klinikasining kanallarini ishlatishi mumkin
+  if (isClinicAdmin && channelIds !== undefined && (channelIds as string[]).length > 0) {
+    const ownChannels = await prisma.adChannel.findMany({
+      where: { id: { in: channelIds as string[] }, clinicId: user.clinicId ?? undefined },
+    });
+    if (ownChannels.length !== (channelIds as string[]).length) return forbidden();
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     if (channelIds !== undefined) {
       await tx.adCampaignChannel.deleteMany({ where: { campaignId: params.id } });
-      if (channelIds.length > 0) {
+      if ((channelIds as string[]).length > 0) {
         await tx.adCampaignChannel.createMany({
           data: (channelIds as string[]).map((channelId) => ({
             id:         `${Date.now()}-${channelId}`,
@@ -80,13 +98,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = requireAuth(req);
   if (!user) return unauthorized();
-  if (user.role !== "super_admin") return forbidden();
+
+  const isSuperAdmin = user.role === "super_admin";
+  const isClinicAdmin = user.role === "clinic_admin";
+  if (!isSuperAdmin && !isClinicAdmin) return forbidden();
 
   const campaign = await prisma.adCampaign.findUnique({ where: { id: params.id } });
   if (!campaign) return notFound("Kampaniya topilmadi");
 
+  if (isClinicAdmin && campaign.clinicId !== user.clinicId) return forbidden();
+
   if (campaign.status === "active") {
-    // Faol kampaniyani to'xtatish — o'chirishdan oldin bekor qilish
     await prisma.adCampaign.update({
       where: { id: params.id },
       data:  { status: "cancelled" },
