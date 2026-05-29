@@ -222,7 +222,7 @@ function ChannelAddModal({
                   </button>
                   <button type="submit" disabled={saving}
                     className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
-                    {saving ? "Saqlanmoqda..." : "Qo&apos;shish"}
+                    {saving ? "Saqlanmoqda..." : "Qo'shish"}
                   </button>
                 </div>
               </form>
@@ -288,7 +288,7 @@ function ChannelAddModal({
               </button>
               <button type="submit" disabled={saving}
                 className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
-                {saving ? "Saqlanmoqda..." : "Qo&apos;shish"}
+                {saving ? "Saqlanmoqda..." : "Qo'shish"}
               </button>
             </div>
           </form>
@@ -968,7 +968,7 @@ export default function AdsPage() {
                             </button>
                             <button onClick={() => toggleChannelActive(ch)}
                               className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${ch.isActive ? "border-red-200 text-red-600 hover:bg-red-50" : "border-green-200 text-green-600 hover:bg-green-50"}`}>
-                              {ch.isActive ? "O&apos;chir" : "Yoq"}
+                              {ch.isActive ? "O'chir" : "Yoq"}
                             </button>
                             <button onClick={() => deleteChannel(ch)}
                               className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">

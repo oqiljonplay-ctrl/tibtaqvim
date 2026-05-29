@@ -161,7 +161,7 @@ function AddChannelModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
                     className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600">Bekor</button>
                   <button type="submit" disabled={saving}
                     className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                    {saving ? "..." : "So&apos;rov yuborish"}
+                    {saving ? "..." : "So'rov yuborish"}
                   </button>
                 </div>
               </form>
@@ -212,7 +212,7 @@ function AddChannelModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
                 className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600">Bekor</button>
               <button type="submit" disabled={saving}
                 className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                {saving ? "Yuborilmoqda..." : "So&apos;rov yuborish"}
+                {saving ? "Yuborilmoqda..." : "So'rov yuborish"}
               </button>
             </div>
           </form>
@@ -282,7 +282,7 @@ function CampaignModal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl my-4">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">{editing ? "Kampaniyani tahrirlash" : "Yangi e&apos;lon"}</h3>
+          <h3 className="font-semibold text-gray-900">{editing ? "Kampaniyani tahrirlash" : "Yangi e'lon"}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
         <form onSubmit={submit} className="px-6 py-4 space-y-3">
