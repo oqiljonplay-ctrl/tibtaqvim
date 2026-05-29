@@ -156,8 +156,8 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
         {/* ── OLD TOMON: relative → container balandligini belgilaydi ── */}
         <div
           style={frontStyle}
-          onClick={() => setFlipped(true)}
-          className="relative bg-white rounded-2xl shadow-sm border border-gray-100 p-4 cursor-pointer active:scale-[0.99] transition-transform"
+          onClick={doc && hasProfile ? () => setFlipped(true) : undefined}
+          className={`relative bg-white rounded-2xl shadow-sm border border-gray-100 p-4 transition-transform${doc && hasProfile ? " cursor-pointer active:scale-[0.99]" : ""}`}
         >
           {/* Flip tugmasi — shifokor bo'lsa har doim ko'rsatiladi */}
           {doc && (

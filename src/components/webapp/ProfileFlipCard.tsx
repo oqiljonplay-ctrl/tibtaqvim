@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
 
 interface ProfileData {
@@ -22,7 +22,7 @@ interface Props {
 export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: Props) {
   const [flipped, setFlipped] = useState(false);
 
-  // Form state — orqa yuz
+  // Form state
   const [firstName, setFirstName] = useState(profile.firstName);
   const [lastName, setLastName] = useState(profile.lastName ?? "");
   const [fatherName, setFatherName] = useState(profile.fatherName ?? "");
@@ -31,6 +31,18 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState(false);
+
+  // Ref bilan container balandligini dinamik hisoblash
+  const frontRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    // useLayoutEffect — browser paint OLDIN ishlaydi → miltillash yo'q
+    // Aktiv yuz (flipped → back, aks holda front) scrollHeight ni oladi
+    const el = flipped ? backRef.current : frontRef.current;
+    if (el) setContainerHeight(el.scrollHeight);
+  }, [flipped, region]); // region o'zgarganda tuman dropdown balandlikni o'zgartiradi
 
   const districts = getDistricts(region);
 
@@ -76,32 +88,37 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
     }
   }
 
-  const frontStyle: React.CSSProperties = {
+  // backfaceVisibility: "hidden" — 3D flip uchun
+  const faceBase: React.CSSProperties = {
     backfaceVisibility: "hidden",
     WebkitBackfaceVisibility: "hidden",
-  };
-  const backStyle: React.CSSProperties = {
-    backfaceVisibility: "hidden",
-    WebkitBackfaceVisibility: "hidden",
-    transform: "rotateY(180deg)",
-    position: "absolute",
-    top: 0, left: 0, right: 0,
+    width: "100%",
   };
 
   return (
-    <div style={{ perspective: "1200px" }} className="w-full">
+    // perspective konteyner — balandlikni aktiv yuzga mos qil
+    <div style={{ perspective: "1200px" }}>
+      {/*
+        Flipper: position:relative + aniq balandlik (containerHeight).
+        Ikkala yuz ham position:absolute → layout flow'dan chiqadi,
+        shuning uchun siz balandlikni qo'lda berishingiz kerak.
+        containerHeight state orqali aktiv yuzga moslanadi.
+      */}
       <div
         style={{
           position: "relative",
           transformStyle: "preserve-3d",
-          transition: "transform 0.6s ease",
+          // Balandlik ham silliq o'zgaradi — flip + height bir vaqtda animatsiya
+          transition: "transform 0.6s ease, height 0.45s ease",
           transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          height: containerHeight || undefined,
         }}
       >
-        {/* ── OLDI: Header ko'rinishi ── */}
+        {/* ── OLDI: Header ── */}
         <div
-          style={frontStyle}
-          className="relative bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7 px-4"
+          ref={frontRef}
+          style={{ ...faceBase, position: "absolute", top: 0, left: 0 }}
+          className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7 px-4"
         >
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0 pr-2">
@@ -116,7 +133,6 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
                   🆔 {profile.tibId}
                 </span>
               )}
-              {/* Tahrirlash tugmasi */}
               <button
                 onClick={(e) => { e.stopPropagation(); setFlipped(true); }}
                 className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-sm hover:bg-white/30 active:scale-95 transition-all"
@@ -140,7 +156,14 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
 
         {/* ── ORQA: Tahrirlash formasi ── */}
         <div
-          style={backStyle}
+          ref={backRef}
+          style={{
+            ...faceBase,
+            position: "absolute",
+            top: 0,
+            left: 0,
+            transform: "rotateY(180deg)",
+          }}
           className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white pt-5 pb-7 px-4"
         >
           {/* Header */}
@@ -156,7 +179,6 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
           </div>
 
           <form onSubmit={handleSave} className="space-y-2.5">
-            {/* Ism */}
             <div>
               <label className="text-blue-200 text-xs mb-1 block">Ism *</label>
               <input
@@ -171,7 +193,6 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
               />
             </div>
 
-            {/* Familiya */}
             <div>
               <label className="text-blue-200 text-xs mb-1 block">Familiya</label>
               <input
@@ -185,7 +206,6 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
               />
             </div>
 
-            {/* Otasining ismi */}
             <div>
               <label className="text-blue-200 text-xs mb-1 block">Otasining ismi</label>
               <input
@@ -199,7 +219,6 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
               />
             </div>
 
-            {/* Viloyat */}
             <div>
               <label className="text-blue-200 text-xs mb-1 block">Viloyat</label>
               <select
@@ -207,7 +226,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
                 onChange={(e) => { setRegion(e.target.value); setDistrict(""); }}
                 onClick={(e) => e.stopPropagation()}
                 onFocus={(e) => e.stopPropagation()}
-                className="w-full bg-white/15 border border-white/30 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/60 appearance-none"
+                className="w-full border border-white/30 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/60 appearance-none"
                 style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
               >
                 <option value="" style={{ color: "#1e3a5f" }}>— Tanlang —</option>
@@ -219,7 +238,6 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
               </select>
             </div>
 
-            {/* Tuman (faqat viloyat tanlanganda) */}
             {region && districts.length > 0 && (
               <div>
                 <label className="text-blue-200 text-xs mb-1 block">Tuman / Shahar</label>
@@ -228,7 +246,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
                   onChange={(e) => setDistrict(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                   onFocus={(e) => e.stopPropagation()}
-                  className="w-full bg-white/15 border border-white/30 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/60 appearance-none"
+                  className="w-full border border-white/30 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/60 appearance-none"
                   style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
                 >
                   <option value="" style={{ color: "#1e3a5f" }}>— Tanlang —</option>

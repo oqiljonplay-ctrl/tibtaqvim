@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
       include: {
         service: { select: { id: true, name: true, type: true } },
         doctor: { select: { id: true, firstName: true, lastName: true, specialty: true } },
+        user: { select: { firstName: true, lastName: true, fatherName: true } },
       },
       orderBy: [{ queueNumber: "asc" }, { createdAt: "asc" }],
     });
@@ -100,9 +101,12 @@ export async function GET(req: NextRequest) {
           patients: [],
         });
       }
+      const resolvedName = a.user?.firstName
+        ? [a.user.firstName, a.user.lastName, a.user.fatherName].filter(Boolean).join(" ")
+        : (a.patientName ?? "");
       serviceMap.get(serviceId)!.patients.push({
         id: a.id,
-        patientName: a.patientName,
+        patientName: resolvedName,
         patientPhone: a.patientPhone,
         queueNumber: a.queueNumber,
         status: a.status,

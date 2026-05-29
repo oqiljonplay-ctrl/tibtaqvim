@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       include: {
         service: { select: { id: true, name: true, type: true, price: true } },
         doctor: { select: { id: true, firstName: true, lastName: true, specialty: true } },
-        user: { select: { id: true, telegramId: true, tibId: true } },
+        user: { select: { id: true, telegramId: true, tibId: true, firstName: true, lastName: true, fatherName: true } },
       },
       orderBy: [{ queueNumber: "asc" }, { createdAt: "asc" }],
     });
@@ -60,10 +60,17 @@ export async function GET(req: NextRequest) {
   }
 }
 
+function buildPatientName(a: any): string {
+  if (a.user?.firstName) {
+    return [a.user.firstName, a.user.lastName, a.user.fatherName].filter(Boolean).join(" ");
+  }
+  return a.patientName ?? "";
+}
+
 function serialize(a: any) {
   return {
     id: a.id,
-    patientName: a.patientName,
+    patientName: buildPatientName(a),
     patientPhone: a.patientPhone,
     queueNumber: a.queueNumber,
     status: a.status,

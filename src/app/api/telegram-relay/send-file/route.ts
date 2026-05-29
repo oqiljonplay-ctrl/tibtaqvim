@@ -6,6 +6,7 @@ import {
   buildFullCaption,
   logRelay,
 } from "@/lib/telegram/relay";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -59,7 +60,17 @@ export async function POST(req: NextRequest) {
     const telegramId = formData.get("telegramId") as string | null;
     const caption = (formData.get("caption") as string | null)?.trim() || null;
     const appointmentId = formData.get("appointmentId") as string | null;
-    const patientName = formData.get("patientName") as string | null;
+    // DB dan haqiqiy ism (markaziy manba)
+    let patientName: string | null = formData.get("patientName") as string | null;
+    if (telegramId) {
+      const patientUser = await prisma.user.findUnique({
+        where: { telegramId },
+        select: { firstName: true, lastName: true, fatherName: true },
+      });
+      if (patientUser) {
+        patientName = [patientUser.firstName, patientUser.lastName, patientUser.fatherName].filter(Boolean).join(" ");
+      }
+    }
 
     if (!file) {
       return NextResponse.json(
@@ -124,7 +135,7 @@ export async function POST(req: NextRequest) {
     }
 
     const prefix = buildCaptionPrefix(staff);
-    const fullCaption = buildFullCaption(prefix, caption);
+    const fullCaption = buildFullCaption(prefix, caption, staff.clinicName);
 
     const tgFormData = new FormData();
     tgFormData.append("chat_id", telegramId);

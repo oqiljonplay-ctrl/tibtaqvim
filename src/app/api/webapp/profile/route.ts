@@ -21,26 +21,45 @@ export async function PATCH(req: NextRequest) {
     });
     if (!user) return error("Foydalanuvchi topilmadi", 404);
 
-    const updated = await prisma.user.update({
-      where: { telegramId },
-      data: {
-        firstName: firstName.trim(),
-        lastName: lastName ? lastName.trim() || null : null,
-        fatherName: fatherName ? fatherName.trim() || null : null,
-        region: region ? region.trim() || null : null,
-        district: district ? district.trim() || null : null,
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        fatherName: true,
-        region: true,
-        district: true,
-        phone: true,
-        tibId: true,
-      },
-    });
+    const newFirstName = firstName.trim();
+    const newLastName = lastName ? lastName.trim() || null : null;
+    const newFatherName = fatherName ? fatherName.trim() || null : null;
+    const newRegion = region ? region.trim() || null : null;
+    const newDistrict = district ? district.trim() || null : null;
+
+    const [updated] = await prisma.$transaction([
+      // 1. Users jadvalini yangilash
+      prisma.user.update({
+        where: { telegramId },
+        data: {
+          firstName: newFirstName,
+          lastName: newLastName,
+          fatherName: newFatherName,
+          region: newRegion,
+          district: newDistrict,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          fatherName: true,
+          region: true,
+          district: true,
+          phone: true,
+          tibId: true,
+        },
+      }),
+      // 2. Aktiv (bekor qilinmagan) bronlarda patientName ni sinxronlash
+      prisma.appointment.updateMany({
+        where: {
+          user: { telegramId },
+          status: { not: "cancelled" },
+        },
+        data: {
+          patientName: [newFirstName, newLastName, newFatherName].filter(Boolean).join(" "),
+        },
+      }),
+    ]);
 
     return ok({
       ...updated,

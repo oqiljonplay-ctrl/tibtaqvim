@@ -6,6 +6,7 @@ import {
   buildFullCaption,
   logRelay,
 } from "@/lib/telegram/relay";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,15 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { telegramId, message, appointmentId, patientName } = body;
+    const { telegramId, message, appointmentId } = body;
+    // DB dan haqiqiy ism (markaziy manba)
+    const patientUser = await prisma.user.findUnique({
+      where: { telegramId },
+      select: { firstName: true, lastName: true, fatherName: true },
+    });
+    const patientName = patientUser
+      ? [patientUser.firstName, patientUser.lastName, patientUser.fatherName].filter(Boolean).join(" ")
+      : (body.patientName ?? null);
 
     if (!telegramId || typeof telegramId !== "string") {
       return NextResponse.json(
@@ -67,7 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     const prefix = buildCaptionPrefix(staff);
-    const fullText = buildFullCaption(prefix, text);
+    const fullText = buildFullCaption(prefix, text, staff.clinicName);
 
     const tgRes = await fetch(
       `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
