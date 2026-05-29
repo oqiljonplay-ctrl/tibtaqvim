@@ -35,6 +35,21 @@ export function useClinic() {
   return ctx
 }
 
+// FIX XATO 1: tgId ni sessionStorage'ga darhol saqlash (URL o'zgarsa ham yo'qolmasin)
+function captureTgId(): void {
+  if (typeof window === 'undefined') return
+  const urlTgId = new URLSearchParams(window.location.search).get('tgid')
+  if (urlTgId) {
+    sessionStorage.setItem('tgid', urlTgId)
+    return
+  }
+  // Telegram WebApp API fallback (agar sessionStorage hali bo'sh bo'lsa)
+  const tgWebApp = (window as any).Telegram?.WebApp
+  if (tgWebApp?.initDataUnsafe?.user?.id && !sessionStorage.getItem('tgid')) {
+    sessionStorage.setItem('tgid', String(tgWebApp.initDataUnsafe.user.id))
+  }
+}
+
 function getTgId(): string | null {
   if (typeof window === 'undefined') return null
   return (
@@ -96,7 +111,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           const clinics: { id: string }[] = data?.clinics ?? []
 
           // 1. BEMOR TANLOVI USTUN: DB'da isCurrent=true bor
-          //    Bot deeplink (?clinic=...) ni E'TIBORGA OLMA — u har bot xabarida bor
           if (currentId) {
             const loaded = await loadClinic(currentId)
             if (loaded) {
@@ -109,8 +123,8 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
             }
           }
 
-          // 2. DB'da currentClinicId yo'q (yangi user, hech qachon tanlamagan)
-          //    URL param bor va u membership'da → uni ishlatib DB'ga yoz
+          // 2. DB'da currentClinicId yo'q — URL param bor va membership'da
+          //    FIX XATO 3: faqat KO'RSAT, DB'ga YOZMA (persistToDb olib tashlandi)
           const urlClinicId = searchParams.get(URL_PARAM) || searchParams.get('clinicId')
           if (urlClinicId && clinics.find((c) => c.id === urlClinicId)) {
             const loaded = await loadClinic(urlClinicId)
@@ -119,13 +133,14 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
               if (typeof window !== 'undefined') {
                 localStorage.setItem(STORAGE_KEY, loaded.id)
               }
-              persistToDb(loaded.id)
+              // persistToDb OLIB TASHLANDI — URL'dagi clinicId avtomatik DB'ga yozilmaydi
               setLoading(false)
               return
             }
           }
 
-          // 3. Birinchi membership klinikasi default
+          // 3. Birinchi membership klinikasi — faqat KO'RSAT
+          //    FIX XATO 3: persistToDb olib tashlandi
           if (clinics.length > 0) {
             const loaded = await loadClinic(clinics[0].id)
             if (loaded) {
@@ -133,13 +148,13 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
               if (typeof window !== 'undefined') {
                 localStorage.setItem(STORAGE_KEY, loaded.id)
               }
-              persistToDb(loaded.id)
+              // persistToDb OLIB TASHLANDI
               setLoading(false)
               return
             }
           }
 
-          // 4. Membership yo'q — klinika tanlash sahifasiga
+          // 4. Membership yo'q
           setClinicState(null)
           setLoading(false)
           return
@@ -186,27 +201,20 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    // FIX XATO 1: tgId ni birinchi bo'lib sessionStorage'ga saqlash
+    captureTgId()
     initClinic()
   }, []) // mount-only
 
-  // Clinic.id ni URL `?clinic=` parametriga sync qilish
-  useEffect(() => {
-    if (!clinic || typeof window === 'undefined') return
-    if (pathname === '/webapp/my-clinics') return
-    const currentParam = searchParams.get(URL_PARAM)
-    if (currentParam !== clinic.id) {
-      const newParams = new URLSearchParams(searchParams.toString())
-      newParams.delete('clinicId')
-      newParams.set(URL_PARAM, clinic.id)
-      router.replace(`${pathname}?${newParams.toString()}`)
-    }
-  }, [clinic]) // eslint-disable-line react-hooks/exhaustive-deps
+  // FIX XATO 2: URL sync effect BUTUNLAY OLIB TASHLANDI
+  // Sabab: DB asosiy manba. URL sync tgid parametrini yo'qotishi va
+  // searchParams bilan loop yaratishi mumkin edi.
 
   const setClinic = useCallback((c: Clinic) => {
     setClinicState(c)
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY, c.id)
-      // DB'ga saqlash (fire-and-forget) — sessiyalar orasida saqlanadi
+      // persistToDb faqat bu yerda — foydalanuvchi intentional "Tanlash" bossa
       persistToDb(c.id)
       ;['booking_draft', 'cart', 'selected_service', 'selected_doctor', 'selected_slot'].forEach(
         (k) => localStorage.removeItem(k),
