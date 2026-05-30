@@ -9,6 +9,7 @@ import { ClinicLogo } from "@/components/ClinicLogo";
 import { BookingFlipCard } from "@/components/webapp/BookingFlipCard";
 import { ProfileFlipCard } from "@/components/webapp/ProfileFlipCard";
 import { ServicePicker } from "@/components/webapp/ServicePicker";
+import { DoctorPicker } from "@/components/webapp/DoctorPicker";
 
 declare global {
   interface Window { Telegram?: { WebApp?: any } }
@@ -17,7 +18,7 @@ declare global {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type AppMode = "loading" | "dashboard" | "booking";
-type BookingStep = "services" | "date" | "slots" | "form" | "confirm" | "done";
+type BookingStep = "services" | "doctor" | "date" | "slots" | "form" | "confirm" | "done";
 
 interface ServiceDoctor {
   id: string; firstName: string; lastName: string; specialty: string; photoUrl: string | null;
@@ -169,6 +170,8 @@ export default function WebApp() {
   const [bookingTibId, setBookingTibId] = useState<string | null>(null);
 
   const [doneCountdown, setDoneCountdown] = useState(5);
+  const [selectedDoctor, setSelectedDoctor] = useState<ServiceDoctor | null>(null);
+  const [showOnboardingHint, setShowOnboardingHint] = useState(false);
 
   const tgUserRef = useRef<TgUser | null>(null);
   const rebookServiceIdRef = useRef<string | null>(null);
@@ -435,7 +438,15 @@ export default function WebApp() {
     setSelectedService(s);
     setSelectedDate("");
     setSelectedSlot("");
-    setStep("date");
+    setSelectedDoctor(null);
+    if (s.doctors.length === 0) {
+      setStep("date");
+    } else if (s.doctors.length === 1) {
+      setSelectedDoctor(s.doctors[0]);
+      setStep("date");
+    } else {
+      setStep("doctor");
+    }
   }
 
   async function selectDate(date: string) {
@@ -517,6 +528,7 @@ export default function WebApp() {
       };
       if (selectedSlot) payload.slotId = selectedSlot;
       if (selectedService.requiresAddress && form.address) payload.address = form.address;
+      if (selectedDoctor) payload.doctorId = selectedDoctor.id;
 
       const res = await fetch("/api/book", {
         method: "POST",
@@ -544,6 +556,9 @@ export default function WebApp() {
 
   const displayTibId = tgUser?.tibId ?? bookingTibId;
   const nameIsKnown = (form.name?.length ?? 0) >= 2;
+  const isProfileComplete = !!(
+    tgUser?.phone && tgUser?.firstName && tgUser.firstName !== "Foydalanuvchi"
+  );
 
   // ─── Render: Loading ───────────────────────────────────────────────────────
 
@@ -690,20 +705,32 @@ export default function WebApp() {
         {/* Sticky bottom bar */}
         <div className="fixed bottom-0 left-0 right-0 w-full px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 bg-gray-50 border-t border-gray-100">
           <div className="flex gap-2">
-            <button
-              onClick={() => {
-                const cId = clinicIdRef.current;
-                if (cId) {
-                  window.location.href = `/webapp/clinics/${cId}`;
-                } else {
-                  const qs = new URLSearchParams({ mode: "booking" });
-                  window.location.href = `/webapp?${qs}`;
-                }
-              }}
-              className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm shadow-lg shadow-blue-200 active:scale-95 transition-all"
-            >
-              ➕ Yangi bron
-            </button>
+            <div className="flex-1 relative">
+              {!isProfileComplete && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3 z-10">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  if (!isProfileComplete) {
+                    setShowOnboardingHint(true);
+                    return;
+                  }
+                  const cId = clinicIdRef.current;
+                  if (cId) {
+                    window.location.href = `/webapp/clinics/${cId}`;
+                  } else {
+                    const qs = new URLSearchParams({ mode: "booking" });
+                    window.location.href = `/webapp?${qs}`;
+                  }
+                }}
+                className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm shadow-lg shadow-blue-200 active:scale-95 transition-all"
+              >
+                ➕ Yangi bron
+              </button>
+            </div>
             <button
               onClick={() => {
                 const qs = new URLSearchParams();
@@ -730,6 +757,71 @@ export default function WebApp() {
             </button>
           </div>
         </div>
+        {/* Onboarding Hint Modal */}
+        {showOnboardingHint && (
+          <div
+            className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center px-4
+                       pb-[calc(100px+env(safe-area-inset-bottom))]"
+            onClick={() => setShowOnboardingHint(false)}
+          >
+            <div
+              className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-4">
+                <div className="text-3xl mb-2">📋</div>
+                <h3 className="font-bold text-gray-900">Bron qilishdan oldin</h3>
+                <p className="text-sm text-gray-500 mt-1">Quyidagi qadamlarni bajaring</p>
+              </div>
+              <div className="space-y-3 mb-5">
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
+                  <span className="text-xl">{tgUser?.phone ? "✅" : "📞"}</span>
+                  <div className="flex-1">
+                    <div className={`text-sm font-semibold ${tgUser?.phone ? "text-green-700" : "text-gray-900"}`}>
+                      Telefon ulash
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {tgUser?.phone ? tgUser.phone : "Profilingizda telefon ulash tugmasini bosing"}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
+                  <span className="text-xl">
+                    {tgUser?.firstName && tgUser.firstName !== "Foydalanuvchi" ? "✅" : "✏️"}
+                  </span>
+                  <div className="flex-1">
+                    <div className={`text-sm font-semibold ${
+                      tgUser?.firstName && tgUser.firstName !== "Foydalanuvchi"
+                        ? "text-green-700" : "text-gray-900"
+                    }`}>
+                      Ismingizni kiriting
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {tgUser?.firstName && tgUser.firstName !== "Foydalanuvchi"
+                        ? tgUser.firstName
+                        : "✏️ tugmasini bosib profilni to'ldiring"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowOnboardingHint(false);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold mb-2 active:scale-95 transition-all"
+              >
+                Profilga o'tish →
+              </button>
+              <button
+                onClick={() => setShowOnboardingHint(false)}
+                className="w-full py-2.5 rounded-xl text-gray-500 text-sm border border-gray-200"
+              >
+                Keyinroq
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -738,9 +830,11 @@ export default function WebApp() {
 
   const bookingProgress =
     step === "done" ? 100 :
-    step === "confirm" ? 85 :
-    step === "form" ? 70 :
-    step === "slots" ? 55 : 35;
+    step === "confirm" ? 88 :
+    step === "form" ? 72 :
+    step === "slots" ? 58 :
+    step === "date" ? 55 :
+    step === "doctor" ? 42 : 28;
 
   return (
     <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -802,10 +896,35 @@ export default function WebApp() {
           </div>
         )}
 
+        {/* ── Doctor ── */}
+        {step === "doctor" && selectedService && (
+          <div>
+            <button onClick={() => setStep("services")} className="text-blue-600 text-sm mb-4 flex items-center gap-1">
+              ← Orqaga
+            </button>
+            <div className="bg-blue-50 rounded-xl p-3 mb-4 flex items-center gap-3">
+              <span className="text-xl">{typeEmojis[selectedService.type]}</span>
+              <div>
+                <div className="text-sm font-semibold text-blue-900">{selectedService.name}</div>
+                <div className="text-xs text-blue-600">{selectedService.price.toLocaleString()} so&apos;m</div>
+              </div>
+            </div>
+            <DoctorPicker
+              doctors={selectedService.doctors}
+              onSelect={(doc) => { setSelectedDoctor(doc); setStep("date"); }}
+            />
+          </div>
+        )}
+
         {/* ── Date ── */}
         {step === "date" && (
           <div>
-            <button onClick={() => setStep("services")} className="text-blue-600 text-sm mb-4 flex items-center gap-1">
+            <button
+              onClick={() => setStep(
+                selectedService && selectedService.doctors.length > 1 ? "doctor" : "services"
+              )}
+              className="text-blue-600 text-sm mb-4 flex items-center gap-1"
+            >
               ← Orqaga
             </button>
             {selectedService && (
@@ -827,6 +946,23 @@ export default function WebApp() {
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
                 <p className="text-xs font-semibold text-blue-800">🎫 Onlayn jonli navbat rejimi</p>
                 <p className="text-xs text-blue-700 mt-0.5">Navbat raqamingiz beriladi, kabinetga to&apos;g&apos;ridan kelasiz.</p>
+              </div>
+            )}
+            {/* 1 shifokor avtomatik tanlangan — banner */}
+            {selectedDoctor && selectedService?.doctors.length === 1 && (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-blue-200 text-blue-700 font-bold flex items-center justify-center text-xs shrink-0">
+                  {selectedDoctor.firstName[0]}{selectedDoctor.lastName?.[0] ?? ""}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-blue-500">Shifokor</div>
+                  <div className="text-sm font-semibold text-blue-900">
+                    {selectedDoctor.firstName} {selectedDoctor.lastName}
+                  </div>
+                </div>
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full shrink-0">
+                  ✅ Tanlangan
+                </span>
               </div>
             )}
             <h2 className="font-semibold text-gray-900 mb-3">Sanani tanlang</h2>
@@ -947,6 +1083,9 @@ export default function WebApp() {
               {selectedService && (
                 <SummaryRow label="Xizmat" value={`${typeEmojis[selectedService.type]} ${selectedService.name}`} />
               )}
+              {selectedDoctor && (
+                <SummaryRow label="Shifokor" value={`${selectedDoctor.firstName} ${selectedDoctor.lastName}`} />
+              )}
               <SummaryRow label="Narx" value={`${selectedService?.price.toLocaleString()} so'm`} />
               <SummaryRow label="Sana" value={selectedDate ? formatDateLabel(selectedDate) : ""} />
               {selectedSlot && slots.find((s) => s.id === selectedSlot) && (
@@ -994,6 +1133,12 @@ export default function WebApp() {
             <p className="text-gray-500 text-sm mb-6">Qabulingiz tasdiqlandi</p>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-left space-y-3 mb-5">
+              {activeClinic?.name && (
+                <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Klinika</span>
+                  <span className="text-sm font-semibold text-gray-900">🏥 {activeClinic.name}</span>
+                </div>
+              )}
               {bookingTibId && (
                 <div className="flex justify-between items-center pb-3 border-b border-gray-100">
                   <span className="text-sm text-gray-500">ID raqam</span>
@@ -1001,6 +1146,9 @@ export default function WebApp() {
                 </div>
               )}
               <SummaryRow label="Xizmat" value={bookingResult.service?.name} />
+              {selectedDoctor && (
+                <SummaryRow label="Shifokor" value={`${selectedDoctor.firstName} ${selectedDoctor.lastName}`} />
+              )}
               {bookingResult.queueNumber && (
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">Navbat raqami</span>
