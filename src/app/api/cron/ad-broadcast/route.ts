@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
       // Yuborish
       const result = await sendAdPost({
         chatId:     channel.chatId,
+        title:      campaign.title,
         adText:     campaign.adText,
         imageUrl:   campaign.imageUrl,
         buttonText: campaign.buttonText,

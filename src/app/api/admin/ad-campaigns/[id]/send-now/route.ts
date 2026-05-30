@@ -44,6 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       try {
         result = await sendAdPost({
           chatId:     channel.chatId,
+          title:      campaign.title,
           adText:     campaign.adText,
           imageUrl:   campaign.imageUrl,
           buttonText: campaign.buttonText,

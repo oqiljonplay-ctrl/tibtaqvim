@@ -2,6 +2,7 @@ import TelegramBot from "node-telegram-bot-api";
 
 export interface BroadcastPayload {
   chatId: string;
+  title?: string | null;
   adText: string;
   imageUrl?: string | null;
   buttonText?: string | null;
@@ -59,7 +60,8 @@ export async function sendAdPost(
   payload: BroadcastPayload
 ): Promise<{ ok: true; messageId: string } | { ok: false; error: string }> {
   const bot = getBot();
-  const { chatId, adText, imageUrl, buttonText, buttonUrl } = payload;
+  const { chatId, title, adText, imageUrl, buttonText, buttonUrl } = payload;
+  const fullText = title?.trim() ? `<b>${title.trim()}</b>\n\n${adText}` : adText;
 
   const replyMarkup =
     buttonText && buttonUrl
@@ -89,7 +91,7 @@ export async function sendAdPost(
 
     return sendWithRetry(() =>
       bot.sendPhoto(chatIdNum, photoSource, {
-        caption:      adText,
+        caption:      fullText,
         parse_mode:   "HTML",
         reply_markup: replyMarkup as TelegramBot.InlineKeyboardMarkup,
       })
@@ -97,7 +99,7 @@ export async function sendAdPost(
   }
 
   return sendWithRetry(() =>
-    bot.sendMessage(chatIdNum, adText, {
+    bot.sendMessage(chatIdNum, fullText, {
       parse_mode:   "HTML",
       reply_markup: replyMarkup as TelegramBot.InlineKeyboardMarkup,
     })
