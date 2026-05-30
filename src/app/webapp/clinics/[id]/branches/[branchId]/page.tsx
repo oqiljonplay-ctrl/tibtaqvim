@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/Calendar";
 import { formatDateLabel } from "@/lib/calendar";
 import { Container } from "@/components/layout";
-import Link from "next/link";
 import { ServicePicker } from "@/components/webapp/ServicePicker";
-import type { Service } from "@/components/webapp/ServicePicker";
+import type { Service, ServiceDoctor } from "@/components/webapp/ServicePicker";
+import { DoctorPicker } from "@/components/webapp/DoctorPicker";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
 
-type BookingStep = "services" | "date" | "slots" | "patient" | "form" | "confirm" | "done";
+type BookingStep = "services" | "doctor" | "date" | "slots" | "patient" | "form" | "confirm" | "done";
 
 interface Slot { id: string; startTime: string; endTime: string; available: boolean }
 interface Dependent { id: string; firstName: string; lastName: string | null; phone: string | null; relation: string | null }
@@ -61,6 +61,8 @@ export default function BranchServicesPage() {
   const [newDepRel, setNewDepRel]   = useState("");
   const [depSaving, setDepSaving]   = useState(false);
 
+  const [selDoctor, setSelDoctor] = useState<ServiceDoctor | null>(null);
+  const [clinicName, setClinicName] = useState<string>("");
   const [doneCountdown, setDoneCountdown] = useState(5);
   const tgUserRef = useRef<TgUser | null>(null);
 
@@ -103,6 +105,12 @@ export default function BranchServicesPage() {
           }
         } catch {}
       }
+
+      // Clinic name olish
+      fetch(`/api/clinics/${clinicId}`)
+        .then((r) => r.json())
+        .then((j) => { if (j.success && j.data?.name) setClinicName(j.data.name); })
+        .catch(() => {});
 
       setLoading(true);
       try {
@@ -201,6 +209,7 @@ export default function BranchServicesPage() {
         patientName: finalName, patientPhone: finalPhone, source: "webapp",
         ...(resolvedUserId ? { userId: resolvedUserId } : {}),
         ...(patient.dependentId ? { dependentId: patient.dependentId } : {}),
+        ...(selDoctor ? { doctorId: selDoctor.id } : {}),
       };
       if (selSlot) payload.slotId = selSlot;
       if (selSvc.requiresAddress && form.address) payload.address = form.address;
@@ -236,7 +245,7 @@ export default function BranchServicesPage() {
         {step !== "services" && step !== "done" && (
           <div className="mt-2 h-1.5 bg-blue-500 rounded-full overflow-hidden">
             <div className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${step === "confirm" ? 85 : step === "form" || step === "patient" ? 70 : step === "slots" ? 55 : 35}%` }} />
+              style={{ width: `${step === "confirm" ? 88 : step === "form" || step === "patient" ? 72 : step === "slots" ? 58 : step === "doctor" ? 42 : step === "date" ? 55 : 28}%` }} />
           </div>
         )}
       </div>
@@ -255,14 +264,29 @@ export default function BranchServicesPage() {
           <ServicePicker
             services={services}
             loading={loading}
-            onSelect={(s) => { setSelSvc(s); setSelDate(""); setSelSlot(""); setStep("date"); }}
+            onSelect={(s) => {
+              setSelSvc(s);
+              setSelDate("");
+              setSelSlot("");
+              setSelDoctor(null);
+              if (s.doctors.length === 0) {
+                setStep("date");
+              } else if (s.doctors.length === 1) {
+                setSelDoctor(s.doctors[0]);
+                setStep("date");
+              } else {
+                setStep("doctor");
+              }
+            }}
           />
         )}
 
-        {/* Date */}
-        {step === "date" && selSvc && (
+        {/* Doctor */}
+        {step === "doctor" && selSvc && (
           <div>
-            <button onClick={() => setStep("services")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
+            <button onClick={() => setStep("services")} className="text-blue-600 text-sm mb-4">
+              ← Orqaga
+            </button>
             <div className="bg-blue-50 rounded-xl p-3 mb-4 flex items-center gap-3">
               <span className="text-xl">{typeEmojis[selSvc.type]}</span>
               <div>
@@ -270,6 +294,46 @@ export default function BranchServicesPage() {
                 <div className="text-xs text-blue-600">{selSvc.price.toLocaleString()} so&apos;m</div>
               </div>
             </div>
+            <DoctorPicker
+              doctors={selSvc.doctors}
+              onSelect={(doc) => { setSelDoctor(doc); setStep("date"); }}
+            />
+          </div>
+        )}
+
+        {/* Date */}
+        {step === "date" && selSvc && (
+          <div>
+            <button
+              onClick={() => setStep(selSvc.doctors.length > 1 ? "doctor" : "services")}
+              className="text-blue-600 text-sm mb-4"
+            >
+              ← Orqaga
+            </button>
+            <div className="bg-blue-50 rounded-xl p-3 mb-4 flex items-center gap-3">
+              <span className="text-xl">{typeEmojis[selSvc.type]}</span>
+              <div>
+                <div className="text-sm font-semibold text-blue-900">{selSvc.name}</div>
+                <div className="text-xs text-blue-600">{selSvc.price.toLocaleString()} so&apos;m</div>
+              </div>
+            </div>
+            {/* 1 shifokor avtomatik tanlangan — banner */}
+            {selDoctor && selSvc.doctors.length === 1 && (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-blue-200 text-blue-700 font-bold flex items-center justify-center text-xs shrink-0">
+                  {selDoctor.firstName[0]}{selDoctor.lastName?.[0] ?? ""}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-blue-500">Shifokor</div>
+                  <div className="text-sm font-semibold text-blue-900">
+                    {selDoctor.firstName} {selDoctor.lastName}
+                  </div>
+                </div>
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full shrink-0">
+                  ✅ Tanlangan
+                </span>
+              </div>
+            )}
             <h2 className="font-semibold text-gray-900 mb-3">Sanani tanlang</h2>
             <Calendar value={selDate || null} onChange={(d) => selectDate(d)} />
           </div>
@@ -419,6 +483,9 @@ export default function BranchServicesPage() {
             <h2 className="font-semibold text-gray-900 mb-4">Tasdiqlash</h2>
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 mb-5">
               <SummaryRow label="Xizmat" value={`${typeEmojis[selSvc.type]} ${selSvc.name}`} />
+              {selDoctor && (
+                <SummaryRow label="Shifokor" value={`${selDoctor.firstName} ${selDoctor.lastName}`} />
+              )}
               <SummaryRow label="Narx" value={`${selSvc.price.toLocaleString()} so'm`} />
               <SummaryRow label="Sana" value={selDate ? formatDateLabel(selDate) : ""} />
               {selSlot && slots.find((s) => s.id === selSlot) && (
@@ -449,6 +516,12 @@ export default function BranchServicesPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-1">Muvaffaqiyatli!</h2>
             <p className="text-gray-500 text-sm mb-6">Qabulingiz tasdiqlandi</p>
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-left space-y-3 mb-5">
+              {clinicName && (
+                <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Klinika</span>
+                  <span className="text-sm font-semibold text-gray-900">🏥 {clinicName}</span>
+                </div>
+              )}
               {displayTibId && (
                 <div className="flex justify-between items-center pb-3 border-b border-gray-100">
                   <span className="text-sm text-gray-500">ID raqam</span>
@@ -456,6 +529,9 @@ export default function BranchServicesPage() {
                 </div>
               )}
               <SummaryRow label="Xizmat" value={result.service?.name ?? ""} />
+              {selDoctor && (
+                <SummaryRow label="Shifokor" value={`${selDoctor.firstName} ${selDoctor.lastName}`} />
+              )}
               {result.queueNumber && (
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500">Navbat</span>

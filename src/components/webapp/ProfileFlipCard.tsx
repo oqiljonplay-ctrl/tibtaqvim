@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useLayoutEffect } from "react";
 import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
+import { normalizePhone } from "@/lib/utils/phone";
 
 interface ProfileData {
   firstName: string;
@@ -17,10 +18,17 @@ interface Props {
   telegramId: string;
   headerDate: string;
   onUpdated: (updated: Partial<ProfileData>) => void;
+  onPhoneAdded?: (phone: string) => void;
 }
 
-export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: Props) {
+export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, onPhoneAdded }: Props) {
   const [flipped, setFlipped] = useState(false);
+
+  // Phone ulash state
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [phoneSaving, setPhoneSaving] = useState(false);
 
   // Form state
   const [firstName, setFirstName] = useState(profile.firstName);
@@ -49,6 +57,62 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
   const displayName = [profile.firstName, profile.lastName, profile.fatherName]
     .filter(Boolean)
     .join(" ");
+
+  async function savePhone(phone: string, tgFirstName?: string) {
+    setPhoneSaving(true);
+    setPhoneError(null);
+    try {
+      const body: Record<string, string> = { telegramId, phone };
+      if (tgFirstName && tgFirstName.length >= 2) body.firstName = tgFirstName;
+      const res = await fetch("/api/webapp/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPhoneError(data.error ?? "Saqlashda xato");
+        return;
+      }
+      setShowPhoneInput(false);
+      setPhoneInput("");
+      onUpdated({ phone: data.data.phone, firstName: data.data.firstName });
+      onPhoneAdded?.(data.data.phone);
+      // first_name pre-fill: ORQA tomondagi forma
+      if (tgFirstName && tgFirstName.length >= 2) setFirstName(tgFirstName);
+    } catch {
+      setPhoneError("Tarmoq xatosi");
+    } finally {
+      setPhoneSaving(false);
+    }
+  }
+
+  function handleRequestContact() {
+    const tg = (window as any).Telegram?.WebApp;
+    const canRequest = typeof tg?.requestContact === "function";
+    if (canRequest) {
+      tg.requestContact((result: any) => {
+        if (result?.status === "sent" || result?.contact?.phone_number) {
+          const rawPhone =
+            result.contact?.phone_number ??
+            result.responseUnsafe?.contact?.phone_number ??
+            "";
+          const tgFirstName = result.contact?.first_name ?? "";
+          if (!rawPhone) { setShowPhoneInput(true); return; }
+          try {
+            const normalized = normalizePhone(rawPhone);
+            savePhone(normalized, tgFirstName);
+          } catch {
+            setShowPhoneInput(true);
+          }
+        } else {
+          setShowPhoneInput(true);
+        }
+      });
+    } else {
+      setShowPhoneInput(true);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -143,10 +207,55 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated }: 
               </button>
             </div>
           </div>
-          {profile.phone
-            ? <p className="text-blue-200 text-xs mt-2">📞 {profile.phone}</p>
-            : <p className="text-blue-300 text-xs mt-2 italic">Telefon raqam kiritilmagan</p>
-          }
+          {profile.phone ? (
+            <p className="text-blue-200 text-xs mt-2">📞 {profile.phone}</p>
+          ) : showPhoneInput ? (
+            <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="tel"
+                className="w-full bg-white/20 text-white placeholder-blue-300 rounded-xl px-3 py-2 text-sm
+                           border border-white/30 focus:outline-none focus:border-white/60"
+                placeholder="+998 90 123 45 67"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                autoFocus
+              />
+              {phoneError && (
+                <p className="text-red-300 text-xs">{phoneError}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    try {
+                      const normalized = normalizePhone(phoneInput);
+                      savePhone(normalized);
+                    } catch {
+                      setPhoneError("Telefon formati noto'g'ri (+998XXXXXXXXX)");
+                    }
+                  }}
+                  disabled={phoneSaving || phoneInput.trim().length < 9}
+                  className="flex-1 bg-white text-blue-700 font-semibold text-xs py-2 rounded-xl
+                             disabled:opacity-50 active:scale-95 transition-all"
+                >
+                  {phoneSaving ? "Saqlanmoqda..." : "Saqlash"}
+                </button>
+                <button
+                  onClick={() => { setShowPhoneInput(false); setPhoneError(null); setPhoneInput(""); }}
+                  className="px-3 py-2 text-blue-200 text-xs rounded-xl bg-white/10"
+                >
+                  Bekor
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleRequestContact(); }}
+              className="mt-2 flex items-center gap-1.5 text-xs bg-white/20 hover:bg-white/30
+                         text-white px-3 py-1.5 rounded-full active:scale-95 transition-all"
+            >
+              📞 Telefon ulash
+            </button>
+          )}
           {(profile.region || profile.district) && (
             <p className="text-blue-200 text-xs mt-1">
               📍 {[profile.district, profile.region].filter(Boolean).join(", ")}
