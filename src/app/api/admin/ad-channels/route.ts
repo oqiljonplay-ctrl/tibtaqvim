@@ -43,6 +43,23 @@ export async function POST(req: NextRequest) {
   // clinic_admin: scope majburiy clinic, clinicId = o'z klinikasi
   if (isClinicAdmin) {
     if (!user.clinicId) return error("Klinika ID topilmadi");
+
+    const existing = await prisma.adChannel.findUnique({ where: { chatId: chatId.trim() } });
+    if (existing) {
+      if (existing.clinicId === user.clinicId) {
+        return error("Bu kanal allaqachon klinikangizga ulangan");
+      }
+      // myChatMember tomonidan scope=platform yaratilgan → claim qilib scope=clinic ga o'tkazish
+      if (existing.scope === "platform" && !existing.clinicId) {
+        const updated = await prisma.adChannel.update({
+          where: { chatId: chatId.trim() },
+          data: { scope: "clinic", clinicId: user.clinicId, isActive: false },
+        });
+        return created(updated);
+      }
+      return error("Bu kanal/guruh boshqa klinikaga tegishli");
+    }
+
     const channel = await prisma.adChannel.create({
       data: {
         title:       title.trim(),
@@ -59,9 +76,14 @@ export async function POST(req: NextRequest) {
     return created(channel);
   }
 
-  // super_admin
-  if (!scope || !["clinic", "platform"].includes(scope)) return error("scope: clinic yoki platform");
-  if (scope === "clinic" && !clinicId) return error("clinic scope uchun clinicId majburiy");
+  // super_admin: scope default platform, ixtiyoriy clinicId
+  const finalScope: "clinic" | "platform" = (scope === "clinic" || scope === "platform") ? scope : "platform";
+  if (finalScope === "clinic" && !clinicId) return error("clinic scope uchun clinicId majburiy");
+
+  const existingForSuper = await prisma.adChannel.findUnique({ where: { chatId: chatId.trim() } });
+  if (existingForSuper) {
+    return error("Bu chatId allaqachon mavjud. Kanalni ro'yxatdan tahrirlang.");
+  }
 
   const channel = await prisma.adChannel.create({
     data: {
@@ -70,8 +92,8 @@ export async function POST(req: NextRequest) {
       type,
       username:    username?.trim() || null,
       memberCount: memberCount ? Number(memberCount) : null,
-      scope,
-      clinicId:    scope === "clinic" ? clinicId : null,
+      scope:       finalScope,
+      clinicId:    finalScope === "clinic" ? clinicId : null,
       addedById:   user.userId,
     },
   });

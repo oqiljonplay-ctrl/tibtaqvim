@@ -34,38 +34,51 @@ export async function handleMyChatMember(
   if (status === "administrator" || status === "member") {
     const existing = await prisma.adChannel.findUnique({ where: { chatId } });
 
-    if (!existing) {
-      // Kanalga qo'shgan foydalanuvchi clinic_admin bo'lsa → scope=clinic
-      let scope: "clinic" | "platform" = "platform";
-      let clinicId: string | null = null;
-
-      if (from?.id) {
-        const adminUser = await prisma.user.findFirst({
-          where: { telegramId: String(from.id), role: "clinic_admin" },
-          select: { clinicId: true },
-        });
-        if (adminUser?.clinicId) {
-          scope = "clinic";
-          clinicId = adminUser.clinicId;
-        }
+    // Qo'shgan foydalanuvchi clinic_admin bo'lsa → scope=clinic, clinicId=uning klinikasi
+    let resolvedScope: "clinic" | "platform" = "platform";
+    let resolvedClinicId: string | null = null;
+    if (from?.id) {
+      const adminUser = await prisma.user.findFirst({
+        where: { telegramId: String(from.id), role: "clinic_admin" },
+        select: { clinicId: true },
+      });
+      if (adminUser?.clinicId) {
+        resolvedScope = "clinic";
+        resolvedClinicId = adminUser.clinicId;
       }
+    }
 
+    if (!existing) {
       await prisma.adChannel.create({
         data: {
           title:     chat.title || chatId,
           chatId,
           type,
           username:  chat.username || null,
-          scope,
-          clinicId,
+          scope:     resolvedScope,
+          clinicId:  resolvedClinicId,
           addedById: "auto",
           isActive:  false, // tasdiqlagunicha nofaol
         },
       });
-      console.log(`[myChatMember] Yangi kanal: ${chat.title} (${chatId}) scope=${scope}`);
-    } else if (!existing.isActive && status === "administrator") {
-      await prisma.adChannel.update({ where: { chatId }, data: { isActive: true } });
-      console.log(`[myChatMember] Kanal faollashtirildi: ${chat.title}`);
+      console.log(`[myChatMember] Yangi kanal: ${chat.title} (${chatId}) scope=${resolvedScope}`);
+    } else {
+      const updates: Record<string, unknown> = {};
+
+      // scope=platform, clinicId=null → clinic_admin qo'shsa → scope=clinic ga yangilash
+      if (existing.scope === "platform" && existing.clinicId === null && resolvedClinicId) {
+        updates.scope = "clinic";
+        updates.clinicId = resolvedClinicId;
+      }
+
+      if (!existing.isActive && status === "administrator") {
+        updates.isActive = true;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await prisma.adChannel.update({ where: { chatId }, data: updates });
+        console.log(`[myChatMember] Kanal yangilandi: ${chat.title} (${chatId})`, updates);
+      }
     }
   } else if (status === "kicked" || status === "left") {
     await prisma.adChannel.updateMany({

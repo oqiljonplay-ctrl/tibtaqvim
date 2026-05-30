@@ -82,10 +82,10 @@ function nextCronTime(): string {
 // ─── Channel Add Modal (Faza 2 — 2 yo'l) ─────────────────────────────────────
 
 function ChannelAddModal({
-  onClose, onSaved,
-}: { onClose: () => void; onSaved: () => void }) {
+  clinics, onClose, onSaved,
+}: { clinics: Clinic[]; onClose: () => void; onSaved: () => void }) {
   const [mode, setMode] = useState<"auto" | "manual">("auto");
-  const [form, setForm] = useState({ title: "", chatId: "", type: "channel", username: "", memberCount: "" });
+  const [form, setForm] = useState({ title: "", chatId: "", type: "channel", username: "", memberCount: "", scope: "platform", clinicId: "" });
   const [lookupInput, setLookupInput] = useState("");
   const [looking, setLooking] = useState(false);
   const [lookupResult, setLookupResult] = useState<{ chatId: string; title: string; type: string; memberCount: number | null; username: string | null; isAdmin: boolean } | null>(null);
@@ -101,13 +101,14 @@ function ChannelAddModal({
       const j = await r.json();
       if (j.success) {
         setLookupResult(j.data);
-        setForm({
+        setForm((f) => ({
+          ...f,
           title:       j.data.title,
           chatId:      j.data.chatId,
           type:        j.data.type,
           username:    j.data.username ?? "",
           memberCount: j.data.memberCount ? String(j.data.memberCount) : "",
-        });
+        }));
       } else {
         setLookupErr(j.error?.message ?? "Kanal topilmadi");
       }
@@ -126,6 +127,7 @@ function ChannelAddModal({
         body: JSON.stringify({
           ...form,
           memberCount: form.memberCount ? Number(form.memberCount) : null,
+          clinicId: form.scope === "clinic" && form.clinicId ? form.clinicId : undefined,
         }),
       });
       const j = await r.json();
@@ -214,13 +216,33 @@ function ChannelAddModal({
                     value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Scope</label>
+                    <select className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value, clinicId: "" })}>
+                      <option value="platform">Umumiy (platform)</option>
+                      <option value="clinic">Klinika</option>
+                    </select>
+                  </div>
+                  {form.scope === "clinic" && (
+                    <div>
+                      <label className="text-xs font-medium text-gray-600">Klinika *</label>
+                      <select className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                        value={form.clinicId} onChange={(e) => setForm({ ...form, clinicId: e.target.value })} required>
+                        <option value="">— tanlang —</option>
+                        {clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
                 {err && <p className="text-red-600 text-xs">{err}</p>}
                 <div className="flex gap-2">
                   <button type="button" onClick={onClose}
                     className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
                     Bekor
                   </button>
-                  <button type="submit" disabled={saving}
+                  <button type="submit" disabled={saving || (form.scope === "clinic" && !form.clinicId)}
                     className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
                     {saving ? "Saqlanmoqda..." : "Qo'shish"}
                   </button>
@@ -280,13 +302,33 @@ function ChannelAddModal({
                 placeholder="@kanalusername"
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600">Scope</label>
+                <select className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value, clinicId: "" })}>
+                  <option value="platform">Umumiy (platform)</option>
+                  <option value="clinic">Klinika</option>
+                </select>
+              </div>
+              {form.scope === "clinic" && (
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Klinika *</label>
+                  <select className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    value={form.clinicId} onChange={(e) => setForm({ ...form, clinicId: e.target.value })} required>
+                    <option value="">— tanlang —</option>
+                    {clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
             {err && <p className="text-red-600 text-xs">{err}</p>}
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={onClose}
                 className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
                 Bekor
               </button>
-              <button type="submit" disabled={saving}
+              <button type="submit" disabled={saving || (form.scope === "clinic" && !form.clinicId)}
                 className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
                 {saving ? "Saqlanmoqda..." : "Qo'shish"}
               </button>
@@ -1071,7 +1113,7 @@ export default function AdsPage() {
 
       {/* Modals */}
       {showChannelModal && (
-        <ChannelAddModal onClose={() => setShowChannelModal(false)} onSaved={load} />
+        <ChannelAddModal clinics={clinics} onClose={() => setShowChannelModal(false)} onSaved={load} />
       )}
       {editingChannel && (
         <ChannelEditModal
