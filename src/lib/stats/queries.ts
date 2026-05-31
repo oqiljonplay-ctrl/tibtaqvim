@@ -81,8 +81,8 @@ export async function fetchKpi(scope: StatsScope): Promise<KpiData> {
       where: { ...baseWhere, date: { gte: r.lastMonthStart, lt: r.lastMonthEnd } },
     }),
     prisma.appointment.findMany({
-      where: { ...baseWhere, date: { gte: r.monthStart, lt: r.tomorrow }, status: "arrived" },
-      select: { service: { select: { price: true } } },
+      where: { ...baseWhere, date: { gte: r.monthStart, lt: r.tomorrow }, paymentStatus: "paid" },
+      select: { paidAmount: true, service: { select: { price: true } } },
     }),
     prisma.user.count({
       where: {
@@ -107,7 +107,10 @@ export async function fetchKpi(scope: StatsScope): Promise<KpiData> {
     }),
   ]);
 
-  const thisMonthRevenue = revenueAgg.reduce((sum, a) => sum + Number(a.service?.price ?? 0), 0);
+  const thisMonthRevenue = revenueAgg.reduce(
+    (sum, a) => sum + (a.paidAmount != null ? a.paidAmount : Number(a.service?.price ?? 0)),
+    0
+  );
   const totalCompleted = arrivedCount + missedCount;
   const conversionRate = totalCompleted > 0 ? Math.round((arrivedCount / totalCompleted) * 100) : 0;
 

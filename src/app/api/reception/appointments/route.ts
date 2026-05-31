@@ -85,6 +85,8 @@ function serialize(a: any) {
     doctor: a.doctor
       ? { id: a.doctor.id, name: [a.doctor.lastName, a.doctor.firstName].filter(Boolean).join(" "), specialty: a.doctor.specialty }
       : null,
+    paidAmount: a.paidAmount ?? null,
+    appliedDiscountPercent: a.appliedDiscountPercent ?? 0,
     patientTelegramId: a.user?.telegramId ?? null,
     tibId: a.user?.tibId ?? null,
     locationLat: a.locationLat ?? null,

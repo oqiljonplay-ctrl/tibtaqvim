@@ -16,12 +16,16 @@ export interface WorkflowResult {
 export async function markAsPaid(
   appointmentId: string,
   actorClinicId: string | null,
-  source: PaymentSource = "reception"
+  source: PaymentSource = "reception",
+  mode: "full" | "discount" = "full"
 ): Promise<WorkflowResult> {
   try {
     const appt = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      select: { id: true, clinicId: true, paymentStatus: true, status: true },
+      select: {
+        id: true, clinicId: true, paymentStatus: true, status: true,
+        service: { select: { price: true } },
+      },
     });
     if (!appt) return { success: false, error: "Bron topilmadi" };
     if (actorClinicId && appt.clinicId !== actorClinicId)
@@ -31,11 +35,28 @@ export async function markAsPaid(
     if (appt.paymentStatus === "paid")
       return { success: false, error: "Bu bron allaqachon to'langan" };
 
+    const servicePrice = Number(appt.service?.price ?? 0);
+    let paidAmount: number;
+    let appliedDiscountPercent: number;
+
+    if (mode === "discount") {
+      const settings = await prisma.clinicSettings.findUnique({
+        where: { clinicId: appt.clinicId },
+        select: { discountPercent: true },
+      });
+      const dp = settings?.discountPercent ?? 0;
+      appliedDiscountPercent = dp;
+      paidAmount = Math.round(servicePrice * (100 - dp) / 100);
+    } else {
+      paidAmount = Math.round(servicePrice);
+      appliedDiscountPercent = 0;
+    }
+
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: "paid" },
+      data: { paymentStatus: "paid", paidAmount, appliedDiscountPercent },
     });
-    console.log(`[workflow] markAsPaid: ${appointmentId} by ${source}`);
+    console.log(`[workflow] markAsPaid: ${appointmentId} mode=${mode} paidAmount=${paidAmount} discount=${appliedDiscountPercent}% by ${source}`);
     return { success: true, appointment: updated };
   } catch (err: any) {
     console.error("[workflow/markAsPaid]", err);
@@ -50,17 +71,20 @@ export async function markAsUnpaid(
   try {
     const appt = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      select: { id: true, clinicId: true, paymentStatus: true, status: true },
+      select: { id: true, clinicId: true, paymentStatus: true, status: true, appliedDiscountPercent: true, paidAmount: true },
     });
     if (!appt) return { success: false, error: "Bron topilmadi" };
     if (actorClinicId && appt.clinicId !== actorClinicId)
       return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
+    if (appt.appliedDiscountPercent === 100) {
+      return { success: false, error: "100% chegirmali to'lovni qaytarib bo'lmaydi (0 so'm to'langan)" };
+    }
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: "pending" },
+      data: { paymentStatus: "pending", paidAmount: null, appliedDiscountPercent: 0 },
     });
     return { success: true, appointment: updated };
   } catch (err: any) {
