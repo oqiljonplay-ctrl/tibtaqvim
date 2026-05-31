@@ -473,6 +473,34 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-05-31 — ADMIN-SIDEBAR-NAV: Sidebar/Navbar/Profil bug tuzatildi
+
+**Muammo:** `clinic_admin` sidebar'dan "Qabulxona" yoki "Navbat" bosganida `admin/(panel)` layout'dan chiqib ketib, sidebar yo'qolardi. `/doctor/profile` — admin uchun "Forbidden" banneri ko'rinardi. Mobil'da sidebar umuman ko'rinmasdi.
+
+**Ildiz sabab:** `AdminSidebar.tsx` dagi `/reception` va `/doctor` linklari `admin/(panel)` route group'idan tashqariga ishora qilardi → Next.js layout tree almashardi → sidebar unmount bo'lardi.
+
+**Tuzatishlar:**
+- `src/components/pages/ReceptionView.tsx` — Yangi: `reception/page.tsx` mazmuni ajratildi, `context?: "standalone"|"admin"` prop
+- `src/components/pages/DoctorQueueView.tsx` — Yangi: `doctor/page.tsx` mazmuni ajratildi, `context="admin"` bo'lsa `/api/doctor/profile` chaqirilmaydi
+- `src/app/admin/(panel)/reception/page.tsx` — Yangi: `ReceptionView context="admin"` (sidebar saqlanadi)
+- `src/app/admin/(panel)/doctor/page.tsx` — Yangi: `DoctorQueueView context="admin"` (sidebar saqlanadi)
+- `src/app/reception/page.tsx`, `src/app/doctor/page.tsx` — Thin wrapper (standalone route'lar SAQLANADI)
+- `src/components/ui/AdminSidebar.tsx` — href `/reception→/admin/reception`, `/doctor→/admin/doctor`; mobil hamburger drawer qo'shildi (fixed bottom-right ☰ tugmasi + slide-out)
+- `src/components/ui/Navbar.tsx` — `getRoleExtraItems`: cross-link href'lar ham `/admin/reception`, `/admin/doctor` ga o'zgartirildi
+- `src/app/admin/(panel)/layout.tsx` — `hidden md:block` wrapper olib tashlandi (AdminSidebar o'zi boshqaradi)
+- `src/app/doctor/profile/page.tsx` — 403 FORBIDDEN → `router.replace('/admin')` redirect (xom "Forbidden" ko'rsatilmaydi)
+- `src/app/admin/(panel)/error.tsx` — Yangi: admin panel error boundary
+
+**Asosiy qoidalar (O'ZGARTIRMA):**
+- `/reception` va `/doctor` standalone route'lar SAQLANADI — receptionist va doctor rollari uchun
+- `/admin/reception` va `/admin/doctor` — faqat admin uchun, sidebar saqlanadi
+- Middleware TEGILMADI — `/admin/*` allaqachon `clinic_admin` uchun ochiq
+- API TEGILMADI — RLS xavfsizligi saqlanadi
+
+**Commit:** fix/admin-sidebar-nav-profile → main. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-05-31 — DOCTOR-BLOCK: Shifokor darajasida kun bloklash
 
 **Maqsad:** Klinika blokidan (yakshanba/bayram) MUSTAQIL ravishda shifokor darajasida kunlarni bloklash. Bir yo'nalishda 3 shifokor — Dr. Rahimov har shanba kelmaydi → FAQAT u qizil, qolgan 2 shifokor ochiq. Takroriy (haftaning ixtiyoriy kuni, 0-6) va bir martalik (aniq YYYY-MM-DD). 3 rol bloklaydi: shifokor o'zi + qabulxona + admin. 24/7 klinikada ham ishlaydi.
