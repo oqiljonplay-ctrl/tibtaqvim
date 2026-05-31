@@ -461,6 +461,8 @@ model Appointment {
   liveStatus         String?
   queueMode    QueueMode         @default(online)
   paymentStatus String           @default("pending")
+  paidAmount             Int?
+  appliedDiscountPercent Int      @default(0)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -528,6 +530,7 @@ model ClinicSettings {
   patientSelfLimit      Int      @default(4)
   dependentBookingLimit Int      @default(1)
   maxDependents         Int      @default(2)
+  discountPercent       Int      @default(0)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

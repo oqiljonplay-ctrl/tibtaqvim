@@ -27,9 +27,11 @@ export async function PATCH(
 
     let result;
     switch (action) {
-      case "paid":
-        result = await markAsPaid(params.id, actorClinicId, "reception");
+      case "paid": {
+        const mode = (body.mode as string) === "discount" ? "discount" : "full";
+        result = await markAsPaid(params.id, actorClinicId, "reception", mode);
         break;
+      }
       case "unpaid":
         result = await markAsUnpaid(params.id, actorClinicId);
         break;

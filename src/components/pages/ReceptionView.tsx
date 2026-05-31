@@ -19,6 +19,8 @@ interface ReceptionAppointment {
   address: string | null;
   notes: string | null;
   tibId: string | null;
+  paidAmount: number | null;
+  appliedDiscountPercent: number;
   service: { id: string; name: string; type: string; price: number } | null;
   doctor: { id: string; name: string; specialty: string | null } | null;
   patientTelegramId: string | null;
@@ -57,6 +59,7 @@ export default function ReceptionView({ context = "standalone" }: ReceptionViewP
   const [doctors, setDoctors] = useState<DoctorItem[]>([]);
   const [selBlockDoctorId, setSelBlockDoctorId] = useState<string>("");
   const [showBlockSection, setShowBlockSection] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState(0);
 
   const fetchData = useCallback(async (d?: string) => {
     try {
@@ -93,6 +96,13 @@ export default function ReceptionView({ context = "standalone" }: ReceptionViewP
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    fetch("/api/admin/clinic-settings", { credentials: "include" })
+      .then((r) => r.json())
+      .then((j) => { if (j.success && j.data) setDiscountPercent(j.data.discountPercent ?? 0); })
+      .catch(() => {});
+  }, []);
+
   function handleDateChange(d: string) {
     setDate(d);
     setLoading(true);
@@ -101,16 +111,20 @@ export default function ReceptionView({ context = "standalone" }: ReceptionViewP
 
   async function handlePaymentAction(
     appointmentId: string,
-    action: "paid" | "unpaid" | "cancel"
+    action: "paid" | "unpaid" | "cancel",
+    mode?: "full" | "discount"
   ) {
     if (action === "cancel" && !confirm("Bronni butunlay bekor qilishni tasdiqlaysizmi?")) return;
     setActionLoading(appointmentId);
     try {
+      const body: Record<string, unknown> = { action };
+      if (action === "paid" && mode) body.mode = mode;
+
       const res = await fetch(`/api/reception/appointments/${appointmentId}/payment`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (json.success) {
@@ -163,6 +177,11 @@ export default function ReceptionView({ context = "standalone" }: ReceptionViewP
             </span>
           </div>
         )}
+        {discountPercent > 0 && (
+          <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg font-medium text-sm">
+            🏷 Chegirma: {discountPercent}%
+          </span>
+        )}
       </div>
 
       {errorMsg && (
@@ -197,7 +216,9 @@ export default function ReceptionView({ context = "standalone" }: ReceptionViewP
                     appt={appt}
                     loading={actionLoading === appt.id}
                     section="pending"
-                    onPaid={() => handlePaymentAction(appt.id, "paid")}
+                    discountPercent={discountPercent}
+                    onPaid={() => handlePaymentAction(appt.id, "paid", "full")}
+                    onDiscount={() => handlePaymentAction(appt.id, "paid", "discount")}
                     onCancel={() => handlePaymentAction(appt.id, "cancel")}
                   />
                 ))}
@@ -225,6 +246,7 @@ export default function ReceptionView({ context = "standalone" }: ReceptionViewP
                     appt={appt}
                     loading={actionLoading === appt.id}
                     section="paid"
+                    discountPercent={discountPercent}
                     onUnpaid={() => handlePaymentAction(appt.id, "unpaid")}
                   />
                 ))}
@@ -276,12 +298,21 @@ interface CardProps {
   appt: ReceptionAppointment;
   loading: boolean;
   section: "pending" | "paid";
+  discountPercent: number;
   onPaid?: () => void;
+  onDiscount?: () => void;
   onUnpaid?: () => void;
   onCancel?: () => void;
 }
 
-function ReceptionCard({ appt, loading, section, onPaid, onUnpaid, onCancel }: CardProps) {
+function ReceptionCard({ appt, loading, section, discountPercent, onPaid, onDiscount, onUnpaid, onCancel }: CardProps) {
+  const price = appt.service?.price ?? 0;
+  const discountedAmount = Math.round(price * (100 - discountPercent) / 100);
+  const showDiscountBtn = section === "pending" && discountPercent > 0 && price > 0;
+
+  // Qaytarish tugmasi: 100% chegirma (paidAmount=0) bo'lsa ko'rsatilmaydi
+  const canRefund = appt.appliedDiscountPercent !== 100 && appt.paidAmount !== 0;
+
   return (
     <div className={`card p-3 ${section === "paid" ? "opacity-80" : ""}`}>
       <div className="flex items-start gap-3">
@@ -302,9 +333,16 @@ function ReceptionCard({ appt, loading, section, onPaid, onUnpaid, onCancel }: C
               )}
             </div>
             {section === "paid" && (
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium flex-shrink-0">
-                ✅ To'langan
-              </span>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium flex-shrink-0">
+                  ✅ To'langan
+                </span>
+                {appt.appliedDiscountPercent > 0 && (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium flex-shrink-0">
+                    🏷 {appt.appliedDiscountPercent}% chegirma
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
@@ -312,6 +350,9 @@ function ReceptionCard({ appt, loading, section, onPaid, onUnpaid, onCancel }: C
             <p>🏷 {appt.service?.name ?? "—"}{appt.service?.price ? ` · ${appt.service.price.toLocaleString()} so'm` : ""}</p>
             {appt.doctor && <p>👨‍⚕️ {appt.doctor.name}{appt.doctor.specialty ? ` (${appt.doctor.specialty})` : ""}</p>}
             {appt.address && <p className="text-orange-500">📍 {appt.address}</p>}
+            {section === "paid" && appt.paidAmount != null && appt.appliedDiscountPercent > 0 && (
+              <p className="text-blue-600 font-medium">💰 To'langan: {appt.paidAmount.toLocaleString()} so'm</p>
+            )}
           </div>
 
           {/* Telegram va joylashuv */}
@@ -345,26 +386,41 @@ function ReceptionCard({ appt, loading, section, onPaid, onUnpaid, onCancel }: C
       </div>
 
       {/* Tugmalar */}
-      <div className="flex gap-2 mt-3">
+      <div className="mt-3">
         {section === "pending" && (
-          <>
+          <div className="flex flex-col gap-2">
+            {/* 1. To'ladi (yashil) — har doim */}
             <button
               onClick={onPaid}
               disabled={loading}
-              className="flex-1 px-3 py-2 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
+              className="w-full px-3 py-2 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
             >
               {loading ? "..." : "💰 To'ladi"}
             </button>
+
+            {/* 2. Chegirma tugmasi (ko'k) — faqat discountPercent > 0 va price > 0 */}
+            {showDiscountBtn && (
+              <button
+                onClick={onDiscount}
+                disabled={loading}
+                className="w-full px-3 py-2 min-h-[44px] bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
+              >
+                {loading ? "..." : `${discountedAmount.toLocaleString("uz-UZ")} so'm to'ladi`}
+              </button>
+            )}
+
+            {/* 3. Bekor (qizil) — har doim */}
             <button
               onClick={onCancel}
               disabled={loading}
-              className="px-3 py-2 min-h-[44px] bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 rounded-lg text-sm transition-colors"
+              className="w-full px-3 py-2 min-h-[44px] bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 rounded-lg text-sm transition-colors"
             >
               Bekor
             </button>
-          </>
+          </div>
         )}
-        {section === "paid" && (
+
+        {section === "paid" && canRefund && (
           <button
             onClick={onUnpaid}
             disabled={loading}

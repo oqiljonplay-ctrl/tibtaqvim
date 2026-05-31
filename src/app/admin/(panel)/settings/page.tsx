@@ -5,6 +5,7 @@ interface LimitSettings {
   patientSelfLimit: number;
   dependentBookingLimit: number;
   maxDependents: number;
+  discountPercent: number;
 }
 
 interface FieldMeta {
@@ -17,6 +18,14 @@ interface FieldMeta {
 }
 
 const FIELDS: FieldMeta[] = [
+  {
+    key: "discountPercent",
+    label: "Klinika chegirma foizi",
+    min: 0,
+    max: 100,
+    hint: "Qabulxona xodimi 'chegirma' tugmasini bosganda, bemor shu foizda kam to'laydi. 0 qo'ysangiz, chegirma tugmasi umuman ko'rinmaydi. Diapazon: 0 dan 100 gacha.",
+    example: "Masalan 60% qo'ysangiz, 100 000 so'mlik qabulda bemor 40 000 so'm to'laydi. 100% = bemor bepul (0 so'm). 0 = chegirma o'chiq.",
+  },
   {
     key: "patientSelfLimit",
     label: "Bemor o'zi uchun faol bron limiti",
@@ -48,6 +57,7 @@ export default function AdminSettingsPage() {
     patientSelfLimit: 4,
     dependentBookingLimit: 1,
     maxDependents: 2,
+    discountPercent: 0,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,9 +115,9 @@ export default function AdminSettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">Bron limit sozlamalari</h1>
+        <h1 className="text-xl font-semibold text-gray-900">Klinika sozlamalari</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Bemorlar va oila a'zolari uchun faol bron limitlarini belgilang. Bu sozlamalar faqat sizning klinikangizga taalluqli.
+          Chegirma, bron limitleri va boshqa sozlamalar. Faqat sizning klinikangizga taalluqli.
         </p>
       </div>
 
