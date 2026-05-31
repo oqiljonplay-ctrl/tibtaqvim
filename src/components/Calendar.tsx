@@ -13,14 +13,29 @@ interface Props {
   onChange: (date: string) => void;
   blockedDates?: string[];
   is24Hours?: boolean;
+  blockedWeekdays?: number[];
 }
 
-export function Calendar({ value, onChange, blockedDates = [], is24Hours = false }: Props) {
+export function Calendar({
+  value,
+  onChange,
+  blockedDates = [],
+  is24Hours = false,
+  blockedWeekdays = [],
+}: Props) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
 
-  const matrix = generateCalendarMatrix(viewYear, viewMonth, "Asia/Tashkent", blockedDates, is24Hours);
+  const matrix = generateCalendarMatrix(
+    viewYear,
+    viewMonth,
+    "Asia/Tashkent",
+    blockedDates,
+    is24Hours,
+    [],              // doctorBlockedDates — caller combines into blockedDates
+    blockedWeekdays  // shifokor takroriy kunlar
+  );
   const label = getMonthLabel(viewYear, viewMonth);
 
   function handlePrev() {
@@ -72,7 +87,8 @@ export function Calendar({ value, onChange, blockedDates = [], is24Hours = false
           const isSelected = cell.dateStr === value;
           const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
           const isPastDay = cell.dateStr < today;
-          const isBlockedCell = !isPastDay && !is24Hours && cell.disabled;
+          // Shifokor bloki is24Hours dan mustaqil — ikkala holat uchun qizil
+          const isBlockedCell = !isPastDay && cell.disabled;
           return (
             <button
               key={cell.dateStr}

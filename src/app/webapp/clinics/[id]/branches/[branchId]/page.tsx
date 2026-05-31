@@ -65,6 +65,7 @@ export default function BranchServicesPage() {
   const [clinicName, setClinicName] = useState<string>("");
   const [doneCountdown, setDoneCountdown] = useState(5);
   const [clinicSchedule, setClinicSchedule] = useState<{ is24Hours: boolean; holidays: string[] }>({ is24Hours: false, holidays: [] });
+  const [doctorSchedule, setDoctorSchedule] = useState<{ blockedDates: string[]; blockedWeekdays: number[] }>({ blockedDates: [], blockedWeekdays: [] });
   const tgUserRef = useRef<TgUser | null>(null);
 
   // Done step: 5 soniyadan keyin Telegram WebApp avtomatik yopish
@@ -276,10 +277,15 @@ export default function BranchServicesPage() {
               setSelDate("");
               setSelSlot("");
               setSelDoctor(null);
+              setDoctorSchedule({ blockedDates: [], blockedWeekdays: [] });
               if (s.doctors.length === 0) {
                 setStep("date");
               } else if (s.doctors.length === 1) {
                 setSelDoctor(s.doctors[0]);
+                fetch(`/api/doctors/${s.doctors[0].id}/schedule`)
+                  .then((r) => r.json())
+                  .then((j) => { if (j.success) setDoctorSchedule(j.data); })
+                  .catch(() => {});
                 setStep("date");
               } else {
                 setStep("doctor");
@@ -303,7 +309,15 @@ export default function BranchServicesPage() {
             </div>
             <DoctorPicker
               doctors={selSvc.doctors}
-              onSelect={(doc) => { setSelDoctor(doc); setStep("date"); }}
+              onSelect={(doc) => {
+                setSelDoctor(doc);
+                setDoctorSchedule({ blockedDates: [], blockedWeekdays: [] });
+                fetch(`/api/doctors/${doc.id}/schedule`)
+                  .then((r) => r.json())
+                  .then((j) => { if (j.success) setDoctorSchedule(j.data); })
+                  .catch(() => {});
+                setStep("date");
+              }}
             />
           </div>
         )}
@@ -345,7 +359,8 @@ export default function BranchServicesPage() {
             <Calendar
               value={selDate || null}
               onChange={(d) => selectDate(d)}
-              blockedDates={clinicSchedule.holidays}
+              blockedDates={[...clinicSchedule.holidays, ...doctorSchedule.blockedDates]}
+              blockedWeekdays={doctorSchedule.blockedWeekdays}
               is24Hours={clinicSchedule.is24Hours}
             />
           </div>
