@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Stack } from "@/components/layout";
 
 interface Experience {
@@ -163,6 +164,7 @@ function ExperienceEditor({
 }
 
 export default function DoctorProfilePage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -200,6 +202,10 @@ export default function DoctorProfilePage() {
           setExperiences(d.experiences.map((e) => ({ place: e.place, startYear: e.startYear, endYear: e.endYear })));
           setWorkplaces(d.workplaces.map((w) => w.place));
         } else {
+          if (json.error?.code === "FORBIDDEN") {
+            router.replace("/admin");
+            return;
+          }
           setErrorMsg(json.error?.message ?? "Ma'lumot yuklanmadi");
         }
       })

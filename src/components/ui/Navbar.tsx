@@ -11,8 +11,8 @@ interface NavItem {
 }
 
 function getRoleExtraItems(role: string): NavItem[] {
-  const reception: NavItem = { href: "/reception", label: "Qabulxona" };
-  const doctor: NavItem    = { href: "/doctor",    label: "Navbat" };
+  const reception: NavItem = { href: "/admin/reception", label: "Qabulxona" };
+  const doctor: NavItem    = { href: "/admin/doctor",    label: "Navbat" };
   switch (role) {
     case "clinic_admin":
     case "branch_admin":
