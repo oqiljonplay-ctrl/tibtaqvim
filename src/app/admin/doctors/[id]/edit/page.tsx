@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { DoctorProfileFields, DoctorProfileData, emptyProfileData, profileFromServer } from "@/components/DoctorProfileFields";
+import { DoctorBlockedDatesManager } from "@/components/DoctorBlockedDatesManager";
 
 interface ServiceItem { id: string; name: string; price: number; type: string }
 interface Branch      { id: string; name: string }
@@ -231,6 +232,13 @@ export default function EditDoctorPage() {
           </button>
         </div>
       </form>
+
+      {/* Bloklangan kunlar */}
+      <div className="card mt-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Bloklangan kunlar</h2>
+        <p className="text-xs text-gray-400 mb-4">Shifokor kelmagan kun(lar)ni belgilang — kalendarda qizil ko'rinadi</p>
+        <DoctorBlockedDatesManager doctorId={doctorId} credentials="include" />
+      </div>
     </div>
   );
 }
