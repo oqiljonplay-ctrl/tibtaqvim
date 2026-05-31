@@ -35,7 +35,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     enableHomeService,
     enableWebapp,
     enableBot,
+    is24Hours,
+    holidays,
   } = body;
+
+  // holidays[] formatini tekshirish: har element YYYY-MM-DD bo'lishi kerak
+  if (holidays !== undefined) {
+    if (!Array.isArray(holidays)) {
+      return Response.json({ success: false, error: { message: "holidays massiv bo'lishi kerak" } }, { status: 400 });
+    }
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (holidays.some((d: unknown) => typeof d !== "string" || !dateRe.test(d))) {
+      return Response.json({ success: false, error: { message: "holidays elementlari YYYY-MM-DD formatida bo'lishi kerak" } }, { status: 400 });
+    }
+  }
 
   const settings = await prisma.clinicSettings.upsert({
     where: { clinicId: params.id },
@@ -50,6 +63,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       enableHomeService: enableHomeService ?? false,
       enableWebapp: enableWebapp ?? true,
       enableBot: enableBot ?? true,
+      is24Hours: is24Hours ?? false,
+      holidays: holidays ?? [],
     },
     update: {
       ...(dailyLimit !== undefined && { dailyLimit }),
@@ -61,6 +76,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...(enableHomeService !== undefined && { enableHomeService }),
       ...(enableWebapp !== undefined && { enableWebapp }),
       ...(enableBot !== undefined && { enableBot }),
+      ...(is24Hours !== undefined && { is24Hours }),
+      ...(holidays !== undefined && { holidays }),
     },
   });
 
