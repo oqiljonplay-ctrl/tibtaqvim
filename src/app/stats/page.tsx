@@ -1,5 +1,6 @@
 import KpiCards from "@/components/stats/KpiCards";
 import ChartsSection from "./components/ChartsSection";
+import DiscountStats from "@/components/stats/DiscountStats";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -55,6 +56,13 @@ export default async function StatsPage() {
             </div>
           )}
         </section>
+
+        {(payload.role === "super_admin" || payload.role === "clinic_admin") && (
+          <section className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Chegirma tahlili</h2>
+            <DiscountStats />
+          </section>
+        )}
       </div>
     </div>
   );

@@ -108,7 +108,7 @@ export default function KpiCards() {
     {
       label: "Daromad (oy)",
       value: formatCurrency(kpi.thisMonthRevenue),
-      sub: "Faqat 'keldi' status",
+      sub: "Haqiqiy to'lovlar (paid)",
       gradient: "from-green-600 to-green-700",
       icon: "💰",
     },

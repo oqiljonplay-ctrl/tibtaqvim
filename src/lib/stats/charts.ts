@@ -150,13 +150,13 @@ export async function getDailyRevenue(
     Prisma.sql`
       SELECT
         DATE(a."createdAt") AS date,
-        COALESCE(SUM(s.price), 0) AS revenue
+        COALESCE(SUM(COALESCE(a."paidAmount", CAST(s.price AS INTEGER))), 0) AS revenue
       FROM appointments a
       INNER JOIN services s ON s.id = a."serviceId"
       WHERE
         a."createdAt" >= ${startDate}
         AND a."createdAt" <= ${endDate}
-        AND a.status = 'arrived'
+        AND a."paymentStatus" = 'paid'
         ${cf}
       GROUP BY DATE(a."createdAt")
       ORDER BY date ASC
