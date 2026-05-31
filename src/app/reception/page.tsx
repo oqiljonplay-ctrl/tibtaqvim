@@ -5,6 +5,7 @@ import TelegramChatButton from "@/components/shared/TelegramChatButton";
 import LocationButtons from "@/components/LocationButtons";
 import LiveLocationPanel from "@/components/LiveLocationPanel";
 import { Stack } from "@/components/layout";
+import { DoctorBlockedDatesManager } from "@/components/DoctorBlockedDatesManager";
 
 interface ReceptionAppointment {
   id: string;
@@ -40,6 +41,8 @@ interface ReceptionData {
 
 const AUTO_REFRESH_MS = 30_000;
 
+interface DoctorItem { id: string; firstName: string; lastName: string; specialty: string }
+
 export default function ReceptionPage() {
   const [data, setData] = useState<ReceptionData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +50,9 @@ export default function ReceptionPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [date, setDate] = useState(() => new Date().toLocaleDateString("sv-SE"));
   const [lastRefresh, setLastRefresh] = useState("");
+  const [doctors, setDoctors] = useState<DoctorItem[]>([]);
+  const [selBlockDoctorId, setSelBlockDoctorId] = useState<string>("");
+  const [showBlockSection, setShowBlockSection] = useState(false);
 
   const fetchData = useCallback(async (d?: string) => {
     try {
@@ -75,6 +81,13 @@ export default function ReceptionPage() {
     const timer = setInterval(() => fetchData(), AUTO_REFRESH_MS);
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  useEffect(() => {
+    fetch("/api/admin/doctors", { credentials: "include" })
+      .then((r) => r.json())
+      .then((j) => { if (j.success) setDoctors(j.data ?? []); })
+      .catch(() => {});
+  }, []);
 
   function handleDateChange(d: string) {
     setDate(d);
@@ -216,6 +229,39 @@ export default function ReceptionPage() {
           </section>
         </div>
       )}
+
+      {/* Shifokor kun bloklash */}
+      <div className="mt-6">
+        <button
+          onClick={() => setShowBlockSection((v) => !v)}
+          className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+        >
+          <span className={`transition-transform ${showBlockSection ? "rotate-90" : ""}`}>▶</span>
+          Shifokor kun bloklash
+        </button>
+        {showBlockSection && (
+          <div className="mt-3 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Shifokorni tanlang</label>
+              <select
+                value={selBlockDoctorId}
+                onChange={(e) => setSelBlockDoctorId(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              >
+                <option value="">— Shifokorni tanlang —</option>
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.lastName} {d.firstName} — {d.specialty}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selBlockDoctorId && (
+              <DoctorBlockedDatesManager doctorId={selBlockDoctorId} credentials="include" />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

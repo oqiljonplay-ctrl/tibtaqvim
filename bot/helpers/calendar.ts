@@ -13,17 +13,26 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+export interface CalendarSettings {
+  is24Hours?: boolean;
+  holidays?: string[];
+  doctorBlockedDates?: string[];
+  doctorBlockedWeekdays?: number[];
+}
+
 export function mkCalendarKeyboard(
   year: number,
   month: number,
-  settings?: { is24Hours?: boolean; holidays?: string[] }
+  settings?: CalendarSettings
 ): InlineKeyboardButton[][] {
   const matrix = generateCalendarMatrix(
     year,
     month,
     TZ,
     settings?.holidays ?? [],
-    settings?.is24Hours ?? false
+    settings?.is24Hours ?? false,
+    settings?.doctorBlockedDates ?? [],
+    settings?.doctorBlockedWeekdays ?? []
   );
   const label = getMonthLabel(year, month);
   const prev = prevMonth(year, month);

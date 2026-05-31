@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import StatsButton from "@/components/StatsButton";
 import { Stack } from "@/components/layout";
+import { DoctorBlockedDatesManager } from "@/components/DoctorBlockedDatesManager";
 
 interface DoctorPatient {
   id: string;
@@ -38,7 +39,16 @@ export default function DoctorPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [date, setDate] = useState(() => new Date().toLocaleDateString("sv-SE"));
   const [lastRefresh, setLastRefresh] = useState("");
+  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [showBlockManager, setShowBlockManager] = useState(false);
   const dateRef = useRef(date);
+
+  useEffect(() => {
+    fetch("/api/doctor/profile", { credentials: "include" })
+      .then((r) => r.json())
+      .then((j) => { if (j.success) setDoctorId(j.data.id); })
+      .catch(() => {});
+  }, []);
 
   const fetchData = useCallback(async (d?: string) => {
     const target = d ?? dateRef.current;
@@ -180,6 +190,24 @@ export default function DoctorPage() {
               onAttendance={handleAttendance}
             />
           ))}
+        </div>
+      )}
+
+      {/* Bloklangan kunlar */}
+      {doctorId && (
+        <div className="mt-6">
+          <button
+            onClick={() => setShowBlockManager((v) => !v)}
+            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+          >
+            <span className={`transition-transform ${showBlockManager ? "rotate-90" : ""}`}>▶</span>
+            Bloklangan kunlarni boshqarish
+          </button>
+          {showBlockManager && (
+            <div className="mt-3 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+              <DoctorBlockedDatesManager doctorId={doctorId} credentials="include" />
+            </div>
+          )}
         </div>
       )}
     </div>

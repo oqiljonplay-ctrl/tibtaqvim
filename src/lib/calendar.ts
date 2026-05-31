@@ -56,7 +56,9 @@ export function generateCalendarMatrix(
   month: number,
   tz: string = DEFAULT_TZ,
   blockedDates: string[] = [],
-  is24Hours: boolean = false
+  is24Hours: boolean = false,
+  doctorBlockedDates: string[] = [],      // shifokor bir martalik sanalari
+  doctorBlockedWeekdays: number[] = []    // shifokor takroriy kunlar [0-6]
 ): CalendarDay[][] {
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: tz });
 
@@ -70,11 +72,16 @@ export function generateCalendarMatrix(
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = formatDateISO(year, month, d);
     const pastDay = dateStr < today;
-    const blocked = !is24Hours && isBlockedDate(dateStr, blockedDates);
+    const clinicBlocked = !is24Hours && isBlockedDate(dateStr, blockedDates);
+    // Shifokor bloki is24Hours dan MUSTAQIL — 24/7 klinikada ham ishlaydi
+    const weekday = new Date(dateStr + "T12:00:00").getDay();
+    const doctorBlocked =
+      doctorBlockedDates.includes(dateStr) ||
+      doctorBlockedWeekdays.includes(weekday);
     cells.push({
       dateStr,
       day: d,
-      disabled: pastDay || blocked,
+      disabled: pastDay || clinicBlocked || doctorBlocked,
       isToday: dateStr === today,
     });
   }

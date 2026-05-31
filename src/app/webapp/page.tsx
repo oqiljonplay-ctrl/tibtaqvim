@@ -173,6 +173,7 @@ export default function WebApp() {
   const [selectedDoctor, setSelectedDoctor] = useState<ServiceDoctor | null>(null);
   const [showOnboardingHint, setShowOnboardingHint] = useState(false);
   const [clinicSchedule, setClinicSchedule] = useState<{ is24Hours: boolean; holidays: string[] }>({ is24Hours: false, holidays: [] });
+  const [doctorSchedule, setDoctorSchedule] = useState<{ blockedDates: string[]; blockedWeekdays: number[] }>({ blockedDates: [], blockedWeekdays: [] });
 
   const tgUserRef = useRef<TgUser | null>(null);
   const rebookServiceIdRef = useRef<string | null>(null);
@@ -448,15 +449,28 @@ export default function WebApp() {
     }
   }
 
+  async function fetchDoctorSchedule(doctorId: string) {
+    try {
+      const r = await fetch(`/api/doctors/${doctorId}/schedule`);
+      const j = await r.json();
+      if (j.success) setDoctorSchedule(j.data);
+      else setDoctorSchedule({ blockedDates: [], blockedWeekdays: [] });
+    } catch {
+      setDoctorSchedule({ blockedDates: [], blockedWeekdays: [] });
+    }
+  }
+
   function selectService(s: Service) {
     setSelectedService(s);
     setSelectedDate("");
     setSelectedSlot("");
     setSelectedDoctor(null);
+    setDoctorSchedule({ blockedDates: [], blockedWeekdays: [] });
     if (s.doctors.length === 0) {
       setStep("date");
     } else if (s.doctors.length === 1) {
       setSelectedDoctor(s.doctors[0]);
+      fetchDoctorSchedule(s.doctors[0].id);
       setStep("date");
     } else {
       setStep("doctor");
@@ -925,7 +939,7 @@ export default function WebApp() {
             </div>
             <DoctorPicker
               doctors={selectedService.doctors}
-              onSelect={(doc) => { setSelectedDoctor(doc); setStep("date"); }}
+              onSelect={(doc) => { setSelectedDoctor(doc); fetchDoctorSchedule(doc.id); setStep("date"); }}
             />
           </div>
         )}
@@ -983,7 +997,8 @@ export default function WebApp() {
             <Calendar
               value={selectedDate || null}
               onChange={(date) => selectDate(date)}
-              blockedDates={clinicSchedule.holidays}
+              blockedDates={[...clinicSchedule.holidays, ...doctorSchedule.blockedDates]}
+              blockedWeekdays={doctorSchedule.blockedWeekdays}
               is24Hours={clinicSchedule.is24Hours}
             />
             {bookingLoading && <div className="text-center text-gray-400 text-sm mt-3">Tekshirilmoqda...</div>}

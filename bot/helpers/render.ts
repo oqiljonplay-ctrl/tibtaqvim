@@ -1,5 +1,5 @@
 import TelegramBot, { InlineKeyboardButton } from "node-telegram-bot-api";
-import { mkCalendarKeyboard, currentYearMonth } from "./calendar";
+import { mkCalendarKeyboard, currentYearMonth, CalendarSettings } from "./calendar";
 
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
 
@@ -140,7 +140,7 @@ export function mkWelcomeBackKeyboard(): InlineKeyboardButton[][] {
 
 export function mkDateKeyboard(
   backStep = "select_service",
-  settings?: { is24Hours?: boolean; holidays?: string[] }
+  settings?: CalendarSettings
 ): InlineKeyboardButton[][] {
   const { year, month } = currentYearMonth();
   return mkDateKeyboardForMonth(year, month, backStep, settings);
@@ -150,7 +150,7 @@ export function mkDateKeyboardForMonth(
   year: number,
   month: number,
   backStep = "select_service",
-  settings?: { is24Hours?: boolean; holidays?: string[] }
+  settings?: CalendarSettings
 ): InlineKeyboardButton[][] {
   return [
     ...mkCalendarKeyboard(year, month, settings),
