@@ -99,6 +99,7 @@ async function bookDoctorQueue(
           serviceId: input.serviceId,
           doctorId: input.doctorId ?? null,
           userId: input.userId ?? null,
+          dependentId: input.dependentId ?? null,
           slotId: null,
           date: bookingDate,
           patientName: input.patientName.trim(),
@@ -164,6 +165,7 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
           serviceId: input.serviceId,
           doctorId: input.doctorId ?? null,
           userId: input.userId ?? null,
+          dependentId: input.dependentId ?? null,
           slotId: input.slotId ?? null,
           date: bookingDate,
           patientName: input.patientName.trim(),
@@ -290,6 +292,65 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
   if (blockCheck.blocked) {
     const code = blockCheck.source === "doctor" ? "DOCTOR_BLOCKED" : "DATE_BLOCKED";
     return bookingError(code, blockCheck.reason ?? "Bu kunda qabul amalga oshirilmaydi", 409);
+  }
+
+  // ── Bemor/Dependent limit tekshiruvi ──────────────────────────────────────
+  if (input.userId) {
+    const settings = await prisma.clinicSettings.findUnique({
+      where: { clinicId: input.clinicId },
+      select: { patientSelfLimit: true, dependentBookingLimit: true },
+    });
+    const selfLimit = settings?.patientSelfLimit ?? 4;
+    const depLimit = settings?.dependentBookingLimit ?? 1;
+
+    if (input.dependentId) {
+      if (depLimit === 0) {
+        return bookingError("DEPENDENT_BOOKING_DISABLED", "Qaramog'idagilar uchun bron qilish o'chirilgan", 403);
+      }
+      const depCount = await prisma.appointment.count({
+        where: { dependentId: input.dependentId, clinicId: input.clinicId, status: "booked" },
+      });
+      if (depCount >= depLimit) {
+        return bookingError(
+          "DEPENDENT_LIMIT_REACHED",
+          `Qaramog'idagi uchun faol bronlar limiti to'ldi (${depCount}/${depLimit})`,
+          409,
+        );
+      }
+    } else {
+      const selfCount = await prisma.appointment.count({
+        where: { userId: input.userId, dependentId: null, clinicId: input.clinicId, status: "booked" },
+      });
+      if (selfCount >= selfLimit) {
+        return bookingError(
+          "PATIENT_LIMIT_REACHED",
+          `Faol bronlar limiti to'ldi (${selfCount}/${selfLimit}). Avval biron bronni bekor qiling yoki shifokor tasdig'ini kuting.`,
+          409,
+        );
+      }
+    }
+
+    // Bir shifokorga faqat bitta faol bron (butun kalendar)
+    if (input.doctorId) {
+      const subjectDepId = input.dependentId ?? null;
+      const existingForDoctor = await prisma.appointment.findFirst({
+        where: {
+          userId: input.userId,
+          dependentId: subjectDepId,
+          clinicId: input.clinicId,
+          doctorId: input.doctorId,
+          status: "booked",
+        },
+        select: { id: true, date: true },
+      });
+      if (existingForDoctor) {
+        return bookingError(
+          "DOCTOR_ALREADY_BOOKED",
+          "Bu shifokorga allaqachon faol bron mavjud. Avval uni bekor qiling yoki kutib turing.",
+          409,
+        );
+      }
+    }
   }
 
   // queueMode: serviceDoctor binding → service default → 'online'

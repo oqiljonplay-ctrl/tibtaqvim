@@ -27,6 +27,7 @@ export interface BookingAppt {
   service: { name: string; type: string };
   date: string;
   status: string;
+  dependentId?: string | null;
   queueNumber?: number | null;
   queueMode?: string | null;
   slot?: { startTime: string; endTime: string } | null;
@@ -47,14 +48,19 @@ const TYPE_EMOJI: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  booked: "Kutilmoqda", arrived: "Keldi", missed: "Kelmadi", cancelled: "Bekor",
+  booked: "Kutilmoqda",
+  arrived: "Keldi",
+  missed: "Kelmadi",
+  cancelled: "Bekor",
+  expired: "Muddati o'tdi",
 };
 
 const STATUS_CLS: Record<string, string> = {
-  booked: "bg-blue-50 text-blue-700 border border-blue-200",
-  arrived: "bg-green-50 text-green-700 border border-green-200",
-  missed: "bg-red-50 text-red-700 border border-red-200",
-  cancelled: "bg-gray-100 text-gray-500 border border-gray-200",
+  booked:    "bg-green-50 text-green-800 border border-green-200",
+  arrived:   "bg-blue-50 text-blue-700 border border-blue-200",
+  missed:    "bg-red-50 text-red-700 border border-red-200 opacity-80",
+  cancelled: "bg-gray-100 text-gray-500 border border-gray-200 line-through",
+  expired:   "bg-yellow-50 text-yellow-700 border border-yellow-200",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

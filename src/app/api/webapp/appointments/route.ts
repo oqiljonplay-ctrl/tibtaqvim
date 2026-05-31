@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
         id: true,
         date: true,
         status: true,
+        dependentId: true,
         queueNumber: true,
         queueMode: true,
         paymentStatus: true,

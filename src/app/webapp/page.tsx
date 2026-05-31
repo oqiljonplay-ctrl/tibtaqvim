@@ -64,7 +64,8 @@ interface AppointmentDoctor {
 interface AppointmentItem {
   id: string;
   date: string;
-  status: "booked" | "arrived" | "missed" | "cancelled";
+  status: "booked" | "arrived" | "missed" | "cancelled" | "expired";
+  dependentId?: string | null;
   queueNumber: number | null;
   queueMode?: "live" | "online" | "slot" | null;
   paymentStatus?: string | null;
@@ -160,6 +161,7 @@ export default function WebApp() {
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [dashLoading, setDashLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [selfLimit, setSelfLimit] = useState<number | null>(null);
 
   // ── Shared state ──
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
@@ -376,9 +378,17 @@ export default function WebApp() {
     const effectiveCId = cId || process.env.NEXT_PUBLIC_CLINIC_ID || "";
     setDashLoading(true);
     try {
-      const res = await fetch(`/api/webapp/appointments?telegramId=${tgId}&clinicId=${effectiveCId}`);
-      const json = await res.json();
-      if (json.success) setAppointments(json.data);
+      const [apptRes, limitRes] = await Promise.all([
+        fetch(`/api/webapp/appointments?telegramId=${tgId}&clinicId=${effectiveCId}`),
+        fetch(`/api/webapp/booking-limits?clinicId=${effectiveCId}`),
+      ]);
+      const apptJson = await apptRes.json();
+      if (apptJson.success) setAppointments(apptJson.data);
+
+      const limitJson = await limitRes.json().catch(() => null);
+      if (limitJson?.success && limitJson.data?.patientSelfLimit != null) {
+        setSelfLimit(limitJson.data.patientSelfLimit);
+      }
     } catch {}
     finally { setDashLoading(false); }
   }
@@ -606,7 +616,10 @@ export default function WebApp() {
   if (appMode === "dashboard") {
     const todayAppts = appointments.filter((a) => isToday(a.date));
     const upcomingAppts = appointments.filter((a) => isFuture(a.date) && !isToday(a.date) && a.status === "booked");
-    const historyAppts = appointments.filter((a) => !isFuture(a.date) || a.status === "cancelled" || a.status === "arrived" || a.status === "missed");
+    const historyAppts = appointments.filter((a) => !isFuture(a.date) || a.status === "cancelled" || a.status === "arrived" || a.status === "missed" || a.status === "expired");
+    // Faol bronlar soni: status="booked" VA dependentId=null (bemor o'zi uchun)
+    const selfActiveCount = appointments.filter((a) => a.status === "booked" && !a.dependentId).length;
+    const limitFull = selfLimit !== null && selfActiveCount >= selfLimit;
 
     return (
       <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -642,6 +655,23 @@ export default function WebApp() {
           {activeClinic && (
             <div className="mt-3">
               <ClinicSwitcher />
+            </div>
+          )}
+
+          {/* Faol bron sanagichi */}
+          {selfLimit !== null && !dashLoading && (
+            <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm ${
+              limitFull
+                ? "bg-orange-50 border-orange-200 text-orange-800"
+                : "bg-white border-gray-200 text-gray-700"
+            }`}>
+              <span>
+                {limitFull ? "⚠️" : "✅"} Faol bronlaringiz:{" "}
+                <span className="font-semibold">{selfActiveCount}/{selfLimit}</span>
+              </span>
+              {limitFull && (
+                <span className="text-xs text-orange-600">Limit to'ldi</span>
+              )}
             </div>
           )}
 

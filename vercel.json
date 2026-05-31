@@ -3,6 +3,14 @@
     {
       "path": "/api/reminders?type=day_before",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/ad-broadcast",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/expire-bookings",
+      "schedule": "0 19 * * *"
     }
   ]
 }

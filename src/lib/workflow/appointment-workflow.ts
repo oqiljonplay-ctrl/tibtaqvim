@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Appointment } from "@prisma/client";
 
 export type PaymentStatus = "pending" | "paid" | "not_required" | "cancelled";
-export type AppointmentStatus = "booked" | "arrived" | "missed" | "cancelled";
+export type AppointmentStatus = "booked" | "arrived" | "missed" | "cancelled" | "expired";
 export type PaymentSource = "reception" | "payme" | "click" | "cash" | "admin";
 
 export interface WorkflowResult {
@@ -177,4 +177,34 @@ export async function resetToBooked(
     console.error("[workflow/resetToBooked]", err);
     return { success: false, error: err?.message || "Server xatosi" };
   }
+}
+
+// ── Avtomatik expiry (cron tomonidan chaqiriladi) ─────────────────────────────
+
+export interface ExpireResult {
+  expiredIds: string[];
+  errors: number;
+}
+
+export async function expireBookings(beforeDateStr: string): Promise<ExpireResult> {
+  // beforeDateStr = bugungi sana (Asia/Tashkent) "YYYY-MM-DD" formatida
+  // appointments.date — @db.Date, UTC midnight sifatida saqlanadi
+  // date < cutoff: bugungi sana < bugun 00:00 UTC → o'tgan kunlar
+  const cutoff = new Date(beforeDateStr + "T00:00:00.000Z");
+
+  // Avval ID'larni olib, keyin update — Telegram xabar uchun kerak
+  const toExpire = await prisma.appointment.findMany({
+    where: { status: "booked", date: { lt: cutoff } },
+    select: { id: true },
+  });
+
+  if (toExpire.length === 0) return { expiredIds: [], errors: 0 };
+
+  const ids = toExpire.map((a) => a.id);
+  await prisma.appointment.updateMany({
+    where: { id: { in: ids } },
+    data: { status: "expired" },
+  });
+
+  return { expiredIds: ids, errors: 0 };
 }

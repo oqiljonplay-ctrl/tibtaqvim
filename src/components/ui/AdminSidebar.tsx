@@ -21,6 +21,7 @@ const ALL_ADMIN_ITEMS: SidebarItem[] = [
   { href: "/admin/super/ads",      label: "Reklamalar",       roles: ["super_admin"] },
   { href: "/admin/reception",      label: "Qabulxona",        roles: ["clinic_admin", "branch_admin"] },
   { href: "/admin/doctor",         label: "Navbat",           roles: ["clinic_admin", "branch_admin"] },
+  { href: "/admin/settings",       label: "Sozlamalar",       roles: ["super_admin", "clinic_admin"] },
 ];
 
 function isActive(itemHref: string, currentPath: string): boolean {

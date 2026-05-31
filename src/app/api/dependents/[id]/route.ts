@@ -65,12 +65,19 @@ export async function DELETE(
     });
     if (!existing) return error("Topilmadi", 404);
 
-    await prisma.dependent.update({
-      where: { id: params.id },
-      data: { deletedAt: new Date() },
-    });
+    // Transaksiyada: soft-delete + uning faol bronlarini cancel
+    const [, cancelResult] = await prisma.$transaction([
+      prisma.dependent.update({
+        where: { id: params.id },
+        data: { deletedAt: new Date() },
+      }),
+      prisma.appointment.updateMany({
+        where: { dependentId: params.id, status: "booked" },
+        data: { status: "cancelled" },
+      }),
+    ]);
 
-    return ok({ deleted: true });
+    return ok({ deleted: true, cancelledBookings: cancelResult.count });
   } catch (err) {
     console.error("[DELETE /api/dependents/[id]] error:", err);
     return error("O'chirib bo'lmadi", 500);

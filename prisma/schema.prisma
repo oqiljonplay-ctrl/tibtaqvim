@@ -21,6 +21,7 @@ enum AppointmentStatus {
   arrived
   missed
   cancelled
+  expired
 }
 
 enum UserRole {
@@ -337,6 +338,7 @@ model Staff {
   lastName   String
   role       UserRole @default(receptionist)
   phone      String?
+  photoUrl   String?
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -399,7 +401,8 @@ model Dependent {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
 
   @@index([userId])
   @@index([userId, deletedAt])
@@ -461,13 +464,16 @@ model Appointment {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  clinic        Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  branch        Branch?  @relation(fields: [branchId], references: [id])
-  service       Service  @relation(fields: [serviceId], references: [id])
-  doctor        Doctor?  @relation(fields: [doctorId], references: [id])
-  user          User?    @relation(fields: [userId], references: [id])
-  slot          Slot?    @relation(fields: [slotId], references: [id])
-  assignedStaff Staff?   @relation("AssignedStaff", fields: [staffId], references: [id])
+  dependentId  String?
+
+  clinic        Clinic     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  branch        Branch?    @relation(fields: [branchId], references: [id])
+  service       Service    @relation(fields: [serviceId], references: [id])
+  doctor        Doctor?    @relation(fields: [doctorId], references: [id])
+  user          User?      @relation(fields: [userId], references: [id])
+  slot          Slot?      @relation(fields: [slotId], references: [id])
+  assignedStaff Staff?     @relation("AssignedStaff", fields: [staffId], references: [id])
+  dependent     Dependent? @relation(fields: [dependentId], references: [id], onDelete: SetNull)
   payments      Payment[]
   relayLogs     TelegramRelayLog[]
 
@@ -475,6 +481,9 @@ model Appointment {
   @@index([clinicId, date])
   @@index([doctorId, date])
   @@index([serviceId, date])
+  @@index([userId, clinicId, status])
+  @@index([dependentId, clinicId, status])
+  @@index([date, status])
   @@index([liveStatus, liveExpiresAt], map: "appointments_live_active_idx")
   @@map("appointments")
 }
@@ -516,8 +525,11 @@ model ClinicSettings {
   enableBot         Boolean  @default(true)
   is24Hours         Boolean  @default(false)
   holidays          Json     @default("[]") @db.JsonB
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  patientSelfLimit      Int      @default(4)
+  dependentBookingLimit Int      @default(1)
+  maxDependents         Int      @default(2)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
