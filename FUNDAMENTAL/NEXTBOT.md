@@ -251,6 +251,8 @@ date          DateTime @db.Date
 status        booked|arrived|missed|cancelled
 paymentStatus not_required|pending|paid|cancelled  @default("pending")
               ← CHECK constraint (DB). Qabulxona boshqaradi. Kelajak: Payme/Click webhook
+paidAmount    Int?         ← haqiqatan to'langan summa (so'm). Null = to'lanmagan
+appliedDiscountPercent Int @default(0)  ← to'lov paytida muzlatilgan foiz (0-100)
 queueMode     live|online|slot-disabled
 notifiedDayBefore Boolean @default(false)   ← idempotency
 notifiedTwoHours  Boolean @default(false)   ← idempotency
@@ -472,6 +474,46 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 ---
 
 ## 12. RECENT CHANGES LOG
+
+### 2026-06-01 — CHEGIRMA TIZIMI: Qabulxona chegirma, X/Y/Z statistika
+
+**Maqsad:** Klinika admini discountPercent (0-100%) belgilaydi. Qabulxona xodimi 3 tugma orqali: "💰 To'ladi" (to'liq), "X so'm to'ladi" (chegirmali), "Bekor". Statistikada X/Y/Z tahlil.
+
+**DB (Supabase migration `add_discount_system`):**
+- `clinic_settings.discountPercent` INTEGER NOT NULL DEFAULT 0, CHECK 0-100
+- `appointments.paidAmount` INTEGER nullable — haqiqatan to'langan summa
+- `appointments.appliedDiscountPercent` INTEGER NOT NULL DEFAULT 0 — muzlatilgan foiz
+
+**Yangi fayllar:**
+- `src/app/api/admin/stats/discount/route.ts` — X/Y/Z statistika API
+- `src/components/stats/DiscountStats.tsx` — 3 karta + horizontal bar chart (recharts)
+
+**O'zgartirilgan fayllar:**
+- `prisma/schema.prisma` — Appointment + ClinicSettings yangi ustunlar
+- `src/app/api/admin/clinic-settings/route.ts` — discountPercent GET/PUT, receptionist ham o'qiy oladi
+- `src/app/admin/(panel)/settings/page.tsx` — 4-chi field: chegirma foizi + izoh
+- `src/app/api/reception/appointments/route.ts` — serialize: paidAmount, appliedDiscountPercent
+- `src/app/api/reception/appointments/[id]/payment/route.ts` — mode=full|discount
+- `src/lib/workflow/appointment-workflow.ts` — markAsPaid mode param + server hisob; markAsUnpaid 100% bloklash + paidAmount reset
+- `src/components/pages/ReceptionView.tsx` — discountPercent fetch, 3 tugma (yashil/ko'k/qizil), qaytarish logikas
+- `src/app/stats/page.tsx` — DiscountStats blok
+- `src/lib/stats/queries.ts` — thisMonthRevenue: status=arrived→paymentStatus=paid, COALESCE(paidAmount, service.price)
+- `src/lib/stats/charts.ts` — getDailyRevenue SQL: paidAmount ga o'tdi
+- `src/components/stats/KpiCards.tsx` — "Daromad (oy)" sub matn yangilandi
+
+**Asosiy qoidalar (O'ZGARTIRMA):**
+- Chegirma FAQAT `paymentStatus+paidAmount+appliedDiscountPercent` — `status` tegilmaydi
+- Server summani o'zi hisoblaydi (`mode` qabul qiladi, summa emas)
+- markAsArrived `paymentStatus='paid'` talab qiladi — SAQLANADI
+- Payment/Refund (Payme/Click) jadvallari TEGILMADI
+- Bemor webapp/Telegram'da TO'LIQ narx ko'radi (chegirma klinika-ichki)
+- Statistika muzlatilgan `appliedDiscountPercent`+`paidAmount` dan — joriy settings'dan emas
+- 100% chegirmada qaytarish YO'Q (UI + server blok)
+- Math.round formula: server va frontend bir xil
+
+**Commit:** feat/discount-system → main. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
 
 ### 2026-05-31 — ADMIN-SIDEBAR-NAV: Sidebar/Navbar/Profil bug tuzatildi
 
