@@ -497,6 +497,8 @@ model ClinicSettings {
   enableHomeService Boolean  @default(false)
   enableWebapp      Boolean  @default(true)
   enableBot         Boolean  @default(true)
+  is24Hours         Boolean  @default(false)
+  holidays          Json     @default("[]") @db.JsonB
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
