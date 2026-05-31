@@ -27,6 +27,8 @@ interface Settings {
   enableHomeService: boolean;
   enableWebapp: boolean;
   enableBot: boolean;
+  is24Hours: boolean;
+  holidays: string[];
 }
 
 interface ModuleItem {
@@ -434,6 +436,55 @@ export default function ClinicBuilderPage() {
                   />
                 </div>
               ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Ish Rejimi">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-1">
+                <div>
+                  <div className="text-sm font-medium text-gray-900">24/7 Rejim</div>
+                  <div className="text-xs text-gray-400">Yoqilsa — yakshanba va bayramlar bloklanmaydi</div>
+                </div>
+                <Toggle
+                  checked={settings.is24Hours}
+                  onChange={(v) => setSettings({ ...settings, is24Hours: v })}
+                />
+              </div>
+
+              {!settings.is24Hours && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1">
+                    Bayram kunlari
+                    <span className="text-xs text-gray-400 ml-2">(yakshanba avtomatik)</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {settings.holidays.map((d) => (
+                      <span key={d} className="flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 text-xs rounded-lg border border-red-100">
+                        {d}
+                        <button
+                          onClick={() => setSettings({ ...settings, holidays: settings.holidays.filter((h) => h !== d) })}
+                          className="text-red-400 hover:text-red-600 ml-1 font-bold"
+                        >×</button>
+                      </span>
+                    ))}
+                    {settings.holidays.length === 0 && (
+                      <span className="text-xs text-gray-400">Bayram qo&apos;shilmagan</span>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    className="input text-sm w-full max-w-xs"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v && !settings.holidays.includes(v)) {
+                        setSettings({ ...settings, holidays: [...settings.holidays, v].sort() });
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </SectionCard>
 

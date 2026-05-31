@@ -259,9 +259,16 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
       return;
     }
     const savedUser = await fetchUserByTelegramId(chatId);
+    const msgSched = await (async () => {
+      try {
+        const s = await prisma.clinicSettings.findUnique({ where: { clinicId: DEFAULT_CLINIC_ID }, select: { is24Hours: true, holidays: true } });
+        if (!s) return { is24Hours: false, holidays: [] };
+        return { is24Hours: s.is24Hours, holidays: Array.isArray(s.holidays) ? s.holidays as string[] : [] };
+      } catch { return { is24Hours: false, holidays: [] }; }
+    })();
     const sent = await bot.sendMessage(chatId, "📅 Qaysi kunga yozilmoqchisiz?", {
       parse_mode: "Markdown",
-      reply_markup: { inline_keyboard: mkDateKeyboard() },
+      reply_markup: { inline_keyboard: mkDateKeyboard("select_service", msgSched) },
     });
     await userState.set(chatId, {
       step: "select_date",
@@ -282,6 +289,8 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
   }
 
   if (!state || !state.step) {
+    // Guruh chatlarda spam yubormaslik
+    if (msg.chat.type === "group" || msg.chat.type === "supergroup") return;
     await bot.sendMessage(chatId, "Boshlash uchun /start ni bosing");
     return;
   }

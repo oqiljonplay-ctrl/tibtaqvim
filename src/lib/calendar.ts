@@ -46,10 +46,17 @@ export function formatDateLabel(dateStr: string): string {
   return `${weekday}, ${d} ${UZ_MONTHS[m - 1]}`;
 }
 
+function isBlockedDate(dateStr: string, holidays: string[]): boolean {
+  const d = new Date(dateStr + "T12:00:00");
+  return d.getDay() === 0 || holidays.includes(dateStr);
+}
+
 export function generateCalendarMatrix(
   year: number,
   month: number,
-  tz: string = DEFAULT_TZ
+  tz: string = DEFAULT_TZ,
+  blockedDates: string[] = [],
+  is24Hours: boolean = false
 ): CalendarDay[][] {
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: tz });
 
@@ -62,10 +69,12 @@ export function generateCalendarMatrix(
   for (let i = 0; i < startOffset; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = formatDateISO(year, month, d);
+    const pastDay = dateStr < today;
+    const blocked = !is24Hours && isBlockedDate(dateStr, blockedDates);
     cells.push({
       dateStr,
       day: d,
-      disabled: dateStr < today,
+      disabled: pastDay || blocked,
       isToday: dateStr === today,
     });
   }

@@ -13,8 +13,18 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export function mkCalendarKeyboard(year: number, month: number): InlineKeyboardButton[][] {
-  const matrix = generateCalendarMatrix(year, month, TZ);
+export function mkCalendarKeyboard(
+  year: number,
+  month: number,
+  settings?: { is24Hours?: boolean; holidays?: string[] }
+): InlineKeyboardButton[][] {
+  const matrix = generateCalendarMatrix(
+    year,
+    month,
+    TZ,
+    settings?.holidays ?? [],
+    settings?.is24Hours ?? false
+  );
   const label = getMonthLabel(year, month);
   const prev = prevMonth(year, month);
   const next = nextMonth(year, month);

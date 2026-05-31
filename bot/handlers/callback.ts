@@ -20,6 +20,20 @@ import {
 } from "../helpers/render";
 import { handleClinicCallback, handleBranchCallback, handleBackToClinic, showBranchOrService } from "./clinicFlow";
 
+async function getClinicSchedule(clinicId?: string): Promise<{ is24Hours: boolean; holidays: string[] }> {
+  if (!clinicId) return { is24Hours: false, holidays: [] };
+  try {
+    const s = await prisma.clinicSettings.findUnique({
+      where: { clinicId },
+      select: { is24Hours: true, holidays: true },
+    });
+    if (!s) return { is24Hours: false, holidays: [] };
+    return { is24Hours: s.is24Hours, holidays: Array.isArray(s.holidays) ? s.holidays as string[] : [] };
+  } catch {
+    return { is24Hours: false, holidays: [] };
+  }
+}
+
 export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   const chatId = query.message?.chat.id;
   if (!chatId) {
@@ -50,7 +64,8 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   if (data.startsWith("cal:month:")) {
     const ym = data.slice("cal:month:".length);
     const [yearStr, monthStr] = ym.split("-");
-    const keyboard = mkDateKeyboardForMonth(parseInt(yearStr), parseInt(monthStr));
+    const sched = await getClinicSchedule(state.clinicId || process.env.DEFAULT_CLINIC_ID);
+    const keyboard = mkDateKeyboardForMonth(parseInt(yearStr), parseInt(monthStr), "select_service", sched);
     if (msgId) {
       try {
         await (bot as any).editMessageReplyMarkup(
@@ -267,10 +282,11 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     if (target === "select_date") {
       // Back uchun: doctor bor edi → doctor bosqichiga qayt, yo'q → servicega qayt
       const backStep = state._doctors?.length > 0 ? "select_doctor" : "select_service";
+      const sched1 = await getClinicSchedule(state.clinicId || process.env.DEFAULT_CLINIC_ID);
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
         "📅 Qaysi kunga yozilmoqchisiz?",
-        mkDateKeyboard(backStep)
+        mkDateKeyboard(backStep, sched1)
       );
       await userState.set(chatId, {
         ...state,
@@ -346,10 +362,11 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
         });
       } else {
         // No cached list — go back to date selection
+        const schedB = await getClinicSchedule(state.clinicId || process.env.DEFAULT_CLINIC_ID);
         const newMsgId = await editOrSend(
           bot, chatId, msgId,
           "📅 Qaysi kunga yozilmoqchisiz?",
-          mkDateKeyboard()
+          mkDateKeyboard("select_service", schedB)
         );
         await userState.set(chatId,{
           ...state,
@@ -489,10 +506,11 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       });
     } else {
       // Shifokor yo'q — to'g'ridan sana tanlash
+      const schedC = await getClinicSchedule(state.clinicId || process.env.DEFAULT_CLINIC_ID);
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
         "📅 Qaysi kunga yozilmoqchisiz?",
-        mkDateKeyboard("select_service")
+        mkDateKeyboard("select_service", schedC)
       );
       await userState.set(chatId, {
         ...baseState,
@@ -578,10 +596,11 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       });
     } else {
       // BUG FIX: requiresSlot=true lekin slot yo'q → confirmga yuborma, xabar ber
+      const schedD = await getClinicSchedule(state.clinicId || process.env.DEFAULT_CLINIC_ID);
       const newMsgId = await editOrSend(
         bot, chatId, msgId,
         "😔 *Bu kunda bo'sh vaqt mavjud emas.*\n\nBoshqa kunni tanlang:",
-        mkDateKeyboard()
+        mkDateKeyboard("select_service", schedD)
       );
       await userState.set(chatId,{
         ...state,
@@ -600,10 +619,11 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     const resolvedDoctorId = doctorId === "none" ? null : doctorId;
 
     // Yangi flow: doctor tanlangach → sana tanlash (confirm/name emas)
+    const schedE = await getClinicSchedule(state.clinicId || process.env.DEFAULT_CLINIC_ID);
     const newMsgId = await editOrSend(
       bot, chatId, msgId,
       "📅 Qaysi kunga yozilmoqchisiz?",
-      mkDateKeyboard("select_doctor")
+      mkDateKeyboard("select_doctor", schedE)
     );
     await userState.set(chatId, {
       ...state,

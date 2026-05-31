@@ -11,14 +11,16 @@ import {
 interface Props {
   value: string | null;
   onChange: (date: string) => void;
+  blockedDates?: string[];
+  is24Hours?: boolean;
 }
 
-export function Calendar({ value, onChange }: Props) {
+export function Calendar({ value, onChange, blockedDates = [], is24Hours = false }: Props) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
 
-  const matrix = generateCalendarMatrix(viewYear, viewMonth);
+  const matrix = generateCalendarMatrix(viewYear, viewMonth, "Asia/Tashkent", blockedDates, is24Hours);
   const label = getMonthLabel(viewYear, viewMonth);
 
   function handlePrev() {
@@ -68,6 +70,9 @@ export function Calendar({ value, onChange }: Props) {
             return <div key={`empty-${idx}`} className="h-9" />;
           }
           const isSelected = cell.dateStr === value;
+          const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
+          const isPastDay = cell.dateStr < today;
+          const isBlockedCell = !isPastDay && !is24Hours && cell.disabled;
           return (
             <button
               key={cell.dateStr}
@@ -76,9 +81,11 @@ export function Calendar({ value, onChange }: Props) {
               className={`h-9 w-full rounded-xl text-sm font-medium transition-all ${
                 isSelected
                   ? "bg-blue-600 text-white shadow-sm scale-105"
+                  : isBlockedCell
+                  ? "bg-red-50 text-red-300 cursor-not-allowed ring-1 ring-red-100"
                   : cell.isToday && !cell.disabled
                   ? "bg-blue-50 text-blue-700 font-bold ring-1 ring-blue-300"
-                  : cell.disabled
+                  : isPastDay
                   ? "text-gray-200 cursor-not-allowed"
                   : "text-gray-700 hover:bg-blue-50 hover:text-blue-600 active:scale-95"
               }`}

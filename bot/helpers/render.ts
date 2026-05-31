@@ -138,14 +138,22 @@ export function mkWelcomeBackKeyboard(): InlineKeyboardButton[][] {
   ]];
 }
 
-export function mkDateKeyboard(backStep = "select_service"): InlineKeyboardButton[][] {
+export function mkDateKeyboard(
+  backStep = "select_service",
+  settings?: { is24Hours?: boolean; holidays?: string[] }
+): InlineKeyboardButton[][] {
   const { year, month } = currentYearMonth();
-  return mkDateKeyboardForMonth(year, month, backStep);
+  return mkDateKeyboardForMonth(year, month, backStep, settings);
 }
 
-export function mkDateKeyboardForMonth(year: number, month: number, backStep = "select_service"): InlineKeyboardButton[][] {
+export function mkDateKeyboardForMonth(
+  year: number,
+  month: number,
+  backStep = "select_service",
+  settings?: { is24Hours?: boolean; holidays?: string[] }
+): InlineKeyboardButton[][] {
   return [
-    ...mkCalendarKeyboard(year, month),
+    ...mkCalendarKeyboard(year, month, settings),
     [back(backStep)],
   ];
 }
