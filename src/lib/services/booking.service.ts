@@ -284,11 +284,12 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
   // Force UTC midnight so @db.Date stores the correct calendar date
   const bookingDate = new Date(input.date + "T00:00:00.000Z");
 
-  // Klinika tipi blok tekshiruvi — $transaction dan tashqarida (sana o'zgarmas)
-  const { isDateBlockedForClinic } = await import("@/lib/day-block");
-  const blockCheck = await isDateBlockedForClinic(input.clinicId, input.date);
+  // Klinika + shifokor blok tekshiruvi — $transaction dan tashqarida (sana o'zgarmas)
+  const { isDateBlockedFull } = await import("@/lib/day-block");
+  const blockCheck = await isDateBlockedFull(input.clinicId, input.doctorId, input.date);
   if (blockCheck.blocked) {
-    return bookingError("DATE_BLOCKED", blockCheck.reason ?? "Bu kunda qabul amalga oshirilmaydi", 409);
+    const code = blockCheck.source === "doctor" ? "DOCTOR_BLOCKED" : "DATE_BLOCKED";
+    return bookingError(code, blockCheck.reason ?? "Bu kunda qabul amalga oshirilmaydi", 409);
   }
 
   // queueMode: serviceDoctor binding → service default → 'online'

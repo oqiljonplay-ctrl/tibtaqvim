@@ -246,9 +246,26 @@ model Doctor {
   directions      DoctorDirection[]
   experiences     DoctorExperience[]
   workplaces      DoctorWorkplace[]
+  blockedDates    DoctorBlockedDate[]
 
   @@index([clinicId])
   @@map("doctors")
+}
+
+model DoctorBlockedDate {
+  id        String   @id @default(cuid())
+  doctorId  String
+  type      String   // 'recurring' | 'once'
+  weekday   Int?     // 0=Yakshanba ... 6=Shanba, recurring uchun
+  date      String?  // 'YYYY-MM-DD', once uchun
+  reason    String?
+  createdBy String   // userId
+  createdAt DateTime @default(now())
+
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@map("doctor_blocked_dates")
 }
 
 model DoctorSpecialty {
