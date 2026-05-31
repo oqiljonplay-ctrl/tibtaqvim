@@ -34,6 +34,22 @@ async function getClinicSchedule(clinicId?: string): Promise<{ is24Hours: boolea
   }
 }
 
+async function getDoctorSchedule(doctorId: string | null | undefined): Promise<{ blockedDates: string[]; blockedWeekdays: number[] }> {
+  if (!doctorId) return { blockedDates: [], blockedWeekdays: [] };
+  try {
+    const blocks = await prisma.doctorBlockedDate.findMany({
+      where: { doctorId },
+      select: { type: true, weekday: true, date: true },
+    });
+    return {
+      blockedDates: blocks.filter((b) => b.type === "once" && b.date).map((b) => b.date!),
+      blockedWeekdays: [...new Set(blocks.filter((b) => b.type === "recurring" && b.weekday != null).map((b) => b.weekday!))],
+    };
+  } catch {
+    return { blockedDates: [], blockedWeekdays: [] };
+  }
+}
+
 export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
   const chatId = query.message?.chat.id;
   if (!chatId) {
@@ -620,10 +636,16 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
 
     // Yangi flow: doctor tanlangach → sana tanlash (confirm/name emas)
     const schedE = await getClinicSchedule(state.clinicId || process.env.DEFAULT_CLINIC_ID);
+    const docSched = await getDoctorSchedule(resolvedDoctorId);
+    const combinedSched = {
+      ...schedE,
+      doctorBlockedDates: docSched.blockedDates,
+      doctorBlockedWeekdays: docSched.blockedWeekdays,
+    };
     const newMsgId = await editOrSend(
       bot, chatId, msgId,
       "📅 Qaysi kunga yozilmoqchisiz?",
-      mkDateKeyboard("select_doctor", schedE)
+      mkDateKeyboard("select_doctor", combinedSched)
     );
     await userState.set(chatId, {
       ...state,
