@@ -64,6 +64,7 @@ export default function BranchServicesPage() {
   const [selDoctor, setSelDoctor] = useState<ServiceDoctor | null>(null);
   const [clinicName, setClinicName] = useState<string>("");
   const [doneCountdown, setDoneCountdown] = useState(5);
+  const [clinicSchedule, setClinicSchedule] = useState<{ is24Hours: boolean; holidays: string[] }>({ is24Hours: false, holidays: [] });
   const tgUserRef = useRef<TgUser | null>(null);
 
   // Done step: 5 soniyadan keyin Telegram WebApp avtomatik yopish
@@ -110,6 +111,12 @@ export default function BranchServicesPage() {
       fetch(`/api/clinics/${clinicId}`)
         .then((r) => r.json())
         .then((j) => { if (j.success && j.data?.name) setClinicName(j.data.name); })
+        .catch(() => {});
+
+      // Klinika ish rejimi (is24Hours + holidays) — kalendar bloklash uchun
+      fetch(`/api/clinics/${clinicId}/schedule`)
+        .then((r) => r.json())
+        .then((j) => { if (j.success && j.data) setClinicSchedule(j.data); })
         .catch(() => {});
 
       setLoading(true);
@@ -335,7 +342,12 @@ export default function BranchServicesPage() {
               </div>
             )}
             <h2 className="font-semibold text-gray-900 mb-3">Sanani tanlang</h2>
-            <Calendar value={selDate || null} onChange={(d) => selectDate(d)} />
+            <Calendar
+              value={selDate || null}
+              onChange={(d) => selectDate(d)}
+              blockedDates={clinicSchedule.holidays}
+              is24Hours={clinicSchedule.is24Hours}
+            />
           </div>
         )}
 

@@ -172,6 +172,7 @@ export default function WebApp() {
   const [doneCountdown, setDoneCountdown] = useState(5);
   const [selectedDoctor, setSelectedDoctor] = useState<ServiceDoctor | null>(null);
   const [showOnboardingHint, setShowOnboardingHint] = useState(false);
+  const [clinicSchedule, setClinicSchedule] = useState<{ is24Hours: boolean; holidays: string[] }>({ is24Hours: false, holidays: [] });
 
   const tgUserRef = useRef<TgUser | null>(null);
   const rebookServiceIdRef = useRef<string | null>(null);
@@ -312,6 +313,14 @@ export default function WebApp() {
           setAppMode("booking");
           loadServices(todayStr());
         }
+
+        // Klinika ish rejimi — kalendar bloklash uchun
+        if (clinicIdRef.current) {
+          fetch(`/api/clinics/${clinicIdRef.current}/schedule`)
+            .then((r) => r.json())
+            .then((j) => { if (j.success && j.data) setClinicSchedule(j.data); })
+            .catch(() => {});
+        }
       } catch (e) {
         console.log("[WebApp] fetch error:", e);
         setAppMode("booking");
@@ -335,6 +344,11 @@ export default function WebApp() {
     if (appMode === "booking") {
       loadServices(todayStr());
     }
+    // Klinika almashganda schedule yangilansin
+    fetch(`/api/clinics/${contextClinicId}/schedule`)
+      .then((r) => r.json())
+      .then((j) => { if (j.success && j.data) setClinicSchedule(j.data); })
+      .catch(() => {});
   }, [contextClinicId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Done step: 5 soniyadan keyin Telegram WebApp avtomatik yopish
@@ -966,7 +980,12 @@ export default function WebApp() {
               </div>
             )}
             <h2 className="font-semibold text-gray-900 mb-3">Sanani tanlang</h2>
-            <Calendar value={selectedDate || null} onChange={(date) => selectDate(date)} />
+            <Calendar
+              value={selectedDate || null}
+              onChange={(date) => selectDate(date)}
+              blockedDates={clinicSchedule.holidays}
+              is24Hours={clinicSchedule.is24Hours}
+            />
             {bookingLoading && <div className="text-center text-gray-400 text-sm mt-3">Tekshirilmoqda...</div>}
           </div>
         )}
