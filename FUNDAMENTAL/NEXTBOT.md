@@ -75,6 +75,8 @@ Doctor Panel → bugungi bemorlar ro'yxati
 │    POST /api/user/register                              │
 │    GET  /api/webapp/appointments (JWT'siz, phone chk)  │
 │    POST /api/webapp/cancel (JWT'siz, phone chk)        │
+│    PATCH /api/webapp/profile (telegramId, firstName,   │
+│          lastName, fatherName, region, district)       │
 │    GET  /api/me/appointments (telegramId, scope, filters)│
 │    GET  /api/me/clinics (telegramId, last clinic)       │
 │    GET  /api/reminders  (cron)                          │
@@ -470,6 +472,48 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 ---
 
 ## 12. RECENT CHANGES LOG
+
+### 2026-05-31 — DOCTOR-BLOCK: Shifokor darajasida kun bloklash
+
+**Maqsad:** Klinika blokidan (yakshanba/bayram) MUSTAQIL ravishda shifokor darajasida kunlarni bloklash. Bir yo'nalishda 3 shifokor — Dr. Rahimov har shanba kelmaydi → FAQAT u qizil, qolgan 2 shifokor ochiq. Takroriy (haftaning ixtiyoriy kuni, 0-6) va bir martalik (aniq YYYY-MM-DD). 3 rol bloklaydi: shifokor o'zi + qabulxona + admin. 24/7 klinikada ham ishlaydi.
+
+**DB (Supabase migration `doctor_blocked_dates`):**
+- Yangi jadval: `doctor_blocked_dates` (id, doctorId FK→CASCADE, type 'recurring'|'once', weekday 0-6?, date TEXT?, reason?, createdBy userId, createdAt)
+- CHECK constraintlar: recurring→weekday majburiy, once→date majburiy, weekday 0-6 range
+- 3 ta index: doctorId, (type,weekday) WHERE recurring, (type,date) WHERE once
+- RLS enabled
+- Prisma: `DoctorBlockedDate` model + `Doctor.blockedDates DoctorBlockedDate[]` relation
+
+**Yangi fayllar:**
+- `src/app/api/doctors/[id]/schedule/route.ts` — `GET` public → `{ blockedDates, blockedWeekdays }` (web+bot BITTA manba)
+- `src/app/api/doctors/[id]/blocked-dates/route.ts` — `GET/POST` (3 rol auth)
+- `src/app/api/doctors/[id]/blocked-dates/[blockId]/route.ts` — `DELETE` (3 rol auth)
+- `src/components/DoctorBlockedDatesManager.tsx` — Reusable blok boshqaruv komponenti (takroriy weekday + bir martalik sana, delete)
+
+**O'zgartirilgan fayllar:**
+- `src/lib/day-block.ts` — 2 yangi funksiya qo'shildi (mavjud O'ZGARMADI): `isDateBlockedForDoctor(doctorId, dateStr)`, `isDateBlockedFull(clinicId, doctorId, dateStr)`
+- `src/lib/calendar.ts` — `generateCalendarMatrix` ga 2 yangi ixtiyoriy param: `doctorBlockedDates: string[] = []`, `doctorBlockedWeekdays: number[] = []` (backward compatible)
+- `src/lib/services/booking.service.ts:289` — `isDateBlockedForClinic` → `isDateBlockedFull` (1 satr, DOCTOR_BLOCKED 409 kod)
+- `bot/helpers/calendar.ts` — `CalendarSettings` interface export + `doctorBlockedDates/Weekdays` params
+- `bot/helpers/render.ts` — `mkDateKeyboard/mkDateKeyboardForMonth` CalendarSettings qabul qiladi
+- `bot/handlers/callback.ts` — `getDoctorSchedule()` helper + `doc:` handler combined schedule
+- `src/components/Calendar.tsx` — `blockedWeekdays?: number[]` prop + `isBlockedCell` shifokor blokini ham ko'rsatadi
+- `src/app/webapp/page.tsx` — `doctorSchedule` state + `fetchDoctorSchedule()` + Calendar birlashtirma
+- `src/app/webapp/clinics/[id]/branches/[branchId]/page.tsx` — xuddi shunday
+- `src/app/doctor/page.tsx` — "Bloklangan kunlar" collapsible section
+- `src/app/reception/page.tsx` — Doctor dropdown + DoctorBlockedDatesManager section
+- `src/app/admin/doctors/[id]/edit/page.tsx` — DoctorBlockedDatesManager card
+
+**Asosiy qoidalar (O'ZGARTIRMA):**
+- `isDateBlocked`, `isDateBlockedForClinic` — mavjud funksiyalar O'ZGARMADI, faqat qo'shimcha
+- Shifokor bloki klinika tipidan MUSTAQIL — 24/7 da ham ishlaydi
+- Web va bot BITTA endpointdan: `/api/doctors/[id]/schedule`
+- Shifokor auth: `doctor.userId === session.userId` (faqat o'ziniki)
+- Booking oqimi O'ZGARMADI: xizmat → shifokor → sana tartib saqlanadi
+
+**Commit:** feature/doctor-blocked-dates → main. Deploy: https://tibtaqvim.vercel.app ✅
+
+---
 
 ### 2026-05-29 — BROADCAST: Kanal/guruhga broadcast to'liq tizim
 
