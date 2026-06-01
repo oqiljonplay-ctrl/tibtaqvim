@@ -8,8 +8,10 @@ interface LimitSettings {
   discountPercent: number;
 }
 
+type SettingsKey = keyof LimitSettings;
+
 interface FieldMeta {
-  key: keyof LimitSettings;
+  key: SettingsKey;
   label: string;
   min: number;
   max: number;
@@ -52,13 +54,28 @@ const FIELDS: FieldMeta[] = [
   },
 ];
 
+const DEFAULT_SETTINGS: LimitSettings = {
+  patientSelfLimit: 4,
+  dependentBookingLimit: 1,
+  maxDependents: 2,
+  discountPercent: 0,
+};
+
+function toInputMap(s: LimitSettings): Record<SettingsKey, string> {
+  return {
+    patientSelfLimit: String(s.patientSelfLimit),
+    dependentBookingLimit: String(s.dependentBookingLimit),
+    maxDependents: String(s.maxDependents),
+    discountPercent: String(s.discountPercent),
+  };
+}
+
 export default function AdminSettingsPage() {
-  const [settings, setSettings] = useState<LimitSettings>({
-    patientSelfLimit: 4,
-    dependentBookingLimit: 1,
-    maxDependents: 2,
-    discountPercent: 0,
-  });
+  const [settings, setSettings] = useState<LimitSettings>(DEFAULT_SETTINGS);
+  // inputValues — foydalanuvchi yozayotgan raw string (bo'sh bo'lishi mumkin)
+  const [inputValues, setInputValues] = useState<Record<SettingsKey, string>>(
+    toInputMap(DEFAULT_SETTINGS)
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -67,15 +84,32 @@ export default function AdminSettingsPage() {
     fetch("/api/admin/clinic-settings")
       .then((r) => r.json())
       .then((res) => {
-        if (res.success && res.data) setSettings(res.data);
+        if (res.success && res.data) {
+          setSettings(res.data);
+          setInputValues(toInputMap(res.data));
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  function handleChange(key: keyof LimitSettings, raw: string) {
+  function handleChange(key: SettingsKey, raw: string) {
+    // raw string ni har doim saqlash — foydalanuvchi erkin o'zgartirsin
+    setInputValues((prev) => ({ ...prev, [key]: raw }));
+    // Faqat to'g'ri son bo'lsa settings'ni yangilaymiz
     const val = parseInt(raw, 10);
-    if (!isNaN(val)) setSettings((prev) => ({ ...prev, [key]: val }));
+    if (!isNaN(val)) {
+      setSettings((prev) => ({ ...prev, [key]: val }));
+    }
+  }
+
+  function handleBlur(key: SettingsKey) {
+    // Focus ketganda: bo'sh yoki noto'g'ri bo'lsa, eski qiymatni qaytaramiz
+    const raw = inputValues[key];
+    const val = parseInt(raw, 10);
+    if (isNaN(val)) {
+      setInputValues((prev) => ({ ...prev, [key]: String(settings[key]) }));
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -90,6 +124,8 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
+        setSettings(data.data);
+        setInputValues(toInputMap(data.data));
         setMessage({ type: "ok", text: "Sozlamalar saqlandi!" });
       } else {
         setMessage({ type: "err", text: data.error?.message ?? "Xatolik yuz berdi" });
@@ -105,7 +141,7 @@ export default function AdminSettingsPage() {
     return (
       <div className="space-y-4">
         <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
-        {[1, 2, 3].map((i) => (
+        {[1, 2, 3, 4].map((i) => (
           <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
         ))}
       </div>
@@ -123,9 +159,8 @@ export default function AdminSettingsPage() {
 
       <form onSubmit={handleSave} className="space-y-5">
         {FIELDS.map((f) => {
-          const val = settings[f.key];
-          const meta = FIELDS.find((x) => x.key === f.key)!;
-          const invalid = typeof val !== "number" || val < meta.min || val > meta.max;
+          const numVal = settings[f.key];
+          const invalid = typeof numVal !== "number" || numVal < f.min || numVal > f.max;
           return (
             <div
               key={f.key}
@@ -144,8 +179,9 @@ export default function AdminSettingsPage() {
                     type="number"
                     min={f.min}
                     max={f.max}
-                    value={val}
+                    value={inputValues[f.key]}
                     onChange={(e) => handleChange(f.key, e.target.value)}
+                    onBlur={() => handleBlur(f.key)}
                     className={`w-20 text-center px-2 py-2 text-lg font-semibold border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       invalid
                         ? "border-red-400 bg-red-50 text-red-700"
