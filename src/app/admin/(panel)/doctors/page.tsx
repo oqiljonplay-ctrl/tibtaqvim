@@ -44,11 +44,13 @@ const emptyForm = {
 };
 
 function QueueModeSelector({
+  doctorId,
   serviceId,
   serviceName,
   currentMode,
   onChange,
 }: {
+  doctorId: string;
   serviceId: string;
   serviceName: string;
   currentMode: QueueMode;
@@ -65,7 +67,7 @@ function QueueModeSelector({
           </div>
           <input
             type="radio"
-            name={`queueMode-${serviceId}`}
+            name={`queueMode-${doctorId}-${serviceId}`}
             checked={currentMode === "live"}
             onChange={() => onChange("live")}
             className="w-4 h-4 text-blue-600"
@@ -78,7 +80,7 @@ function QueueModeSelector({
           </div>
           <input
             type="radio"
-            name={`queueMode-${serviceId}`}
+            name={`queueMode-${doctorId}-${serviceId}`}
             checked={currentMode === "online"}
             onChange={() => onChange("online")}
             className="w-4 h-4 text-blue-600"
@@ -96,7 +98,7 @@ function QueueModeSelector({
   );
 }
 
-function DoctorQueueModes({ doctor, onSaved }: { doctor: Doctor; onSaved: () => void }) {
+function DoctorQueueModes({ doctor, onSaved }: { doctor: Doctor; onSaved?: () => void }) {
   const [modes, setModes] = useState<Record<string, QueueMode>>(
     Object.fromEntries(doctor.services.map((s) => [s.id, s.queueMode]))
   );
@@ -123,7 +125,7 @@ function DoctorQueueModes({ doctor, onSaved }: { doctor: Doctor; onSaved: () => 
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      onSaved();
+      // onSaved intentionally not called — local modes state is already correct after PATCH
     } catch {
       alert("Server xatosi");
     } finally {
@@ -151,6 +153,7 @@ function DoctorQueueModes({ doctor, onSaved }: { doctor: Doctor; onSaved: () => 
         {doctor.services.map((svc) => (
           <QueueModeSelector
             key={svc.id}
+            doctorId={doctor.id}
             serviceId={svc.id}
             serviceName={`${svc.name} — ${Number(svc.price).toLocaleString()} so'm`}
             currentMode={modes[svc.id] ?? "online"}

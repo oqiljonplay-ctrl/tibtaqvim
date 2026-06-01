@@ -1,5 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// Modes with payment button placeholder (extend when real API is ready)
+const PAYMENT_ENABLED_MODES = ["online"];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,7 +125,14 @@ function ChipList({ icon, label, items }: { icon: string; label: string; items: 
 
 export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancellingId }: Props) {
   const [flipped, setFlipped] = useState(false);
+  const [paymentNotice, setPaymentNotice] = useState(false);
   const doc = a.doctor;
+
+  useEffect(() => {
+    if (!paymentNotice) return;
+    const t = setTimeout(() => setPaymentNotice(false), 3000);
+    return () => clearTimeout(t);
+  }, [paymentNotice]);
 
   const hasProfile = !!(doc && (
     doc.education || doc.position || doc.department || doc.bio ||
@@ -258,6 +268,29 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
                 >
                   {cancellingId === a.id ? "..." : "❌ Bekor qilish"}
                 </button>
+              )}
+              {/* Payment placeholder — shown for PAYMENT_ENABLED_MODES only */}
+              {/* TODO: connect to real Payme/Click API when payments table is ready */}
+              {a.status === "booked" && PAYMENT_ENABLED_MODES.includes(a.queueMode ?? "") && (
+                <div className="flex gap-1.5 mt-0.5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPaymentNotice(true); }}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 active:scale-95 transition-all"
+                  >
+                    💳 Payme
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPaymentNotice(true); }}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 active:scale-95 transition-all"
+                  >
+                    💳 Click
+                  </button>
+                </div>
+              )}
+              {paymentNotice && (
+                <div className="mt-1 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                  <p className="text-xs text-amber-700 font-medium">🚧 To&apos;lov tizimi tez orada ulanadi</p>
+                </div>
               )}
             </div>
           </div>

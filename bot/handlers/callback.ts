@@ -71,6 +71,16 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
     return;
   }
 
+  // ─── pay_placeholder: — payment UI placeholder (no real API yet) ──────────
+  // TODO: replace with real Payme/Click API when ready
+  if (data.startsWith("pay_placeholder:")) {
+    await bot.answerCallbackQuery(query.id, {
+      text: "🚧 To'lov tizimi tez orada ulanadi",
+      show_alert: true,
+    });
+    return;
+  }
+
   await bot.answerCallbackQuery(query.id);
 
   // ─── cal:noop — keyboard placeholder buttons ──────────────────────────────
@@ -740,6 +750,9 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
       const queueMode = (a as any).queueMode || "online";
       const isLive = queueMode === "live";
 
+      // Modes with payment button placeholder (extend list when real API is ready)
+      const PAYMENT_ENABLED_MODES = ["online"];
+
       const successText = [
         "✅ *Qabul tasdiqlandi!*",
         "",
@@ -760,18 +773,34 @@ export async function handleCallback(bot: TelegramBot, query: CallbackQuery) {
           : (finalTibId ? "📍 Klinikaga kelganda ushbu ID ni ko'rsating" : "Klinikaga o'z vaqtida keling! 🏥"),
       ].filter(Boolean).join("\n");
 
+      const payInlineKeyboard = PAYMENT_ENABLED_MODES.includes(queueMode) && a.id
+        ? {
+            inline_keyboard: [[
+              { text: "💳 Payme", callback_data: `pay_placeholder:${a.id}` },
+              { text: "💳 Click", callback_data: `pay_placeholder:${a.id}` },
+            ]],
+          }
+        : undefined;
+
       if (msgId) {
         try {
           await (bot as any).editMessageText(successText, {
             chat_id: chatId,
             message_id: msgId,
             parse_mode: "Markdown",
+            ...(payInlineKeyboard ? { reply_markup: payInlineKeyboard } : {}),
           });
         } catch {
-          await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+          await bot.sendMessage(chatId, successText, {
+            parse_mode: "Markdown",
+            ...(payInlineKeyboard ? { reply_markup: payInlineKeyboard } : {}),
+          });
         }
       } else {
-        await bot.sendMessage(chatId, successText, { parse_mode: "Markdown" });
+        await bot.sendMessage(chatId, successText, {
+          parse_mode: "Markdown",
+          ...(payInlineKeyboard ? { reply_markup: payInlineKeyboard } : {}),
+        });
       }
 
       // Uyda bemor ko'rish — joylashuv so'rash
