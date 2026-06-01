@@ -1,9 +1,12 @@
 import { NextRequest } from "next/server";
 import { sendDayBeforeReminders, sendTwoHourReminders } from "@/lib/services/reminder.service";
+import { expireBookings } from "@/lib/workflow/appointment-workflow";
 import { ok, error, unauthorized, forbidden } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
+
+const TZ = process.env.CLINIC_TIMEZONE || "Asia/Tashkent";
 
 const REMINDER_LIMIT = 10;
 const REMINDER_WINDOW_MS = 60_000;
@@ -24,6 +27,18 @@ async function runReminder(req: NextRequest) {
   if (type === "day_before") {
     const result = await sendDayBeforeReminders();
     logger.info("day_before reminders triggered");
+
+    // Backup expiry: Vercel Hobby 2-cron cheklovi bo'lsa ham ishlaydi
+    try {
+      const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: TZ });
+      const expireResult = await expireBookings(todayStr);
+      if (expireResult.expiredIds.length > 0) {
+        logger.info("[reminders/expire-backup] expired", { count: expireResult.expiredIds.length, date: todayStr });
+      }
+    } catch (expireErr) {
+      logger.error("[reminders/expire-backup] error", { error: String(expireErr) });
+    }
+
     return ok(result);
   }
 
