@@ -54,7 +54,7 @@ export async function markAsPaid(
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: "paid", paidAmount, appliedDiscountPercent },
+      data: { paymentStatus: "paid", paidAmount, appliedDiscountPercent, paidAt: new Date() },
     });
     console.log(`[workflow] markAsPaid: ${appointmentId} mode=${mode} paidAmount=${paidAmount} discount=${appliedDiscountPercent}% by ${source}`);
     return { success: true, appointment: updated };
@@ -84,7 +84,7 @@ export async function markAsUnpaid(
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: "pending", paidAmount: null, appliedDiscountPercent: 0 },
+      data: { paymentStatus: "pending", paidAmount: null, appliedDiscountPercent: 0, paidAt: null },
     });
     return { success: true, appointment: updated };
   } catch (err: any) {
@@ -110,7 +110,7 @@ export async function cancelAppointment(
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { status: "cancelled", paymentStatus: "cancelled" },
+      data: { status: "cancelled", paymentStatus: "cancelled", paidAmount: null, appliedDiscountPercent: 0, paidAt: null },
     });
     return { success: true, appointment: updated };
   } catch (err: any) {

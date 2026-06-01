@@ -149,16 +149,16 @@ export async function getDailyRevenue(
   const rows = await prisma.$queryRaw<Array<{ date: Date; revenue: string | number }>>(
     Prisma.sql`
       SELECT
-        DATE(a."createdAt") AS date,
-        COALESCE(SUM(COALESCE(a."paidAmount", CAST(s.price AS INTEGER))), 0) AS revenue
+        DATE(a."paidAt") AS date,
+        COALESCE(SUM(COALESCE(a."paidAmount", 0)), 0) AS revenue
       FROM appointments a
-      INNER JOIN services s ON s.id = a."serviceId"
       WHERE
-        a."createdAt" >= ${startDate}
-        AND a."createdAt" <= ${endDate}
+        a."paidAt" >= ${startDate}
+        AND a."paidAt" <= ${endDate}
         AND a."paymentStatus" = 'paid'
+        AND a."paidAt" IS NOT NULL
         ${cf}
-      GROUP BY DATE(a."createdAt")
+      GROUP BY DATE(a."paidAt")
       ORDER BY date ASC
     `
   );
