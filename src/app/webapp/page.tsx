@@ -162,6 +162,7 @@ export default function WebApp() {
   const [dashLoading, setDashLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [selfLimit, setSelfLimit] = useState<number | null>(null);
+  const [selfActiveCountDB, setSelfActiveCountDB] = useState<number>(0);
 
   // ── Shared state ──
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
@@ -380,14 +381,15 @@ export default function WebApp() {
     try {
       const [apptRes, limitRes] = await Promise.all([
         fetch(`/api/webapp/appointments?telegramId=${tgId}&clinicId=${effectiveCId}`),
-        fetch(`/api/webapp/booking-limits?clinicId=${effectiveCId}`),
+        fetch(`/api/webapp/booking-limits?clinicId=${effectiveCId}&telegramId=${tgId}`),
       ]);
       const apptJson = await apptRes.json();
       if (apptJson.success) setAppointments(apptJson.data);
 
       const limitJson = await limitRes.json().catch(() => null);
-      if (limitJson?.success && limitJson.data?.patientSelfLimit != null) {
-        setSelfLimit(limitJson.data.patientSelfLimit);
+      if (limitJson?.success && limitJson.data) {
+        if (limitJson.data.patientSelfLimit != null) setSelfLimit(limitJson.data.patientSelfLimit);
+        if (limitJson.data.selfActiveCount != null) setSelfActiveCountDB(limitJson.data.selfActiveCount);
       }
     } catch {}
     finally { setDashLoading(false); }
@@ -405,9 +407,14 @@ export default function WebApp() {
       });
       const json = await res.json();
       if (json.success) {
-        setAppointments((prev) =>
-          prev.map((a) => a.id === appointmentId ? { ...a, status: "cancelled" as const } : a)
-        );
+        setAppointments((prev) => {
+          const appt = prev.find((a) => a.id === appointmentId);
+          // Agar bemor o'zi uchun faol bron bekor bo'lsa, DB count'ni kamayt
+          if (appt?.status === "booked" && !appt.dependentId) {
+            setSelfActiveCountDB((c) => Math.max(0, c - 1));
+          }
+          return prev.map((a) => a.id === appointmentId ? { ...a, status: "cancelled" as const } : a);
+        });
       } else {
         setErrorMsg(json.error?.message ?? "Bekor qilishda xatolik");
       }
@@ -617,8 +624,8 @@ export default function WebApp() {
     const todayAppts = appointments.filter((a) => isToday(a.date));
     const upcomingAppts = appointments.filter((a) => isFuture(a.date) && !isToday(a.date) && a.status === "booked");
     const historyAppts = appointments.filter((a) => !isFuture(a.date) || a.status === "cancelled" || a.status === "arrived" || a.status === "missed" || a.status === "expired");
-    // Faol bronlar soni: status="booked" VA dependentId=null (bemor o'zi uchun)
-    const selfActiveCount = appointments.filter((a) => a.status === "booked" && !a.dependentId).length;
+    // Faol bronlar soni: DBdan kelgan haqiqiy son (take:30 cheklovsiz)
+    const selfActiveCount = selfActiveCountDB;
     const limitFull = selfLimit !== null && selfActiveCount >= selfLimit;
 
     return (
