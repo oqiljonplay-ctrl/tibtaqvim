@@ -1,16 +1,20 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, error } from "@/lib/api-response";
+import { resolveWebappTelegramId } from "@/lib/telegram/webapp-auth";
 
 const DEFAULT_CLINIC_ID = process.env.DEFAULT_CLINIC_ID || "";
 
 // GET /api/webapp/appointments?telegramId=...&clinicId=...
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const telegramId = searchParams.get("telegramId");
+  const rawTelegramId = searchParams.get("telegramId");
   const clinicId = searchParams.get("clinicId") || DEFAULT_CLINIC_ID;
 
-  if (!telegramId) return error("telegramId majburiy");
+  const auth = resolveWebappTelegramId(req, rawTelegramId);
+  if (!auth) return error("Autentifikatsiya talab qilinadi", 401);
+  const { telegramId } = auth;
+
   if (!clinicId) return error("clinicId topilmadi");
 
   try {

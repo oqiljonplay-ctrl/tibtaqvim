@@ -1,18 +1,21 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, error } from "@/lib/api-response";
+import { resolveWebappTelegramId } from "@/lib/telegram/webapp-auth";
 
 // POST /api/webapp/cancel
 // { appointmentId, telegramId }
-// Security: patientPhone === user.phone YOKI appointment.userId === user.id
+// Security: initData HMAC (log-only) + patientPhone === user.phone YOKI appointment.userId === user.id
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { appointmentId, telegramId } = body;
+    const { appointmentId, telegramId: rawTelegramId } = body;
 
-    if (!appointmentId || !telegramId) {
-      return error("appointmentId va telegramId majburiy");
-    }
+    if (!appointmentId) return error("appointmentId majburiy");
+
+    const auth = resolveWebappTelegramId(req, rawTelegramId ? String(rawTelegramId) : null);
+    if (!auth) return error("Autentifikatsiya talab qilinadi", 401);
+    const { telegramId } = auth;
 
     const user = await prisma.user.findUnique({
       where: { telegramId: String(telegramId) },
