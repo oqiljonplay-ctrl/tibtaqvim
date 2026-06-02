@@ -13,13 +13,17 @@ export function getBranchScope(
   if (auth.role === "super_admin") {
     return explicitClinicId ? { clinicId: explicitClinicId } : {};
   }
+  // Non-super_admin: clinicId majburiy — yo'q bo'lsa butun DB filter yo'qoladi
+  if (!auth.clinicId) {
+    throw new Error(`[getBranchScope] clinicId yo'q — rol: ${auth.role}, userId: ${auth.userId}`);
+  }
   if (auth.role === "clinic_admin") {
-    return { clinicId: auth.clinicId! };
+    return { clinicId: auth.clinicId };
   }
   if (auth.role === "branch_admin") {
-    return { clinicId: auth.clinicId!, branchId: auth.branchId ?? undefined };
+    return { clinicId: auth.clinicId, branchId: auth.branchId ?? undefined };
   }
-  return { clinicId: auth.clinicId! };
+  return { clinicId: auth.clinicId };
 }
 
 /**

@@ -9,6 +9,7 @@ export interface WorkflowResult {
   success: boolean;
   appointment?: Appointment;
   error?: string;
+  notFound?: boolean;
 }
 
 // ── To'lov nazorati (Qabulxona) ────────────────────────────────────────────────
@@ -20,16 +21,18 @@ export async function markAsPaid(
   mode: "full" | "discount" = "full"
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    // findFirst + clinicId filter: boshqa klinikaning broni "topilmadi" kabi ko'rinadi (IDOR himoya)
+    const appt = await prisma.appointment.findFirst({
+      where: {
+        id: appointmentId,
+        ...(actorClinicId ? { clinicId: actorClinicId } : {}),
+      },
       select: {
         id: true, clinicId: true, paymentStatus: true, status: true,
         service: { select: { price: true } },
       },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron uchun to'lov belgilab bo'lmaydi" };
     if (appt.paymentStatus === "paid")
@@ -69,13 +72,11 @@ export async function markAsUnpaid(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, paymentStatus: true, status: true, appliedDiscountPercent: true, paidAmount: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
     if (appt.appliedDiscountPercent === 100) {
@@ -98,13 +99,11 @@ export async function cancelAppointment(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, status: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
     if (appt.status === "cancelled")
       return { success: false, error: "Bron allaqachon bekor qilingan" };
 
@@ -126,13 +125,11 @@ export async function markAsArrived(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, status: true, paymentStatus: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
     if (appt.paymentStatus !== "paid" && appt.paymentStatus !== "not_required")
@@ -154,13 +151,11 @@ export async function markAsMissed(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, status: true, paymentStatus: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
     if (appt.paymentStatus !== "paid" && appt.paymentStatus !== "not_required")
@@ -182,13 +177,11 @@ export async function resetToBooked(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, status: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bronni qaytarib bo'lmaydi" };
 

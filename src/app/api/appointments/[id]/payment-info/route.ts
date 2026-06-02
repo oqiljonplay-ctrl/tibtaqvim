@@ -23,9 +23,9 @@ export async function GET(
     return NextResponse.json({ error: "Topilmadi" }, { status: 404 });
   }
 
-  // Ownership tekshiruvi: bemor faqat o'z bronini ko'radi
+  // Ownership tekshiruvi: 404 qaytarish (403 emas — mavjudlikni oshkor qilmaslik uchun)
   if (!tgid || appointment.user?.telegramId !== tgid) {
-    return NextResponse.json({ error: "Ruxsat yo'q" }, { status: 403 });
+    return NextResponse.json({ error: "Topilmadi" }, { status: 404 });
   }
 
   const amountTiyin = decimalSumToTiyin(appointment.service.prePaymentAmount);
