@@ -36,6 +36,12 @@ async function bookDoctorQueue(
 
   try {
     const appt = await prisma.$transaction(async (tx) => {
+      // Advisory lock: bir xil (serviceId+date) uchun barcha so'rovlar ketma-ket bajariladi.
+      // Bu duplicate check TOCTOU va queueNumber TOCTOU ikkalasini ham yopadi.
+      // Lock transaksiya tugaganda (commit/rollback) avtomatik ozod bo'ladi.
+      const lockKey = `${input.serviceId}:${bookingDate.toISOString().slice(0, 10)}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
       if (service.dailyLimit !== null) {
         const count = await tx.appointment.count({
           where: { serviceId: input.serviceId, date: bookingDate, status: { not: "cancelled" } },
@@ -80,11 +86,6 @@ async function bookDoctorQueue(
       let paymentStatus = "not_required";
 
       if (queueMode === "online") {
-        // Advisory lock: bir xil (serviceId+date) uchun paralel transaksiyalar seriallashadi.
-        // Lock transaksiya tugaganda avtomatik ozod bo'ladi.
-        const lockKey = `${input.serviceId}:${bookingDate.toISOString().slice(0, 10)}`;
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
-
         const last = await tx.appointment.findFirst({
           where: { serviceId: input.serviceId, date: bookingDate, status: { not: "cancelled" } },
           orderBy: { queueNumber: "desc" },
@@ -141,6 +142,12 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
 
   try {
     const appt = await prisma.$transaction(async (tx) => {
+      // Slot va umumiy diagnostic uchun atomic lock (capacity TOCTOU oldini olish)
+      const diagLockKey = input.slotId
+        ? `slot:${input.slotId}`
+        : `${input.serviceId}:${bookingDate.toISOString().slice(0, 10)}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${diagLockKey}))`;
+
       if (service.dailyLimit !== null) {
         const count = await tx.appointment.count({
           where: { serviceId: input.serviceId, date: bookingDate, status: { not: "cancelled" } },

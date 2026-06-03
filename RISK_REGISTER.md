@@ -15,6 +15,7 @@
 | R6 | **Vercel 10s timeout — broadcast** — ko'p kanalga yuborishda timeout xavfi | 🟡 O'RTA | `waitUntil()` qo'shilmagan. Hozircha kanallar soni kam. | Broadcast to'liq tugamay qolishi mumkin. | Har kampaniya uchun kanallar soni limit qo'yish | **Wave 3** |
 | R7 | **PAYMENT_ENCRYPTION_KEY o'rnatilmagan** — merchant kalitlari shifrlanmadan saqlanyapti | 🟡 O'RTA | Hozir hech qanday real merchant ulanmagan → shifrlanadigan kalit yo'q | Merchant kalitlar plain text DB'da | AES-256-GCM poydevori tayyor emas | **Wave 5 / Sprint 4** |
 | R8 | **Ad campaign/channel IDOR: 403 vs 404** — `forbidden()` qaytaradi, `notFound()` emas | 🔵 PAST | Admin endpoint (valid JWT kerak) → mavjudlikni oshkor qilish xavfi minimal | Juda past | — | Keyingi code-quality round |
+| R9 | **`getBranchScope` undefined guard → 500** — `clinicId: undefined` bo'lsa `throw new Error()` → HTTP 500. Hozircha xavfsiz (hech narsa sizdirmaydi), lekin 500 "kod xatosi" signali beradi, 400/401 emas. | 🔵 PAST | Hozircha xavfsiz (leakage yo'q). Tuzatish minimal. | Juda past | 500 serverda log bo'ladi | Ideal: `throw` o'rniga 400/401 va aniq log. Keyingi code-quality round |
 
 ---
 

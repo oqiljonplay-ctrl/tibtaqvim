@@ -33,8 +33,13 @@ export async function markAsPaid(
       },
     });
     if (!appt) return { success: false, error: "Topilmadi", notFound: true };
+    // Faqat 'booked' status to'lov qabul qiladi; terminal holatlar bloklanadi
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron uchun to'lov belgilab bo'lmaydi" };
+    if (appt.status === "expired")
+      return { success: false, error: "Muddati o'tgan bron uchun to'lov belgilab bo'lmaydi" };
+    if (appt.status === "missed")
+      return { success: false, error: "Kelmagan bron uchun to'lov belgilab bo'lmaydi" };
     if (appt.paymentStatus === "paid")
       return { success: false, error: "Bu bron allaqachon to'langan" };
 
@@ -130,8 +135,13 @@ export async function markAsArrived(
       select: { id: true, clinicId: true, status: true, paymentStatus: true },
     });
     if (!appt) return { success: false, error: "Topilmadi", notFound: true };
+    // Faqat 'booked' (to'langan) holat arrived'ga o'ta oladi
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
+    if (appt.status === "expired")
+      return { success: false, error: "Muddati o'tgan bron — shifokor ko'rigi tasdiqlab bo'lmaydi" };
+    if (appt.status === "missed")
+      return { success: false, error: "Kelmagan deb belgilangan bron" };
     if (appt.paymentStatus !== "paid" && appt.paymentStatus !== "not_required")
       return { success: false, error: "To'lov tasdiqlanmagan — avval qabulxona to'lovni qabul qilishi kerak" };
 
@@ -156,8 +166,13 @@ export async function markAsMissed(
       select: { id: true, clinicId: true, status: true, paymentStatus: true },
     });
     if (!appt) return { success: false, error: "Topilmadi", notFound: true };
+    // Faqat 'arrived' holat missed'ga o'ta oladi
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
+    if (appt.status === "expired")
+      return { success: false, error: "Muddati o'tgan bron" };
+    if (appt.status === "booked")
+      return { success: false, error: "Avval bemor keldi deb belgilang" };
     if (appt.paymentStatus !== "paid" && appt.paymentStatus !== "not_required")
       return { success: false, error: "To'lov tasdiqlanmagan bron" };
 
@@ -182,8 +197,13 @@ export async function resetToBooked(
       select: { id: true, clinicId: true, status: true },
     });
     if (!appt) return { success: false, error: "Topilmadi", notFound: true };
+    // Faqat 'arrived' yoki 'missed' holat booked'ga reset qila oladi
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bronni qaytarib bo'lmaydi" };
+    if (appt.status === "expired")
+      return { success: false, error: "Muddati o'tgan bronni qaytarib bo'lmaydi" };
+    if (appt.status === "booked")
+      return { success: false, error: "Bron allaqachon kutish holatida" };
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
