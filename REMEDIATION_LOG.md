@@ -18,9 +18,14 @@
 
 ---
 
-## TO'LQIN 2 — (keyingi bosqich)
+## TO'LQIN 2 — BRON OQIMI YAXLITLIGI & RACE CONDITIONS
 
-_Hali boshlanmadi. Wave 1 tasdiqlanganidan keyin boshlanadi._
+| # | Jiddiylik | Muammo | Ildiz sababi | Tuzatish | Isbot | Migration? | Qoldiq risk | Commit |
+|---|-----------|--------|--------------|----------|-------|------------|-------------|--------|
+| 2.1 | 🔴 KRITIK → ✅ | queueNumber TOCTOU: parallel bronlarda bir xil navbat raqami | `findFirst(max)+1+create` — READ COMMITTED'da atomic emas. 5 parallel curl → [2,1,2,1,1] — 3 ta duplicate! | `pg_advisory_xact_lock(hashtext(serviceId:date))` — transaksiya boshida lock. Parallel tx'lar seriallashadi. | BEFORE: [2,1,2,1,1]. AFTER: [2,1,5,4,3] — 5 ta unikal ✅. Lock transaction-level, pgBouncer bilan mos. | Yo'q | Juda past: lock granularity — bir xil serviceId+date uchun barcha bronlar seriallashadi. Faol kundagi performance ta'siri minimal (ms-darajada delay). | `260610c` |
+| 2.2+2.3 | 🟡 → ✅ | Duplicate check TOCTOU + Slot TOCTOU: advisory lock faqat queueNumber blokida edi | Duplicate check (serviceId+phone+date) va slot capacity check transaksiya boshiga lock qo'yilmagan edi | Lock transaksiya boshiga ko'chirildi (duplicate+limit+queue hammani qamrab oladi). bookDiagnostic: `slot:${slotId}` advisory lock qo'shildi | Code analysis: lock endi barcha kritik checklar oldida ✅. Slot: production'da `requiresSlot=true` xizmat yo'q — latent bug tuzatildi | Yo'q | Yo'q | `01cea3f` |
+| 2.4 | 🔴 KRITIK → ✅ | Holat mashinasi: `expired → paid` va `expired → arrived` ikkisi ham HTTP 200 qaytardi | `markAsPaid/markAsArrived/markAsMissed/resetToBooked` faqat `cancelled` ni bloklagan, `expired` terminal holatini emas | Har funksiyaga `expired` (va tegishli boshqa invalid holatlarga) explicit check qo'shildi. State machine tuzatildi. | BEFORE: `expired → paid` HTTP 200 ✅. AFTER: HTTP 400 "Muddati o'tgan bron uchun to'lov belgilab bo'lmaydi" ✅. Regression: `cancelled → arrived` HTTP 400 ✅ (buzilmadi) | Yo'q | Test artefakt: appt `cmpv6c4jl0003jx041zimglj9` test sababli `status:arrived, paymentStatus:paid` holatida — MANUAL_CHECKLIST | `01cea3f` |
+| 2.5 | ✅ OK | To'lov idempotentligi — markAsPaid ikki marta | — | Tekshirildi: 1-chi call → `paymentStatus:paid`. 2-chi call → `"Bu bron allaqachon to'langan"` (400) ✅ | Real curl: sequential double call → ikkinchisi 400 qaytardi | Yo'q | Parallel mode farqlari (masalan full+discount bir vaqtda) — juda past ehtimol | — |
 
 ---
 

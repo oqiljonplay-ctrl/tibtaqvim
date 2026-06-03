@@ -137,7 +137,35 @@ curl "https://api.telegram.org/bot8510744887:.../getWebhookInfo"
 
 ---
 
-## 10. BOT STATE — TEKSHIRISH
+## 10. TEST ARTEFAKTLARINI TOZALASH
+
+Quyidagi bronlar Wave 2 testi davomida yaratildi (`__TEST__` prefiksi bor yoki test sababli buzilgan):
+
+**Tozalash kerak (qo'lda, Prisma Studio yoki SQL orqali):**
+
+| Appointment ID | Holat | Sabab |
+|---|---|---|
+| `cmpv6c4jl0003jx041zimglj9` | `status:arrived, paymentStatus:paid` (real: expired bo'lishi kerak) | expired→paid va expired→arrived testi sababli o'zgartirildi |
+| `2026-06-25` sanasidagi barcha `__TEST__Bemor` bronlar | booked | queueNumber TOCTOU testi |
+| `2026-06-26` sanasidagi barcha `__TEST__Bemor` bronlar | booked | Parallel race test (duplicate queueNumber'lar mavjud!) |
+| `2026-06-27` sanasidagi barcha `__TEST__BemV2` bronlar | booked | Fix tasdiqlash testi |
+
+**SQL (Prisma Studio yoki Supabase SQL editor):**
+```sql
+-- Ko'rish:
+SELECT id, status, "paymentStatus", "patientName", date 
+FROM appointments 
+WHERE "patientName" LIKE '__TEST__%' OR date IN ('2026-06-25', '2026-06-26', '2026-06-27');
+
+-- O'chirish (faqat __TEST__ bronlar):
+DELETE FROM appointments WHERE "patientName" LIKE '__TEST__%';
+```
+
+> **DIQQAT:** `cmpv6c4jl0003jx041zimglj9` ni qo'lda `status:expired, paymentStatus:pending` ga qaytaring.
+
+---
+
+## 11. BOT STATE — TEKSHIRISH
 
 **Maqsad:** `bot/state.ts` hali in-memory Map ishlatayaptimi yoki DB-backed?
 
