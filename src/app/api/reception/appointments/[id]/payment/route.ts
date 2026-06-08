@@ -63,7 +63,7 @@ export async function PATCH(
         return error("Noto'g'ri amal (paid/unpaid/cancel)", 400);
     }
 
-    if (!result.success) return error(result.error || "Amal bajarilmadi", 400);
+    if (!result.success) return error(result.error || "Amal bajarilmadi", result.notFound ? 404 : 400);
     return ok({ appointment: result.appointment });
   } catch (err: any) {
     console.error("[PATCH /api/reception/appointments/[id]/payment]", err);

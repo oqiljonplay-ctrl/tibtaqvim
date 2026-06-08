@@ -45,7 +45,7 @@ export async function PATCH(
         return error("Noto'g'ri amal (arrived/missed/reset)", 400);
     }
 
-    if (!result.success) return error(result.error || "Amal bajarilmadi", 400);
+    if (!result.success) return error(result.error || "Amal bajarilmadi", result.notFound ? 404 : 400);
 
     try {
       await prisma.auditLog.create({

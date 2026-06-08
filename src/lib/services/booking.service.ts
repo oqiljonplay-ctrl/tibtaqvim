@@ -36,6 +36,12 @@ async function bookDoctorQueue(
 
   try {
     const appt = await prisma.$transaction(async (tx) => {
+      // Advisory lock: bir xil (serviceId+date) uchun barcha so'rovlar ketma-ket bajariladi.
+      // Bu duplicate check TOCTOU va queueNumber TOCTOU ikkalasini ham yopadi.
+      // Lock transaksiya tugaganda (commit/rollback) avtomatik ozod bo'ladi.
+      const lockKey = `${input.serviceId}:${bookingDate.toISOString().slice(0, 10)}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
       if (service.dailyLimit !== null) {
         const count = await tx.appointment.count({
           where: { serviceId: input.serviceId, date: bookingDate, status: { not: "cancelled" } },
@@ -136,6 +142,12 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
 
   try {
     const appt = await prisma.$transaction(async (tx) => {
+      // Slot va umumiy diagnostic uchun atomic lock (capacity TOCTOU oldini olish)
+      const diagLockKey = input.slotId
+        ? `slot:${input.slotId}`
+        : `${input.serviceId}:${bookingDate.toISOString().slice(0, 10)}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${diagLockKey}))`;
+
       if (service.dailyLimit !== null) {
         const count = await tx.appointment.count({
           where: { serviceId: input.serviceId, date: bookingDate, status: { not: "cancelled" } },
@@ -143,6 +155,18 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
         if (count >= service.dailyLimit) {
           throw { code: "LIMIT_REACHED", message: "Kunlik limit to'ldi" };
         }
+      }
+
+      const diagDuplicate = await tx.appointment.findFirst({
+        where: {
+          serviceId: input.serviceId,
+          patientPhone: normalizePhone(input.patientPhone),
+          date: bookingDate,
+          status: { not: "cancelled" },
+        },
+      });
+      if (diagDuplicate) {
+        throw { code: "DUPLICATE_BOOKING", message: "Bu raqam uchun shu sanada allaqachon bron mavjud" };
       }
 
       if (service.requiresSlot && input.slotId) {
@@ -186,6 +210,7 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
     return { success: true, data: appt, tibId: null };
   } catch (err: any) {
     if (err?.code === "LIMIT_REACHED") return bookingError("LIMIT_REACHED", err.message, 409);
+    if (err?.code === "DUPLICATE_BOOKING") return bookingError("DUPLICATE_BOOKING", err.message, 409);
     if (err?.code === "SLOT_INVALID") return bookingError("SLOT_INVALID", err.message, 400);
     if (err?.code === "SLOT_FULL") return bookingError("SLOT_FULL", err.message, 409);
     throw err;
@@ -200,6 +225,9 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
 
   try {
     const appt = await prisma.$transaction(async (tx) => {
+      const homeLockKey = `${input.serviceId}:${bookingDate.toISOString().slice(0, 10)}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${homeLockKey}))`;
+
       if (service.dailyLimit !== null) {
         const count = await tx.appointment.count({
           where: { serviceId: input.serviceId, date: bookingDate, status: { not: "cancelled" } },
@@ -207,6 +235,18 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
         if (count >= service.dailyLimit) {
           throw { code: "LIMIT_REACHED", message: "Bugun uy xizmati limiti to'ldi" };
         }
+      }
+
+      const homeDuplicate = await tx.appointment.findFirst({
+        where: {
+          serviceId: input.serviceId,
+          patientPhone: normalizePhone(input.patientPhone),
+          date: bookingDate,
+          status: { not: "cancelled" },
+        },
+      });
+      if (homeDuplicate) {
+        throw { code: "DUPLICATE_BOOKING", message: "Bu raqam uchun shu sanada allaqachon bron mavjud" };
       }
 
       return tx.appointment.create({
@@ -236,6 +276,7 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
     return { success: true, data: appt, tibId: null };
   } catch (err: any) {
     if (err?.code === "LIMIT_REACHED") return bookingError("LIMIT_REACHED", err.message, 409);
+    if (err?.code === "DUPLICATE_BOOKING") return bookingError("DUPLICATE_BOOKING", err.message, 409);
     throw err;
   }
 }
@@ -383,7 +424,9 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
     }
 
     if (result.success) {
-      linkUserToAppointment(result.data.id, input.patientPhone, input.patientName).catch(() => {});
+      linkUserToAppointment(result.data.id, input.patientPhone, input.patientName).catch((e) => {
+        logger.error('[booking] linkUserToAppointment failed', { appointmentId: result.data.id, error: String(e) });
+      });
 
       if (input.source !== "bot") {
         notifyPatientAsync(result.data, input.patientPhone);

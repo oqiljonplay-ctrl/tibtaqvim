@@ -2,16 +2,19 @@ import { NextRequest } from "next/server";
 import { ok, error } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/utils/phone";
+import { resolveWebappTelegramId } from "@/lib/telegram/webapp-auth";
 
 // PATCH /api/webapp/profile
 // Body: { telegramId, firstName, lastName?, fatherName?, region?, district? }
-// Auth: telegramId tekshirish (webapp — JWT yo'q, telegramId ownership)
+// Auth: initData HMAC (log-only) — soxta telegramId bilan boshqa profilni o'zgartirishdan himoya
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { telegramId, firstName, lastName, fatherName, region, district, phone } = body ?? {};
+    const { telegramId: rawTelegramId, firstName, lastName, fatherName, region, district, phone } = body ?? {};
 
-    if (!telegramId) return error("telegramId talab qilinadi", 400);
+    const auth = resolveWebappTelegramId(req, rawTelegramId ? String(rawTelegramId) : null);
+    if (!auth) return error("Autentifikatsiya talab qilinadi", 401);
+    const { telegramId } = auth;
 
     // Phone-only so'rovda firstName majburiy emas
     const isPhoneOnly = phone !== undefined && !firstName;

@@ -63,6 +63,7 @@ interface AppointmentDoctor {
 
 interface AppointmentItem {
   id: string;
+  clinicId: string;
   date: string;
   status: "booked" | "arrived" | "missed" | "cancelled" | "expired";
   dependentId?: string | null;

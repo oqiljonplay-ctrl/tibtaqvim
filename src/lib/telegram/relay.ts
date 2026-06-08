@@ -5,6 +5,7 @@ interface StaffInfo {
   lastName: string | null;
   role: string;
   specialty?: string | null;
+  clinicName?: string | null;
 }
 
 export function buildCaptionPrefix(staff: StaffInfo): string {
@@ -23,16 +24,17 @@ export function buildCaptionPrefix(staff: StaffInfo): string {
     case "receptionist":
       return `\u{1F4CB} Qabulxona`;
     default:
-      return `\u{1F3E5} TibTaqvim`;
+      return `\u{1F3E5} Xodim`;
   }
 }
 
-export function buildFullCaption(prefix: string, text: string | null): string {
+export function buildFullCaption(prefix: string, text: string | null, clinicName?: string | null): string {
   const escape = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   const body = text ? `\n\n${escape(text)}` : "";
-  return `<b>${escape(prefix)}:</b>${body}\n\n<i>— TibTaqvim klinikasi</i>`;
+  const footer = clinicName ? `\n\n<i>— ${escape(clinicName)}</i>` : "";
+  return `<b>${escape(prefix)}:</b>${body}${footer}`;
 }
 
 export async function logRelay(params: {
@@ -83,6 +85,7 @@ export async function getStaffInfo(userId: string): Promise<StaffInfo | null> {
       lastName: true,
       role: true,
       doctor: { select: { specialty: true } },
+      clinic: { select: { name: true } },
     },
   });
 
@@ -93,5 +96,6 @@ export async function getStaffInfo(userId: string): Promise<StaffInfo | null> {
     lastName: user.lastName,
     role: user.role,
     specialty: user.doctor?.specialty || null,
+    clinicName: user.clinic?.name || null,
   };
 }

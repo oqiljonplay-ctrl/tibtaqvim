@@ -8,6 +8,7 @@ import ServicesDonutChart from "./ServicesDonutChart";
 import StatusDonutChart from "./StatusDonutChart";
 import DoctorsBarChart from "./DoctorsBarChart";
 import HoursBarChart from "./HoursBarChart";
+import DiscountStats from "@/components/stats/DiscountStats";
 
 type Range = 7 | 14 | 30 | 90;
 
@@ -111,7 +112,7 @@ export default function ChartsSection() {
         {/* 2. Kunlik daromad */}
         <ChartCard
           title="Kunlik daromad"
-          subtitle="Faqat keldi bronlardan (so'm)"
+          subtitle="Kassada to'langan to'lovlar (so'm)"
           icon="💰"
           loading={loading}
           empty={hasData && data.revenue.every((r) => r.revenue === 0)}
@@ -171,6 +172,12 @@ export default function ChartsSection() {
           {data && <HoursBarChart data={data.hours} />}
         </ChartCard>
 
+      </div>
+
+      {/* Chegirma tahlili — range bilan birga filtirlanadi */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-800 mb-3">Chegirma tahlili</h2>
+        <DiscountStats range={range} />
       </div>
     </div>
   );

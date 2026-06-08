@@ -16,13 +16,19 @@ function fmtShort(v: number) {
   return String(v);
 }
 
-export default function DiscountStats() {
+interface Props {
+  range?: number;
+}
+
+export default function DiscountStats({ range = 30 }: Props) {
   const [data, setData] = useState<DiscountData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/stats/discount", { cache: "no-store" })
+    setLoading(true);
+    setErr(null);
+    fetch(`/api/admin/stats/discount?range=${range}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         if (d.success) setData(d.data);
@@ -30,7 +36,7 @@ export default function DiscountStats() {
       })
       .catch(() => setErr("Tarmoq xatosi"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [range]);
 
   if (loading) return <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />;
   if (err) return <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm">{err}</div>;
@@ -51,7 +57,7 @@ export default function DiscountStats() {
         <div className="bg-emerald-50 rounded-lg p-4">
           <p className="text-xs text-emerald-700 font-medium mb-1">X — Jami tushum</p>
           <p className="text-xl font-bold text-emerald-900">{fmt(data.x)}</p>
-          <p className="text-xs text-emerald-600 mt-1">Barcha to'lovlar (chegirmali + to'liq)</p>
+          <p className="text-xs text-emerald-600 mt-1">Jami kassa tushumi (tanlangan davr)</p>
         </div>
         <div className="bg-red-50 rounded-lg p-4">
           <p className="text-xs text-red-700 font-medium mb-1">Y — Chegirilgan</p>
@@ -84,7 +90,7 @@ export default function DiscountStats() {
       </div>
 
       <p className="text-xs text-gray-400">
-        X = Z + chegirmasiz to'lovlar. Y = chegirmali bronlarda berilmagan pul. Qaytarilgan bronlar hisoblanmaydi.
+        X = Z + chegirmasiz to&apos;lovlar. Y = chegirmali bronlarda berilmagan pul. Qaytarilgan bronlar hisoblanmaydi.
       </p>
     </div>
   );

@@ -9,6 +9,7 @@ export interface WorkflowResult {
   success: boolean;
   appointment?: Appointment;
   error?: string;
+  notFound?: boolean;
 }
 
 // ── To'lov nazorati (Qabulxona) ────────────────────────────────────────────────
@@ -20,18 +21,25 @@ export async function markAsPaid(
   mode: "full" | "discount" = "full"
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    // findFirst + clinicId filter: boshqa klinikaning broni "topilmadi" kabi ko'rinadi (IDOR himoya)
+    const appt = await prisma.appointment.findFirst({
+      where: {
+        id: appointmentId,
+        ...(actorClinicId ? { clinicId: actorClinicId } : {}),
+      },
       select: {
         id: true, clinicId: true, paymentStatus: true, status: true,
         service: { select: { price: true } },
       },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
+    // Faqat 'booked' status to'lov qabul qiladi; terminal holatlar bloklanadi
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron uchun to'lov belgilab bo'lmaydi" };
+    if (appt.status === "expired")
+      return { success: false, error: "Muddati o'tgan bron uchun to'lov belgilab bo'lmaydi" };
+    if (appt.status === "missed")
+      return { success: false, error: "Kelmagan bron uchun to'lov belgilab bo'lmaydi" };
     if (appt.paymentStatus === "paid")
       return { success: false, error: "Bu bron allaqachon to'langan" };
 
@@ -54,7 +62,7 @@ export async function markAsPaid(
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: "paid", paidAmount, appliedDiscountPercent },
+      data: { paymentStatus: "paid", paidAmount, appliedDiscountPercent, paidAt: new Date() },
     });
     console.log(`[workflow] markAsPaid: ${appointmentId} mode=${mode} paidAmount=${paidAmount} discount=${appliedDiscountPercent}% by ${source}`);
     return { success: true, appointment: updated };
@@ -69,13 +77,11 @@ export async function markAsUnpaid(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, paymentStatus: true, status: true, appliedDiscountPercent: true, paidAmount: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
     if (appt.appliedDiscountPercent === 100) {
@@ -84,7 +90,7 @@ export async function markAsUnpaid(
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: "pending", paidAmount: null, appliedDiscountPercent: 0 },
+      data: { paymentStatus: "pending", paidAmount: null, appliedDiscountPercent: 0, paidAt: null },
     });
     return { success: true, appointment: updated };
   } catch (err: any) {
@@ -98,19 +104,17 @@ export async function cancelAppointment(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, status: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
     if (appt.status === "cancelled")
       return { success: false, error: "Bron allaqachon bekor qilingan" };
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { status: "cancelled", paymentStatus: "cancelled" },
+      data: { status: "cancelled", paymentStatus: "cancelled", paidAmount: null, appliedDiscountPercent: 0, paidAt: null },
     });
     return { success: true, appointment: updated };
   } catch (err: any) {
@@ -126,15 +130,18 @@ export async function markAsArrived(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, status: true, paymentStatus: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
+    // Faqat 'booked' (to'langan) holat arrived'ga o'ta oladi
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
+    if (appt.status === "expired")
+      return { success: false, error: "Muddati o'tgan bron — shifokor ko'rigi tasdiqlab bo'lmaydi" };
+    if (appt.status === "missed")
+      return { success: false, error: "Kelmagan deb belgilangan bron" };
     if (appt.paymentStatus !== "paid" && appt.paymentStatus !== "not_required")
       return { success: false, error: "To'lov tasdiqlanmagan — avval qabulxona to'lovni qabul qilishi kerak" };
 
@@ -154,15 +161,18 @@ export async function markAsMissed(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, status: true, paymentStatus: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
+    // Faqat 'arrived' holat missed'ga o'ta oladi
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bron" };
+    if (appt.status === "expired")
+      return { success: false, error: "Muddati o'tgan bron" };
+    if (appt.status === "booked")
+      return { success: false, error: "Avval bemor keldi deb belgilang" };
     if (appt.paymentStatus !== "paid" && appt.paymentStatus !== "not_required")
       return { success: false, error: "To'lov tasdiqlanmagan bron" };
 
@@ -182,15 +192,18 @@ export async function resetToBooked(
   actorClinicId: string | null
 ): Promise<WorkflowResult> {
   try {
-    const appt = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ...(actorClinicId ? { clinicId: actorClinicId } : {}) },
       select: { id: true, clinicId: true, status: true },
     });
-    if (!appt) return { success: false, error: "Bron topilmadi" };
-    if (actorClinicId && appt.clinicId !== actorClinicId)
-      return { success: false, error: "Bu bron boshqa klinikaga tegishli" };
+    if (!appt) return { success: false, error: "Topilmadi", notFound: true };
+    // Faqat 'arrived' yoki 'missed' holat booked'ga reset qila oladi
     if (appt.status === "cancelled")
       return { success: false, error: "Bekor qilingan bronni qaytarib bo'lmaydi" };
+    if (appt.status === "expired")
+      return { success: false, error: "Muddati o'tgan bronni qaytarib bo'lmaydi" };
+    if (appt.status === "booked")
+      return { success: false, error: "Bron allaqachon kutish holatida" };
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },

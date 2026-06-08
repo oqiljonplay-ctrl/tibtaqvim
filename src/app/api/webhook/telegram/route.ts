@@ -5,6 +5,7 @@ import { handleStart } from "../../../../../bot/handlers/start";
 import { handleMessage } from "../../../../../bot/handlers/message";
 import { handleCallback } from "../../../../../bot/handlers/callback";
 import { handleEditedMessage } from "../../../../../bot/handlers/editedMessage";
+import { handleMyChatMember } from "../../../../../bot/handlers/myChatMember";
 
 let bot: TelegramBot | null = null;
 
@@ -38,7 +39,8 @@ export async function POST(req: NextRequest) {
 
     if (update.message) {
       const msg = update.message;
-      if (msg.text === "/start") {
+      const isStartCommand = /^\/start(@\w+)?(\s|$)/.test(msg.text || "");
+      if (isStartCommand) {
         await handleStart(b, msg);
       } else {
         await handleMessage(b, msg);
@@ -47,6 +49,8 @@ export async function POST(req: NextRequest) {
       await handleCallback(b, update.callback_query);
     } else if (update.edited_message) {
       await handleEditedMessage(b, update.edited_message);
+    } else if (update.my_chat_member) {
+      await handleMyChatMember(b, update.my_chat_member);
     }
 
     return ok({ ok: true });

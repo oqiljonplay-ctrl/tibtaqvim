@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { sendAdPost, POST_DELAY_MS } from "../../../../../bot/ad-broadcast";
 import { logger } from "@/lib/logger";
 
+export const maxDuration = 300;
+
 function isCronAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
