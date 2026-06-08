@@ -365,11 +365,12 @@ model User {
   fatherName   String?
   region       String?
   district     String?
-  role         UserRole @default(patient)
-  passwordHash String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role           UserRole @default(patient)
+  onboardingStep String?  // null | "contact" | "profile" | "done"
+  passwordHash   String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   clinic             Clinic?             @relation(fields: [clinicId], references: [id])
   branch             Branch?             @relation(fields: [branchId], references: [id])
