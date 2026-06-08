@@ -6,14 +6,21 @@ import { error, unauthorized } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
 import { normalizePhone } from "@/lib/utils/phone";
 
-// Brute-force himoyasi: 1 daqiqada 5 urinish
-const AUTH_LIMIT = 5;
-const AUTH_WINDOW_MS = 60_000;
+// Brute-force himoyasi: 2-qavatli — 5/daqiqa + 20/soat
+// 5/min: qisqa portlarni bloklaydi; 20/soat: uzoq sessiya brute-force'ni bloklaydi
+const AUTH_LIMIT_MIN = 5;
+const AUTH_WINDOW_MIN = 60_000;
+const AUTH_LIMIT_HOUR = 20;
+const AUTH_WINDOW_HOUR = 3_600_000;
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!rateLimit(`auth:${ip}`, AUTH_LIMIT, AUTH_WINDOW_MS)) {
-    return error("Juda ko'p urinish. 1 daqiqa kuting.", 429);
+  const [perMin, perHour] = await Promise.all([
+    rateLimit(`auth:min:${ip}`, AUTH_LIMIT_MIN, AUTH_WINDOW_MIN),
+    rateLimit(`auth:hour:${ip}`, AUTH_LIMIT_HOUR, AUTH_WINDOW_HOUR),
+  ]);
+  if (!perMin || !perHour) {
+    return error("Juda ko'p urinish. Keyinroq qayta urining.", 429);
   }
 
   try {

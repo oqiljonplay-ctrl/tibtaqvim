@@ -15,7 +15,25 @@ const WEBAPP_URL =
 
 export async function handleStart(bot: TelegramBot, msg: Message) {
   const chatId = msg.chat.id;
+  const chatType = msg.chat.type;
   const tgFirstName = msg.from?.first_name || "Foydalanuvchi";
+
+  // Guruh/supergroup chatida bron oqimini boshlamaslik — deep link jo'natish
+  if (chatType === "group" || chatType === "supergroup") {
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "tibtaqvim_bot";
+    await bot.sendMessage(
+      chatId,
+      "🩺 Bron qilish uchun botni shaxsiy chatda oching 👇",
+      {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: "🩺 Bron qilish", url: `https://t.me/${botUsername}?start=group` },
+          ]],
+        },
+      }
+    );
+    return;
+  }
 
   // Profilim tugmasi
   if (WEBAPP_URL) {
