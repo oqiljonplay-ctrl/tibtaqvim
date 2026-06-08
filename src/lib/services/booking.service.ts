@@ -424,7 +424,9 @@ export async function processBooking(input: BookingInput): Promise<BookingResult
     }
 
     if (result.success) {
-      linkUserToAppointment(result.data.id, input.patientPhone, input.patientName).catch(() => {});
+      linkUserToAppointment(result.data.id, input.patientPhone, input.patientName).catch((e) => {
+        logger.error('[booking] linkUserToAppointment failed', { appointmentId: result.data.id, error: String(e) });
+      });
 
       if (input.source !== "bot") {
         notifyPatientAsync(result.data, input.patientPhone);

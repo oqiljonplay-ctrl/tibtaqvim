@@ -142,23 +142,30 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/admin/staff — o'z darajasidagi xodimlar ro'yxati
+// GET /api/admin/staff — staff jadvalidan receptionist ro'yxati (branch+photo bilan)
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
-    if (!["super_admin", "clinic_admin"].includes(auth.role)) return forbidden();
+    if (!["super_admin", "clinic_admin", "branch_admin"].includes(auth.role)) return forbidden();
 
     const explicitClinicId = new URL(req.url).searchParams.get("clinicId");
     const scope = getBranchScope(auth, explicitClinicId);
 
-    const staff = await prisma.user.findMany({
-      where: {
-        ...scope,
-        role: { not: "patient" },
-        isActive: true,
+    const staff = await prisma.staff.findMany({
+      where: { ...scope, isActive: true },
+      select: {
+        id: true,
+        userId: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        photoUrl: true,
+        role: true,
+        branchId: true,
+        createdAt: true,
+        branch: { select: { id: true, name: true } },
       },
-      select: { id: true, firstName: true, lastName: true, phone: true, role: true, branchId: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });
 

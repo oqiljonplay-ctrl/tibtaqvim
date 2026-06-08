@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,14 +88,15 @@ export default function TelegramChatButton({
         {variant !== "icon" && <span>Telegram</span>}
       </button>
 
-      {modalOpen && (
+      {modalOpen && createPortal(
         <TelegramRelayModal
           telegramId={telegramId!}
           patientName={patientName}
           phone={phone}
           appointmentId={appointmentId}
           onClose={() => setModalOpen(false)}
-        />
+        />,
+        document.body
       )}
     </>
   );
@@ -325,7 +327,7 @@ function TelegramRelayModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4"
+      className="fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center p-2 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && !sending && onClose()}
     >
       <div

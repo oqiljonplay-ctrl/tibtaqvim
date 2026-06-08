@@ -13,7 +13,7 @@ const RATE_WINDOW_MS = 60_000;
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
-  if (!rateLimit(`book:${ip}`, RATE_LIMIT, RATE_WINDOW_MS)) {
+  if (!(await rateLimit(`book:${ip}`, RATE_LIMIT, RATE_WINDOW_MS))) {
     logger.warn("Rate limit exceeded", { ip });
     return error("Juda ko'p so'rov. Biroz kuting.", 429);
   }

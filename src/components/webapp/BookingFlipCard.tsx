@@ -26,6 +26,7 @@ interface DocData {
 
 export interface BookingAppt {
   id: string;
+  clinicId: string;
   serviceId: string;
   service: { name: string; type: string };
   date: string;
@@ -126,6 +127,8 @@ function ChipList({ icon, label, items }: { icon: string; label: string; items: 
 export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancellingId }: Props) {
   const [flipped, setFlipped] = useState(false);
   const [paymentNotice, setPaymentNotice] = useState(false);
+  const [fullDoc, setFullDoc] = useState<DocData | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const doc = a.doctor;
 
   useEffect(() => {
@@ -134,13 +137,29 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
     return () => clearTimeout(t);
   }, [paymentNotice]);
 
-  const hasProfile = !!(doc && (
-    doc.education || doc.position || doc.department || doc.bio ||
-    (doc.specialties?.length ?? 0) > 0 ||
-    (doc.directions?.length ?? 0) > 0 ||
-    (doc.experiences?.length ?? 0) > 0 ||
-    (doc.workplaces?.length ?? 0) > 0 ||
-    (doc.operationsCount ?? 0) > 0
+  async function handleFlip() {
+    setFlipped(true);
+    if (!doc || fullDoc) return;
+    setProfileLoading(true);
+    try {
+      const res = await fetch(`/api/webapp/doctor/${doc.id}?clinicId=${a.clinicId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) setFullDoc(json.data);
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  const displayDoc = fullDoc ?? doc;
+  const hasProfile = !!(displayDoc && (
+    displayDoc.education || displayDoc.position || displayDoc.department || displayDoc.bio ||
+    (displayDoc.specialties?.length ?? 0) > 0 ||
+    (displayDoc.directions?.length ?? 0) > 0 ||
+    (displayDoc.experiences?.length ?? 0) > 0 ||
+    (displayDoc.workplaces?.length ?? 0) > 0 ||
+    (displayDoc.operationsCount ?? 0) > 0
   ));
 
   const frontStyle: React.CSSProperties = {
@@ -172,13 +191,13 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
         {/* ── OLD TOMON: relative → container balandligini belgilaydi ── */}
         <div
           style={frontStyle}
-          onClick={doc && hasProfile ? () => setFlipped(true) : undefined}
-          className={`relative bg-white rounded-2xl shadow-sm border border-gray-100 p-4 transition-transform${doc && hasProfile ? " cursor-pointer active:scale-[0.99]" : ""}`}
+          onClick={doc ? () => handleFlip() : undefined}
+          className={`relative bg-white rounded-2xl shadow-sm border border-gray-100 p-4 transition-transform${doc ? " cursor-pointer active:scale-[0.99]" : ""}`}
         >
           {/* Flip tugmasi — shifokor bo'lsa har doim ko'rsatiladi */}
           {doc && (
             <button
-              onClick={(e) => { e.stopPropagation(); setFlipped(true); }}
+              onClick={(e) => { e.stopPropagation(); handleFlip(); }}
               className="absolute top-3 right-3 w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-sm hover:bg-blue-100 active:scale-95 transition-all z-10"
               title="Shifokor haqida"
             >
@@ -310,48 +329,53 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
             >
               ←
             </button>
-            {doc && (
+            {displayDoc && (
               <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                <Avatar doc={doc} size={40} />
+                <Avatar doc={displayDoc} size={40} />
                 <div className="min-w-0">
                   <p className="text-white font-semibold text-sm truncate">
-                    {doc.lastName} {doc.firstName}
+                    {displayDoc.lastName} {displayDoc.firstName}
                   </p>
-                  <p className="text-blue-200 text-xs truncate">{doc.specialty}</p>
+                  <p className="text-blue-200 text-xs truncate">{displayDoc.specialty}</p>
                 </div>
               </div>
             )}
           </div>
 
           {/* Profil mazmuni */}
-          {doc ? (
+          {profileLoading ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin mb-3" />
+              <p className="text-blue-200 text-xs">Yuklanmoqda...</p>
+            </div>
+          ) : displayDoc ? (
             hasProfile ? (
               <div className="space-y-3">
-                {doc.education && (
-                  <BackField icon="🎓" label="Ta'lim" value={doc.education} />
+                {displayDoc.education && (
+                  <BackField icon="🎓" label="Ta'lim" value={displayDoc.education} />
                 )}
-                {(doc.specialties?.length ?? 0) > 0 && (
+                {(displayDoc.specialties?.length ?? 0) > 0 && (
                   <ChipList
                     icon="⚕️"
                     label="Mutaxassisliklar"
-                    items={doc.specialties!.map((s) => s.name)}
+                    items={displayDoc.specialties!.map((s) => s.name)}
                   />
                 )}
-                {doc.position && (
-                  <BackField icon="🏅" label="Lavozimi" value={doc.position} />
+                {displayDoc.position && (
+                  <BackField icon="🏅" label="Lavozimi" value={displayDoc.position} />
                 )}
-                {(doc.directions?.length ?? 0) > 0 && (
+                {(displayDoc.directions?.length ?? 0) > 0 && (
                   <ChipList
                     icon="🎯"
                     label="Qabul yo'nalishlari"
-                    items={doc.directions!.map((d) => d.name)}
+                    items={displayDoc.directions!.map((d) => d.name)}
                   />
                 )}
-                {(doc.experiences?.length ?? 0) > 0 && (
+                {(displayDoc.experiences?.length ?? 0) > 0 && (
                   <div className="bg-white/10 rounded-xl px-3 py-2.5">
                     <p className="text-blue-200 text-xs mb-1.5">⏱ Tajriba</p>
                     <div className="space-y-1.5">
-                      {doc.experiences!.map((exp, i) => (
+                      {displayDoc.experiences!.map((exp, i) => (
                         <p key={i} className="text-white text-xs leading-snug">
                           🏢 {exp.place} — {exp.startYear}–{exp.endYear ?? "hozir"}
                         </p>
@@ -359,26 +383,26 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
                     </div>
                   </div>
                 )}
-                {(doc.workplaces?.length ?? 0) > 0 && (
+                {(displayDoc.workplaces?.length ?? 0) > 0 && (
                   <div className="bg-white/10 rounded-xl px-3 py-2.5">
                     <p className="text-blue-200 text-xs mb-1.5">🏥 Ish joylari</p>
                     <div className="space-y-1">
-                      {doc.workplaces!.map((w, i) => (
+                      {displayDoc.workplaces!.map((w, i) => (
                         <p key={i} className="text-white text-xs">• {w.place}</p>
                       ))}
                     </div>
                   </div>
                 )}
-                {doc.department && (
-                  <BackField icon="🏢" label="Bo'limi" value={doc.department} />
+                {displayDoc.department && (
+                  <BackField icon="🏢" label="Bo'limi" value={displayDoc.department} />
                 )}
-                {(doc.operationsCount ?? 0) > 0 && (
-                  <BackField icon="✂️" label="Operatsiyalar" value={`${doc.operationsCount} ta`} />
+                {(displayDoc.operationsCount ?? 0) > 0 && (
+                  <BackField icon="✂️" label="Operatsiyalar" value={`${displayDoc.operationsCount} ta`} />
                 )}
-                {doc.bio && (
+                {displayDoc.bio && (
                   <div className="bg-white/10 rounded-xl px-3 py-2.5">
                     <p className="text-blue-200 text-xs mb-1">ℹ Bio</p>
-                    <p className="text-white text-xs leading-relaxed">{doc.bio}</p>
+                    <p className="text-white text-xs leading-relaxed">{displayDoc.bio}</p>
                   </div>
                 )}
               </div>

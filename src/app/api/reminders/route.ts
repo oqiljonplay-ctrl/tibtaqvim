@@ -54,7 +54,7 @@ async function runReminder(req: NextRequest) {
 // GET — Vercel Cron Jobs ishlatadi (Authorization: Bearer <CRON_SECRET>)
 export async function GET(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!rateLimit(`reminders:${ip}`, REMINDER_LIMIT, REMINDER_WINDOW_MS)) {
+  if (!(await rateLimit(`reminders:${ip}`, REMINDER_LIMIT, REMINDER_WINDOW_MS))) {
     return error("Rate limit oshirildi", 429);
   }
   try {
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
 // POST — Admin yoki manual trigger uchun
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!rateLimit(`reminders:${ip}`, REMINDER_LIMIT, REMINDER_WINDOW_MS)) {
+  if (!(await rateLimit(`reminders:${ip}`, REMINDER_LIMIT, REMINDER_WINDOW_MS))) {
     return error("Rate limit oshirildi", 429);
   }
   try {

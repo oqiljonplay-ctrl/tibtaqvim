@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
       take: 30,
       select: {
         id: true,
+        clinicId: true,
         date: true,
         status: true,
         dependentId: true,
@@ -51,13 +52,7 @@ export async function GET(req: NextRequest) {
         doctor: {
           select: {
             id: true, firstName: true, lastName: true,
-            specialty: true, photoUrl: true,
-            education: true, position: true, department: true,
-            workSchedule: true, operationsCount: true, bio: true,
-            specialties: { select: { name: true }, orderBy: { sortOrder: "asc" } },
-            directions:  { select: { name: true }, orderBy: { sortOrder: "asc" } },
-            experiences: { select: { place: true, startYear: true, endYear: true }, orderBy: { sortOrder: "asc" } },
-            workplaces:  { select: { place: true }, orderBy: { sortOrder: "asc" } },
+            specialty: true, photoUrl: true, workSchedule: true,
           },
         },
       },
