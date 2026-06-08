@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { normalizePhone } from "@/lib/utils/phone";
+import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
 import { Calendar } from "@/components/Calendar";
 import { Stack } from "@/components/layout";
 import { formatDateLabel } from "@/lib/calendar";
@@ -17,7 +19,7 @@ declare global {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type AppMode = "loading" | "dashboard" | "booking";
+type AppMode = "loading" | "onboarding" | "dashboard" | "booking";
 type BookingStep = "services" | "doctor" | "date" | "slots" | "form" | "confirm" | "done";
 
 interface ServiceDoctor {
@@ -41,6 +43,7 @@ interface TgUser {
   phone: string | null;
   tibId: string | null;
   hasPhone: boolean;
+  onboardingStep: string | null;
 }
 interface AppointmentDoctor {
   id: string;
@@ -176,6 +179,26 @@ export default function WebApp() {
   const [doneCountdown, setDoneCountdown] = useState(5);
   const [selectedDoctor, setSelectedDoctor] = useState<ServiceDoctor | null>(null);
   const [showOnboardingHint, setShowOnboardingHint] = useState(false);
+
+  // ── Onboarding state ──
+  const [obStep, setObStep] = useState<"welcome" | "contact" | "profile">("welcome");
+  // welcome ekran animatsiya holati
+  const [obWelcomePhase, setObWelcomePhase] = useState<"typing" | "exit" | "done">("typing");
+  const [obWelcomeText, setObWelcomeText] = useState("");
+  // contact ekran
+  const [obPhoneInput, setObPhoneInput] = useState("");
+  const [obPhoneError, setObPhoneError] = useState<string | null>(null);
+  const [obShowManual, setObShowManual] = useState(false);
+  // profile ekran
+  const [obFirstName, setObFirstName] = useState("");
+  const [obLastName, setObLastName] = useState("");
+  const [obFatherName, setObFatherName] = useState("");
+  const [obRegion, setObRegion] = useState("");
+  const [obDistrict, setObDistrict] = useState("");
+  const [obFieldError, setObFieldError] = useState<string | null>(null);
+  // umumiy saving
+  const [obSaving, setObSaving] = useState(false);
+
   const [clinicSchedule, setClinicSchedule] = useState<{ is24Hours: boolean; holidays: string[] }>({ is24Hours: false, holidays: [] });
   const [doctorSchedule, setDoctorSchedule] = useState<{ blockedDates: string[]; blockedWeekdays: number[] }>({ blockedDates: [], blockedWeekdays: [] });
 
@@ -304,16 +327,36 @@ export default function WebApp() {
               phone: null,
               tibId: regJson.data.tibId ?? null,
               hasPhone: false,
+              onboardingStep: null,
             };
             tgUserRef.current = user;
             setTgUser(user);
           }
         }
 
-        // user mavjud bo'lsa → har doim dashboard
+        // user mavjud bo'lsa → onboardingStep orqali davom
         if (user) {
-          setAppMode("dashboard");
-          fetchDashboardAppointments(tgId, clinicIdRef.current);
+          const step = user.onboardingStep;
+          if (step === "done") {
+            setAppMode("dashboard");
+            fetchDashboardAppointments(tgId, clinicIdRef.current);
+          } else {
+            // Resume: qaysi qadamdan davom etish
+            if (step === "profile") {
+              setObStep("profile");
+            } else if (step === "contact") {
+              setObStep("contact");
+            } else {
+              setObStep("welcome"); // null → animatsiyadan boshlash
+            }
+            // Profil maydonlarini mavjud qiymatlar bilan to'ldirish
+            setObFirstName(user.firstName === "Foydalanuvchi" ? (tgFirstName || "") : (user.firstName ?? ""));
+            setObLastName(user.lastName ?? "");
+            setObFatherName(user.fatherName ?? "");
+            setObRegion(user.region ?? "");
+            setObDistrict(user.district ?? "");
+            setAppMode("onboarding");
+          }
         } else {
           setAppMode("booking");
           loadServices(todayStr());
@@ -355,6 +398,39 @@ export default function WebApp() {
       .then((j) => { if (j.success && j.data) setClinicSchedule(j.data); })
       .catch(() => {});
   }, [contextClinicId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Welcome typewriter animatsiyasi
+  useEffect(() => {
+    if (appMode !== "onboarding" || obStep !== "welcome") return;
+    const FULL_TEXT = "Xush kelibsiz!";
+    let idx = 0;
+    setObWelcomeText("");
+    setObWelcomePhase("typing");
+
+    const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) {
+      // Animatsiyasiz: to'g'ridan ko'rsatib 1s kutib o'tish
+      setObWelcomeText(FULL_TEXT);
+      const t = setTimeout(() => obAdvanceFromWelcome(), 1000);
+      return () => clearTimeout(t);
+    }
+
+    const iv = setInterval(() => {
+      idx++;
+      setObWelcomeText(FULL_TEXT.slice(0, idx));
+      if (idx >= FULL_TEXT.length) {
+        clearInterval(iv);
+        // Oxirgi harfdan keyin 400ms → exit animatsiya
+        setTimeout(() => {
+          setObWelcomePhase("exit");
+          // Exit animatsiyasi 600ms → keyingi ekran
+          setTimeout(() => obAdvanceFromWelcome(), 650);
+        }, 400);
+      }
+    }, 90);
+
+    return () => clearInterval(iv);
+  }, [appMode, obStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Done step: 5 soniyadan keyin Telegram WebApp avtomatik yopish
   useEffect(() => {
@@ -435,6 +511,135 @@ export default function WebApp() {
   function goToDashboard() {
     const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "dashboard" });
     window.location.href = `/webapp?${qs}`;
+  }
+
+  // ─── Onboarding functions ──────────────────────────────────────────────────
+
+  function completeOnboarding() {
+    setAppMode("dashboard");
+    if (telegramId) fetchDashboardAppointments(telegramId, clinicIdRef.current);
+  }
+
+  async function obSkip() {
+    if (telegramId) {
+      try {
+        await fetch("/api/webapp/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ telegramId, onboardingStep: "done" }),
+        });
+      } catch {}
+    }
+    completeOnboarding();
+  }
+
+  async function obAdvanceFromWelcome() {
+    if (telegramId) {
+      try {
+        await fetch("/api/webapp/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ telegramId, onboardingStep: "contact" }),
+        });
+      } catch {}
+    }
+    setObStep("contact");
+  }
+
+  async function obSavePhone(rawPhone: string, tgName?: string) {
+    if (!telegramId) return;
+    setObSaving(true);
+    setObPhoneError(null);
+    try {
+      let normalized: string;
+      try { normalized = normalizePhone(rawPhone); }
+      catch { setObPhoneError("Telefon formati noto'g'ri (+998XXXXXXXXX)"); return; }
+      const body: Record<string, string> = { telegramId, phone: normalized, onboardingStep: "profile" };
+      if (tgName && tgName.length >= 2) body.firstName = tgName;
+      const res = await fetch("/api/webapp/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) { setObPhoneError(data.error ?? "Saqlashda xato"); return; }
+      const savedPhone = data.data.phone as string;
+      const savedName = data.data.firstName as string;
+      setTgUser((prev) => prev
+        ? { ...prev, phone: savedPhone, hasPhone: true, firstName: savedName, onboardingStep: "profile" }
+        : prev
+      );
+      if (tgUserRef.current) {
+        tgUserRef.current = { ...tgUserRef.current, phone: savedPhone, hasPhone: true, firstName: savedName, onboardingStep: "profile" };
+      }
+      setForm((f) => ({ ...f, phone: savedPhone, name: f.name || savedName }));
+      if (savedName && savedName !== "Foydalanuvchi") {
+        setObFirstName(savedName);
+      }
+      setObStep("profile");
+    } catch { setObPhoneError("Tarmoq xatosi"); }
+    finally { setObSaving(false); }
+  }
+
+  function obRequestContact() {
+    const tg = window.Telegram?.WebApp;
+    if (typeof tg?.requestContact === "function") {
+      tg.requestContact((result: any) => {
+        const rawPhone =
+          result?.contact?.phone_number ??
+          result?.responseUnsafe?.contact?.phone_number ??
+          "";
+        const tgName = result?.contact?.first_name ?? "";
+        if (rawPhone) {
+          obSavePhone(rawPhone, tgName || undefined);
+        } else {
+          setObShowManual(true);
+        }
+      });
+    } else {
+      setObShowManual(true);
+    }
+  }
+
+  async function obSaveProfile() {
+    const firstName = obFirstName.trim();
+    if (firstName.length < 2) { setObFieldError("Ism kamida 2 harf bo'lishi kerak"); return; }
+    if (!telegramId) { completeOnboarding(); return; }
+    setObSaving(true);
+    setObFieldError(null);
+    try {
+      const res = await fetch("/api/webapp/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telegramId,
+          firstName,
+          lastName: obLastName.trim() || null,
+          fatherName: obFatherName.trim() || null,
+          region: obRegion || null,
+          district: obDistrict || null,
+          onboardingStep: "done",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setObFieldError(data.error ?? "Saqlashda xato"); return; }
+      const d = data.data;
+      setTgUser((prev) => prev ? {
+        ...prev,
+        firstName: d.firstName,
+        lastName: d.lastName ?? null,
+        fatherName: d.fatherName ?? null,
+        region: d.region ?? null,
+        district: d.district ?? null,
+        onboardingStep: "done",
+      } : prev);
+      if (tgUserRef.current) {
+        tgUserRef.current = { ...tgUserRef.current, firstName: d.firstName, lastName: d.lastName ?? null };
+      }
+      setForm((f) => ({ ...f, name: d.firstName }));
+    } catch { setObFieldError("Tarmoq xatosi"); return; }
+    finally { setObSaving(false); }
+    completeOnboarding();
   }
 
   // ─── Booking functions ─────────────────────────────────────────────────────
@@ -614,6 +819,206 @@ export default function WebApp() {
         <div className="text-center">
           <div className="text-4xl mb-3">🏥</div>
           <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Render: Onboarding ───────────────────────────────────────────────────
+
+  if (appMode === "onboarding") {
+    const obDistricts = getDistricts(obRegion);
+
+    // ── EKRAN 0: Xush kelibsiz (typewriter animatsiya) ────────────────────
+    if (obStep === "welcome") {
+      return (
+        <div className="w-full min-h-[100dvh] bg-gradient-to-br from-blue-600 via-blue-600 to-blue-800 flex items-center justify-center">
+          <div
+            className="text-center px-6"
+            style={{
+              transition: obWelcomePhase === "exit" ? "transform 600ms ease-out, opacity 600ms ease-out" : "none",
+              transform: obWelcomePhase === "exit" ? "scale(1.8) translateY(-20px)" : "scale(1)",
+              opacity: obWelcomePhase === "exit" ? 0 : 1,
+            }}
+          >
+            <div className="text-6xl mb-6">🏥</div>
+            <h1
+              className="font-bold text-white"
+              style={{ fontSize: "clamp(2rem, 8vw, 3.5rem)", lineHeight: 1.2, minHeight: "1.2em" }}
+            >
+              {obWelcomeText}
+              <span
+                className="inline-block w-0.5 h-[0.9em] bg-white ml-1 align-middle"
+                style={{
+                  opacity: obWelcomePhase === "typing" ? 1 : 0,
+                  animation: obWelcomePhase === "typing" ? "ob-blink 0.7s step-end infinite" : "none",
+                }}
+              />
+            </h1>
+            <p className="text-blue-200 text-sm mt-4">Klinikaga onlayn yozilish platformasi</p>
+          </div>
+          <style>{`@keyframes ob-blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+        </div>
+      );
+    }
+
+    // ── EKRAN 1: Kontakt ulashish ─────────────────────────────────────────
+    if (obStep === "contact") {
+      return (
+        <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
+          <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-12 pb-10 px-5 text-center">
+            <div className="text-5xl mb-3">📱</div>
+            <h1 className="text-xl font-bold">Telefon raqamingiz</h1>
+            <p className="text-blue-200 text-sm mt-1.5">Bron tasdiqlashlari va eslatmalar uchun</p>
+          </div>
+
+          <div className="flex-1 px-5 pt-7 pb-12">
+            {!obShowManual ? (
+              <div className="space-y-3">
+                <button
+                  onClick={obRequestContact}
+                  disabled={obSaving}
+                  className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-60"
+                >
+                  {obSaving ? "⏳ Tekshirilmoqda..." : "📱 Telegram orqali ulash"}
+                </button>
+                <button
+                  onClick={() => setObShowManual(true)}
+                  className="w-full py-3.5 rounded-2xl border-2 border-gray-200 text-gray-600 text-sm font-medium active:scale-95 transition-all"
+                >
+                  ✏️ Qo&apos;lda kiritish
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => { e.preventDefault(); obSavePhone(obPhoneInput); }}
+                className="space-y-3"
+              >
+                <input
+                  type="tel"
+                  className="input w-full"
+                  placeholder="+998 90 000 00 00"
+                  value={obPhoneInput}
+                  onChange={(e) => { setObPhoneInput(e.target.value); setObPhoneError(null); }}
+                  autoFocus
+                />
+                {obPhoneError && <p className="text-red-600 text-sm">{obPhoneError}</p>}
+                <button
+                  type="submit"
+                  disabled={obSaving || obPhoneInput.trim().length < 9}
+                  className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base disabled:opacity-60 active:scale-95 transition-all"
+                >
+                  {obSaving ? "Saqlanmoqda..." : "Davom etish →"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setObShowManual(false); setObPhoneError(null); setObPhoneInput(""); }}
+                  className="w-full py-2.5 text-blue-600 text-sm"
+                >
+                  ← Orqaga
+                </button>
+              </form>
+            )}
+
+            <button onClick={obSkip} className="w-full mt-6 py-3 text-gray-400 text-sm">
+              Keyinroq to&apos;ldiraman
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ── EKRAN 2: Profil ma'lumotlari ─────────────────────────────────────
+    return (
+      <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-12 pb-10 px-5 text-center">
+          <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-2xl mx-auto mb-3">✅</div>
+          <h1 className="text-xl font-bold">Profil ma&apos;lumotlari</h1>
+          <p className="text-blue-200 text-sm mt-1.5">Bron kartochkasida ko&apos;rinadi</p>
+        </div>
+
+        <div className="flex-1 px-5 pt-6 pb-12">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Ism <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                className="input w-full"
+                placeholder="Alisher"
+                value={obFirstName}
+                onChange={(e) => { setObFirstName(e.target.value); setObFieldError(null); }}
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Familiya</label>
+              <input
+                type="text"
+                className="input w-full"
+                placeholder="Karimov"
+                value={obLastName}
+                onChange={(e) => setObLastName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Otasining ismi</label>
+              <input
+                type="text"
+                className="input w-full"
+                placeholder="Valijonovich"
+                value={obFatherName}
+                onChange={(e) => setObFatherName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Viloyat</label>
+              <select
+                className="input w-full"
+                value={obRegion}
+                onChange={(e) => { setObRegion(e.target.value); setObDistrict(""); }}
+              >
+                <option value="">Tanlang...</option>
+                {UZ_REGIONS.map((r) => (
+                  <option key={r.name} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {obRegion && obDistricts.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tuman</label>
+                <select
+                  className="input w-full"
+                  value={obDistrict}
+                  onChange={(e) => setObDistrict(e.target.value)}
+                >
+                  <option value="">Tanlang...</option>
+                  {obDistricts.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {obFieldError && <p className="text-red-600 text-sm">{obFieldError}</p>}
+
+            <button
+              onClick={obSaveProfile}
+              disabled={obSaving || obFirstName.trim().length < 2}
+              className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base disabled:opacity-60 active:scale-95 transition-all shadow-lg shadow-blue-200"
+            >
+              {obSaving ? "Saqlanmoqda..." : "💾 Saqlash va boshlash"}
+            </button>
+          </div>
+
+          <button onClick={obSkip} className="w-full mt-4 py-3 text-gray-400 text-sm">
+            Keyinroq to&apos;ldiraman
+          </button>
         </div>
       </div>
     );
