@@ -1,0 +1,138 @@
+# TibTaqvim — Rejalar va Istiqbol
+
+> Holat: 2026-27-may. Bajarilgan bloklar — Responsive (4 MD),
+> Auth (5 MD), Multi-clinic (6 MD), Bug-fix (3 FIX), Audit + Cleanup.
+> Loyiha yangi katta vazifaga tayyor.
+
+---
+
+## A. BAJARILGAN ISHLAR (xulosa)
+
+- **Responsive** — barcha panel (superadmin, qabulxona, shifokor, bemor)
+  mobil/planshet/noutbuk/keng monitorga moslashadi. Layout primitivlari.
+- **Auth** — har xodimning alohida login akkaunti; doctor faqat o'z
+  navbatini ko'radi; admin parol tiklaydi; xodim o'z parolini
+  o'zgartiradi; audit_logs har amalni yozadi.
+- **Multi-clinic** — ko'p klinika + ko'p filial; bemor a'zolik;
+  Klinikalarim sahifasi; super_admin klinika qo'shadi; xodim filialga
+  biriktiriladi; filial darajasidagi xizmatlar.
+- **Sifat** — DIAG-01 (5 xato), AUDIT-01 (to'liq audit), CLEANUP-01.
+
+---
+
+## B. KEYINGI ANIQ REJALAR (PENDING — kelishilgan)
+
+### B1. To'lov integratsiyasi — Click / Payme
+Variant 1 (Redirect) tasdiqlangan, Payme birinchi tanlov. Eng katta,
+eng ehtiyot talab qiladigan blok — real pul. Bosqichlar (taxminiy):
+- To'lov provayder hisobi/kalitlari sozlash
+- Payme redirect oqumi (bron → to'lov sahifasi → qaytish)
+- Webhook (to'lov tasdig'i) + appointment status yangilanishi
+- To'lov xatolari, qaytarish (refund), idempotentlik
+- Click qo'shish (Payme ishlagach)
+- Test rejimi → real rejimga o'tish
+
+### B2. Uy xizmati natijalari
+Laborant uydan qon olib, klinikada tahlil; natijani yuklash, chop
+etish, bemorga webapp orqali yuborish. Bosqichlar:
+- Natija fayli (PDF/rasm) yuklash — laborant/qabulxona paneli
+- Bemor webapp'da natijani ko'rish/yuklab olish
+- Chop etish formati
+- Natija tayyor bo'lganda bemorga bildirishnoma (Telegram)
+
+### B3. Doctor /stats grafiklar
+Admin'da 6 ta KPI grafik bor, doctor uchun 3 ta qoldi. Kichik ish,
+Recharts namunasi tayyor. Tez g'alaba.
+
+### B4. Slot tizimi CRUD (Bosqich 2)
+Qon tahlili allaqachon requiresSlot=true. Kerak:
+- Admin/qabulxona slot yaratish/tahrirlash/o'chirish UI
+- Slot jadvali (vaqt oralig'i, sig'im)
+- Bron slotni band qilishi, bo'shashi
+
+---
+
+## C. SIFAT / TEXNIK QARZ (audit topgan, past jiddiylik)
+
+- **30 ta `any` tip** — asta-sekin to'g'ri tip bilan almashtirish
+- **In-memory rate limit** — Redis/Upstash bilan almashtirish
+  (kuchli botga qarshi; hozir Vercel Edge qisman himoya beradi)
+- **ESLint 60+ xato** — mavjud kodda; ignoreDuringBuilds yoqilgan,
+  asta-sekin tozalash
+- **`webapp/appointments/[id]` asosiy page yo'q** — agar bot
+  o'sha formatda link bersa 404; hozir ishlatilmaydi
+- **Vercel deploy ERROR takrorlanishi** — kuzatib borish; agar
+  takrorlansa build sababini aniqlash
+
+---
+
+## D. ISTIQBOLLI YANGI FUNKSIYALAR (g'oyalar — muhokama uchun)
+
+> Bular taklif, majburiyat emas. Har biri alohida baholanadi.
+
+### D1. Bemor tajribasi
+- **Bildirishnomalar tizimi** — bron eslatmasi (1 kun / 1 soat oldin),
+  navbat yaqinlashgani, natija tayyor — Telegram orqali avtomatik.
+- **Qayta bron / sevimli shifokor** — bemor oldingi shifokoriga bir
+  bosishda yoziladi.
+- **Bron bekor qilish siyosati** — necha soat oldin bekor qilsa
+  bo'ladi, kech bekor qilishga cheklov.
+- **Bemor sharhi va reyting** — qabuldan keyin shifokorга baho;
+  clinics.rating allaqachon schema'da bor — uni jonli qilish.
+- **Oila a'zolari** — dependents jadvali bor; bemor o'z bolasi/
+  ota-onasi uchun bron qila olishi to'liq ishlasin.
+- **Bron tarixidan PDF** — bemor o'z tashriflari tarixini yuklab
+  olishi.
+
+### D2. Klinika boshqaruvi
+- **Shift / ish jadvali** — shifokor qaysi kun/soatda ishlashi;
+  slot tizimi bilan bog'liq.
+- **Dush off / ta'til** — shifokor mavjud emas kunlari bron
+  ochilmasligi.
+- **SMS bildirishnoma** — Telegram'i yo'q bemorlar uchun zaxira
+  kanal (xarajat bor — baholash kerak).
+- **Qabulxona kunlik hisobot** — kun oxiri: nechta bron, daromad,
+  bekor — avtomatik xulosa.
+- **Bemor qidiruv** — qabulxona ism/telefon bo'yicha bemor topishi.
+
+### D3. Tahlil va biznes
+- **Super_admin moliya paneli** — klinikalar bo'yicha daromad,
+  obuna holati, faollik.
+- **Klinika obuna tizimi** — subscriptionPlan/Status schema'da bor;
+  trial → pullik o'tish, muddat tugashi, eslatma.
+- **Shifokor unumdorligi** — qabul soni, o'rtacha vaqt, bekor foizi.
+- **Eng band soatlar tahlili** — klinika resurs rejalashtirishi uchun.
+
+### D4. Texnik / infratuzilma
+- **Email bildirishnoma** — Telegram'ga qo'shimcha kanal.
+- **Ko'p til** — o'zbek (lotin/kirill) + rus interfeysi.
+- **Ko'p-mamlakatli telefon UI** — (MD-E sifatida ilgari rejalashtirilgan)
+  O'zbek/qozoq/tojik/qirg'iz/turkman/rus kodlari, bayroq, raqam namunasi.
+- **Audit log ko'rinishi** — super_admin uchun "kim nima qildi"
+  jurnalini ko'radigan sahifa (ma'lumot bor, UI yo'q).
+- **Zaxira nusxa siyosati** — Supabase backup jadvalini tekshirish.
+- **Monitoring** — xato kuzatuvi (Sentry yoki shunga o'xshash).
+
+### D5. Uzoq istiqbol (katta g'oyalar)
+- **Telemeditsina** — onlayn video qabul (queueMode'da "online"
+  allaqachon bor — kengaytirish).
+- **Retsept / dori tizimi** — shifokor raqamli retsept beradi.
+- **Tahlil natijalari tarixi** — bemorning barcha tahlillari bir
+  joyda, dinamikada (masalan qon bosimi grafigi).
+- **Klinikalar uchun commerce** — TibTaqvim platformasiga klinika
+  o'zi ro'yxatdan o'tishi (self-onboarding).
+- **Mobil ilova** — webapp'dan tashqari native ilova.
+
+---
+
+## E. TAVSIYA ETILGAN TARTIB
+
+1. **Doctor /stats** (B3) — kichik, tez, poydevor tayyor. Isinish uchun.
+2. **To'lov integratsiyasi** (B1) — eng muhim biznes qiymati.
+3. **Bildirishnomalar** (D1) — to'lovdan keyin tabiiy davom.
+4. **Uy xizmati natijalari** (B2).
+5. **Slot tizimi CRUD** (B4).
+6. Qolganlari — ehtiyojga qarab.
+
+> Eslatma: har katta blokdan oldin tashxis MD, oxirida audit.
+> "Sifat ustun, tezlik emas" tamoyili.
