@@ -808,3 +808,12 @@ model ClinicPromotion {
   @@index([clinicId, isActive])
   @@map("clinic_promotions")
 }
+
+model RateLimit {
+  key         String @id
+  count       Int
+  windowStart BigInt
+  windowMs    BigInt
+
+  @@map("rate_limits")
+}
