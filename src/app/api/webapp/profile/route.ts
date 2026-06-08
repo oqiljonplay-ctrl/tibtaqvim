@@ -10,15 +10,21 @@ import { resolveWebappTelegramId } from "@/lib/telegram/webapp-auth";
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { telegramId: rawTelegramId, firstName, lastName, fatherName, region, district, phone } = body ?? {};
+    const { telegramId: rawTelegramId, firstName, lastName, fatherName, region, district, phone, onboardingStep } = body ?? {};
+
+    const VALID_ONBOARDING_STEPS = ["contact", "profile", "done"];
+    if (onboardingStep !== undefined && !VALID_ONBOARDING_STEPS.includes(onboardingStep)) {
+      return error("onboardingStep qiymati noto'g'ri", 400);
+    }
 
     const auth = resolveWebappTelegramId(req, rawTelegramId ? String(rawTelegramId) : null);
     if (!auth) return error("Autentifikatsiya talab qilinadi", 401);
     const { telegramId } = auth;
 
-    // Phone-only so'rovda firstName majburiy emas
+    // onboardingStep-only so'rovda ham firstName majburiy emas
     const isPhoneOnly = phone !== undefined && !firstName;
-    if (!isPhoneOnly) {
+    const isStepOnly = onboardingStep !== undefined && !firstName && !phone;
+    if (!isPhoneOnly && !isStepOnly) {
       if (!firstName || typeof firstName !== "string" || firstName.trim().length === 0) {
         return error("Ism bo'sh bo'lmasin", 400);
       }
@@ -57,6 +63,7 @@ export async function PATCH(req: NextRequest) {
         ...(newRegion !== undefined ? { region: newRegion } : {}),
         ...(newDistrict !== undefined ? { district: newDistrict } : {}),
         ...(normalizedPhone !== undefined ? { phone: normalizedPhone } : {}),
+        ...(onboardingStep !== undefined ? { onboardingStep } : {}),
       },
       select: {
         id: true,
@@ -67,11 +74,12 @@ export async function PATCH(req: NextRequest) {
         district: true,
         phone: true,
         tibId: true,
+        onboardingStep: true,
       },
     });
 
     // Ism o'zgarganda aktiv bronlardagi patientName ni sinxronlash
-    if (!isPhoneOnly) {
+    if (!isPhoneOnly && !isStepOnly) {
       await prisma.appointment.updateMany({
         where: { user: { telegramId }, status: { not: "cancelled" } },
         data: {

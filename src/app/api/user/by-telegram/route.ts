@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
         district: true,
         phone: true,
         tibId: true,
+        onboardingStep: true,
         dependents: {
           where: { deletedAt: null },
           select: { id: true, firstName: true, lastName: true, phone: true, relation: true },
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
       phone: user.phone ?? null,
       tibId,
       hasPhone: !!user.phone,
+      onboardingStep: user.onboardingStep ?? null,
       dependents: user.dependents,
       canAddDependent: user.dependents.length < 2,
     });
