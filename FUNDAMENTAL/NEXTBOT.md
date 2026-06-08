@@ -224,16 +224,28 @@ nextBOT/
 
 ### User
 ```
-id           String  @id @default(cuid())
-clinicId     String? (nullable — patient yoki super_admin)
-telegramId   String? @unique
-tibId        String? @unique  ← GLOBAL permanent ID (tib000001 format)
-phone        String?          ← +998XXXXXXXXX (normalized)
-firstName    String
-lastName     String?
-role         UserRole (super_admin|clinic_admin|doctor|receptionist|patient)
-passwordHash String?
+id              String  @id @default(cuid())
+clinicId        String? (nullable — patient yoki super_admin)
+telegramId      String? @unique
+tibId           String? @unique  ← GLOBAL permanent ID (tib000001 format)
+phone           String?          ← +998XXXXXXXXX (normalized)
+firstName       String
+lastName        String?
+fatherName      String?
+region          String?
+district        String?
+onboardingStep  String?          ← null|"contact"|"profile"|"done" (onboarding holati)
+role            UserRole (super_admin|clinic_admin|doctor|receptionist|patient)
+passwordHash    String?
 ```
+
+**`onboardingStep` qoidalari:**
+- `null` → yangi user, onboarding'dan boshlasin (welcome animatsiya → contact → profile)
+- `"contact"` → xush kelibsiz ekranni ko'rgan, kontakt qadamida to'xtaghan
+- `"profile"` → telefon saqlandi, profil qadamida
+- `"done"` → tugatgan yoki skip qilgan — onboarding QAYTA CHIQMAYDI
+- `hasPhone === true` bo'lgan barcha mavjud userlar backfill orqali `"done"` bilan belgilangan
+- `isOnboarded` DB'da yo'q — faqat `onboardingStep === "done"` tekshiriladi
 
 ### Appointment
 ```
@@ -474,6 +486,43 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 ---
 
 ## 12. RECENT CHANGES LOG
+
+### 2026-06-09 — ONBOARDING: 3 ekranli to'liq onboarding tizimi
+
+**Muammo:** Yangi user WebApp ochganda onboarding o'tkazib yuborilар — to'g'ridan bo'sh dashboard ko'rinardi.
+
+**Yechim:** `onboardingStep` DB ustuni + 3 full-screen ekran + resume logikasi.
+
+**DB (migration `20260609000001_add_onboarding_step_to_users`):**
+- `users.onboardingStep TEXT` ustuni qo'shildi (nullable)
+- Backfill: mavjud 36 ta telefonli user → `'done'` (regression himoyasi)
+
+**Oqim:**
+```
+WebApp ochiladi → onboardingStep + hasPhone tekshiriladi
+  "done" yoki hasPhone → Dashboard (avvalgi oqim)
+  null   → EKRAN 0: Typewriter "Xush kelibsiz!" animatsiya → auto-advance
+  "contact" → EKRAN 1: Telegram requestContact + qo'lda kiritish fallback
+  "profile" → EKRAN 2: ism*, familiya, ota ismi, viloyat→tuman (uz-regions.ts)
+  Istalgan ekranda "Keyinroq" → onboardingStep="done" → Dashboard
+```
+
+**O'zgartirilgan fayllar:**
+- `prisma/schema.prisma` — `onboardingStep String?` User modeliga
+- `prisma/migrations/20260609000001_.../migration.sql` — ALTER TABLE + backfill UPDATE
+- `src/app/api/user/by-telegram/route.ts` — `onboardingStep` response'ga qo'shildi
+- `src/app/api/webapp/profile/route.ts` — `onboardingStep` qabul qiladi (contact|profile|done validatsiya); `isStepOnly` holat — firstName majburiy emas
+- `src/app/webapp/page.tsx` — `ObStep = "welcome"|"contact"|"profile"`; 3 ekran render; typewriter animatsiya (React state + setTimeout, kutubxonasiz); `prefers-reduced-motion` zaxirasi; resume; `obSkip()`, `obAdvanceFromWelcome()`, `obSavePhone()`, `obSaveProfile()` funksiyalari
+
+**Invariantlar (tegilmadi):**
+- `processBooking()`, `getOrCreateUser()` guest upsert
+- `showOnboardingHint` modal (dashboard'da bron tugmasida)
+- `mode=booking` oqimi, `ClinicGuard`, bot `render.ts`
+- `clinicId` scope, `tibId` format, RLS policy'lar
+
+**Commit:** 3 ta (db → api → webapp). Deploy: HALI YO'Q — vizual test kutilmoqda.
+
+---
 
 ### 2026-06-01 — CHEGIRMA TIZIMI: Qabulxona chegirma, X/Y/Z statistika
 
