@@ -3,6 +3,7 @@ import { userState } from "../state";
 import { fetchServices, fetchUserByTelegramId } from "../api";
 import { normalizePhone, isValidUzbekPhone } from "../helpers/phone";
 import { prisma } from "@/lib/prisma";
+import { mergeGuestToTelegramUser } from "@/lib/services/user-merge.service";
 import {
   editOrSend,
   mkNameKeyboard,
@@ -326,16 +327,32 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
         if (userByTgId.phone !== phone) {
           const conflict = await prisma.user.findUnique({ where: { phone } });
           if (conflict && conflict.id !== userByTgId.id) {
-            await bot.sendMessage(
-              chatId,
-              "❌ Bu telefon raqami boshqa profilga bog'langan.\n\nIltimos, klinikaga murojaat qiling."
-            );
-            return;
+            if (conflict.telegramId === null) {
+              // Guest user (phone-only) — xavfsiz merge
+              try {
+                await mergeGuestToTelegramUser(userByTgId.id, conflict.id, phone);
+              } catch {
+                await bot.sendMessage(
+                  chatId,
+                  "❌ Hisoblarni birlashtirish muvaffaqiyatsiz bo'ldi. Iltimos, qaytadan urinib ko'ring."
+                );
+                return;
+              }
+            } else {
+              // Boshqa Telegram foydalanuvchisining telefoni — haqiqiy conflict
+              await bot.sendMessage(
+                chatId,
+                "❌ Bu telefon raqami boshqa foydalanuvchiga bog'langan.\n\nIltimos, klinikaga murojaat qiling."
+              );
+              return;
+            }
+          } else if (!conflict) {
+            await prisma.user.update({
+              where: { id: userByTgId.id },
+              data: { phone, firstName, lastName: lastName ?? undefined },
+            });
           }
-          await prisma.user.update({
-            where: { id: userByTgId.id },
-            data: { phone, firstName, lastName: lastName ?? undefined },
-          });
+          // conflict.id === userByTgId.id: phone allaqachon to'g'ri — hech narsa qilma
         }
         tibId = userByTgId.tibId;
       } else {
