@@ -76,14 +76,14 @@ export async function mergeGuestToTelegramUser(
       },
     });
 
-    // 6. telegramUser'ga phone qo'shish
+    // 6. guestUser O'CHIRISH — AVVAL (phone UNIQUE indeksdan bo'shaydi)
+    await tx.user.delete({ where: { id: guestUserId } });
+
+    // 7. SHUNDAN KEYIN telegramUser'ga phone qo'shish (UNIQUE to'qnashuvi yo'q)
     await tx.user.update({
       where: { id: telegramUserId },
       data:  { phone },
     });
-
-    // 7. guestUser o'chirish (cascade: telegram_id_history, user_clinics tozalanadi)
-    await tx.user.delete({ where: { id: guestUserId } });
   });
 
   logger.info("[user-merge] guest merged to telegram user", {

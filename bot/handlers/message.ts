@@ -3,7 +3,7 @@ import { userState } from "../state";
 import { fetchServices, fetchUserByTelegramId } from "../api";
 import { normalizePhone, isValidUzbekPhone } from "../helpers/phone";
 import { prisma } from "@/lib/prisma";
-import { mergeGuestToTelegramUser } from "@/lib/services/user-merge.service";
+import { linkPhoneToTelegramUser } from "@/lib/identity";
 import {
   editOrSend,
   mkNameKeyboard,
@@ -320,90 +320,62 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
 
       let tibId: string | null = null;
 
-      // ─── 1-tekshiruv: Telegram ID bilan user bormi? ───────────────────────
-      const userByTgId = await prisma.user.findUnique({ where: { telegramId: tgId } });
+      // ─── linkPhoneToTelegramUser: markaziy identity helper ────────────────
+      // Telegram user allaqachon bor deb hisoblanadi (start handler yaratgan)
+      // Agar yo'q bo'lsa — avval register qilamiz
+      let userByTgId = await prisma.user.findUnique({
+        where: { telegramId: tgId },
+        select: { id: true, phone: true, tibId: true },
+      });
 
-      if (userByTgId) {
-        if (userByTgId.phone !== phone) {
-          const conflict = await prisma.user.findUnique({ where: { phone } });
-          if (conflict && conflict.id !== userByTgId.id) {
-            if (conflict.telegramId === null) {
-              // Guest user (phone-only) — xavfsiz merge
-              try {
-                await mergeGuestToTelegramUser(userByTgId.id, conflict.id, phone);
-              } catch {
-                await bot.sendMessage(
-                  chatId,
-                  "❌ Hisoblarni birlashtirish muvaffaqiyatsiz bo'ldi. Iltimos, qaytadan urinib ko'ring."
-                );
-                return;
-              }
-            } else {
-              // Boshqa Telegram foydalanuvchisining telefoni — haqiqiy conflict
-              await bot.sendMessage(
-                chatId,
-                "❌ Bu telefon raqami boshqa foydalanuvchiga bog'langan.\n\nIltimos, klinikaga murojaat qiling."
-              );
-              return;
-            }
-          } else if (!conflict) {
-            await prisma.user.update({
-              where: { id: userByTgId.id },
-              data: { phone, firstName, lastName: lastName ?? undefined },
-            });
-          }
-          // conflict.id === userByTgId.id: phone allaqachon to'g'ri — hech narsa qilma
-        }
-        tibId = userByTgId.tibId;
+      if (!userByTgId) {
+        // Yangi user — yaratamiz
+        const created = await prisma.user.create({
+          data: {
+            telegramId: tgId,
+            phone,
+            firstName,
+            lastName: lastName ?? undefined,
+            role: "patient",
+            clinicId: clinicId || undefined,
+          },
+          select: { id: true, phone: true, tibId: true },
+        });
+        userByTgId = created;
+        tibId = created.tibId;
       } else {
-        // ─── 2-tekshiruv: Bu telefon bilan eski user bormi? ─────────────────
-        const userByPhone = await prisma.user.findUnique({ where: { phone } });
+        // Mavjud user — linkPhoneToTelegramUser orqali phone ulash
+        const linkResult = await linkPhoneToTelegramUser(tgId, phone);
 
-        if (userByPhone) {
-          // Bu telefon boshqa profilga tegishli — foydalanuvchidan so'raymiz
-          const maskedName = userByPhone.firstName
-            ? userByPhone.firstName.charAt(0) + "***" + (userByPhone.firstName.slice(-1) || "")
-            : "***";
-
-          await userState.set(chatId, {
-            step: "awaiting_relink_decision",
-            pendingPhone: phone,
-            pendingFirstName: firstName,
-            pendingLastName: lastName,
-            existingUserId: userByPhone.id,
-            existingTibId: userByPhone.tibId,
-            clinicId,
-            _services: state._services,
-            _createdAt: Date.now(),
-          });
-
+        if (linkResult.status === "conflict_two_telegram") {
           await bot.sendMessage(
             chatId,
-            `🔍 *Bu telefon raqami avval ro'yxatdan o'tgan*\n\n📞 ${phone}\n👤 Egasi: ${maskedName}\n\nBu sizning eski profilingizmi?\n\nAgar HA bo'lsa — eski ID va bron tarixingiz tiklanadi.\nAgar YO'Q bo'lsa — yangi profil yaratiladi.`,
-            {
-              parse_mode: "Markdown",
-              reply_markup: {
-                inline_keyboard: [[
-                  { text: "✅ Ha, mening profilim", callback_data: "relink_yes" },
-                  { text: "🆕 Yo'q, yangi boshlayman", callback_data: "relink_no" },
-                ]],
-              },
-            }
+            "❌ Bu telefon raqami boshqa Telegram foydalanuvchiga bog'langan.\n\nIltimos, klinikaga murojaat qiling."
           );
           return;
-        } else {
-          // ─── 3: Yangi user yaratish ──────────────────────────────────────
-          const newUser = await prisma.user.create({
-            data: {
-              telegramId: tgId,
-              phone,
-              firstName,
-              lastName: lastName ?? undefined,
-              role: "patient",
-              clinicId: clinicId || undefined,
-            },
-          });
-          tibId = newUser.tibId;
+        }
+        if (linkResult.status === "error") {
+          await bot.sendMessage(
+            chatId,
+            `❌ Telefon ulashda xato: ${linkResult.message}\n\nQayta urinib ko'ring.`,
+            { reply_markup: mkContactKeyboard() as any }
+          );
+          return;
+        }
+        // "already", "already_has_different", "ok" — davom etamiz
+        // tibId ni eng so'nggi user'dan olamiz
+        const refreshed = await prisma.user.findUnique({
+          where: { telegramId: tgId },
+          select: { tibId: true },
+        });
+        tibId = refreshed?.tibId ?? userByTgId.tibId;
+
+        // Ism yangilash (agar Telegram'dan kelgan bo'lsa)
+        if (firstName && firstName !== "Foydalanuvchi") {
+          prisma.user.update({
+            where: { telegramId: tgId },
+            data: { firstName, ...(lastName ? { lastName } : {}) },
+          }).catch(() => {});
         }
       }
 

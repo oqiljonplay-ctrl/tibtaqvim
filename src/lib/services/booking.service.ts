@@ -466,6 +466,26 @@ async function linkUserToAppointment(
   const normalized = normalizePhone(phone);
   if (!normalized) return;
 
+  // Appointment'ning mavjud userId ni o'qiymiz
+  const existing = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: { userId: true, clinicId: true },
+  });
+  if (!existing) return;
+
+  if (existing.userId) {
+    // Telegram user allaqachon biriktirilgan — phone-upsert QILINMAYDI (ghost oldini olish)
+    ensureUserClinic(existing.userId, existing.clinicId, 'patient').catch((e) => {
+      logger.error('[linkUserToAppointment] ensureUserClinic failed (existing)', {
+        userId: existing.userId,
+        clinicId: existing.clinicId,
+        error: String(e),
+      });
+    });
+    return;
+  }
+
+  // userId yo'q (registratura yoki anonim) — phone orqali upsert
   const user = await prisma.user.upsert({
     where: { phone: normalized },
     create: { phone: normalized, firstName: patientName?.trim() || 'Bemor', role: 'patient' },
@@ -473,16 +493,15 @@ async function linkUserToAppointment(
     select: { id: true },
   });
 
-  const appt = await prisma.appointment.update({
+  await prisma.appointment.update({
     where: { id: appointmentId },
     data: { userId: user.id },
-    select: { clinicId: true },
   });
 
-  ensureUserClinic(user.id, appt.clinicId, 'patient').catch((e) => {
+  ensureUserClinic(user.id, existing.clinicId, 'patient').catch((e) => {
     logger.error('[linkUserToAppointment] ensureUserClinic failed', {
       userId: user.id,
-      clinicId: appt.clinicId,
+      clinicId: existing.clinicId,
       error: String(e),
     });
   });

@@ -213,12 +213,11 @@ export default function WebApp() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    // Use clinic context first, then legacy URL param, then env fallback
+    // Klinika: context (userning tanlovi) → URL param. Env fallback ISHLATILMAYDI.
     clinicIdRef.current =
       contextClinicId ||
       urlParams.get("clinicId") ||
       urlParams.get("clinic") ||
-      process.env.NEXT_PUBLIC_CLINIC_ID ||
       "";
 
     // URL-dan mode o'qiymiz — "dashboard" | "booking" | null
@@ -244,6 +243,7 @@ export default function WebApp() {
         if (paramTgId) tgId = paramTgId;
       }
       const tgFirstName = getTelegramFirstName(tg);
+      // NOTE: NEXT_PUBLIC_CLINIC_ID default ishlatilmaydi — har user o'z klinikasini tanlaydi
 
       // tgId sessionStorage'da saqlash — boshqa sahifalarda URL/initData yo'q bo'lsa ishlatadi
       if (tgId) {
@@ -339,23 +339,13 @@ export default function WebApp() {
         if (user) {
           const step = user.onboardingStep;
           if (step === "done") {
+            // Qaytib kelgan user — to'g'ridan dashboard
             setAppMode("dashboard");
             fetchDashboardAppointments(tgId, clinicIdRef.current);
           } else {
-            // Resume: qaysi qadamdan davom etish
-            if (step === "profile") {
-              setObStep("profile");
-            } else if (step === "contact") {
-              setObStep("contact");
-            } else {
-              setObStep("welcome"); // null → animatsiyadan boshlash
-            }
-            // Profil maydonlarini mavjud qiymatlar bilan to'ldirish
-            setObFirstName(user.firstName === "Foydalanuvchi" ? (tgFirstName || "") : (user.firstName ?? ""));
-            setObLastName(user.lastName ?? "");
-            setObFatherName(user.fatherName ?? "");
-            setObRegion(user.region ?? "");
-            setObDistrict(user.district ?? "");
+            // Yangi user — welcome animatsiya → dashboard
+            // Kontakt/profil alohida onboarding ekranlari yo'q: bosh sahifadagi flip-card orqali
+            setObStep("welcome");
             setAppMode("onboarding");
           }
         } else {
@@ -453,8 +443,8 @@ export default function WebApp() {
   // ─── Dashboard functions ───────────────────────────────────────────────────
 
   async function fetchDashboardAppointments(tgId: string, cId: string) {
-    if (!cId && !process.env.NEXT_PUBLIC_CLINIC_ID) return;
-    const effectiveCId = cId || process.env.NEXT_PUBLIC_CLINIC_ID || "";
+    if (!cId) return;
+    const effectiveCId = cId;
     setDashLoading(true);
     try {
       const [apptRes, limitRes] = await Promise.all([
@@ -535,16 +525,18 @@ export default function WebApp() {
   }
 
   async function obAdvanceFromWelcome() {
+    // Welcome animatsiyasidan keyin to'g'ridan dashboard
+    // Kontakt va profil — bosh sahifadagi flip-card orqali (alohida onboarding ekranlar emas)
     if (telegramId) {
       try {
         await fetch("/api/webapp/profile", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ telegramId, onboardingStep: "contact" }),
+          body: JSON.stringify({ telegramId, onboardingStep: "done" }),
         });
       } catch {}
     }
-    setObStep("contact");
+    completeOnboarding();
   }
 
   async function obSavePhone(rawPhone: string, tgName?: string) {
@@ -756,6 +748,7 @@ export default function WebApp() {
     setErrorMsg(null);
     try {
       let resolvedTibId: string | null = tgUser?.tibId ?? null;
+      let resolvedUserId: string | null = null;
 
       // sessionStorage fallback — SDK timeout yoki URL param yo'q bo'lsa
       const effectiveTgId = telegramId ??
@@ -772,7 +765,13 @@ export default function WebApp() {
         }),
       });
       const regJson = await regRes.json();
-      if (regJson.success) resolvedTibId = regJson.data?.tibId ?? resolvedTibId;
+      if (regJson.success) {
+        resolvedTibId = regJson.data?.tibId ?? resolvedTibId;
+        // userId: telegramId yozuviga bog'lash uchun (ghost oldini olish)
+        if (effectiveTgId && regJson.data?.userId) {
+          resolvedUserId = regJson.data.userId;
+        }
+      }
 
       const payload: Record<string, unknown> = {
         clinicId: clinicIdRef.current,
@@ -785,6 +784,8 @@ export default function WebApp() {
       if (selectedSlot) payload.slotId = selectedSlot;
       if (selectedService.requiresAddress && form.address) payload.address = form.address;
       if (selectedDoctor) payload.doctorId = selectedDoctor.id;
+      // Telegram user — bron telegramId yozuviga biriktiriladi, ghost yaratilmaydi
+      if (resolvedUserId) payload.userId = resolvedUserId;
 
       const res = await fetch("/api/book", {
         method: "POST",
@@ -1044,10 +1045,28 @@ export default function WebApp() {
         <div className="flex-1 -mt-3 pb-[calc(96px+env(safe-area-inset-bottom))] px-4">
           <Stack gap={4}>
 
-          {/* Clinic switcher */}
-          {activeClinic && (
+          {/* Clinic switcher yoki "tanlanmagan" holat */}
+          {activeClinic ? (
             <div className="mt-3">
               <ClinicSwitcher />
+            </div>
+          ) : (
+            <div className="mt-3 bg-white rounded-2xl border border-blue-100 px-4 py-3 flex items-center gap-3">
+              <span className="text-2xl">🏥</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-700">Klinika tanlanmagan</p>
+                <p className="text-xs text-gray-400 mt-0.5">Pastdagi <span className="font-medium text-blue-500">Klinikalar</span> tugmasidan tanlang</p>
+              </div>
+              <button
+                onClick={() => {
+                  const qs = new URLSearchParams();
+                  if (telegramId) qs.set("tgid", telegramId);
+                  window.location.href = `/webapp/clinics?${qs}`;
+                }}
+                className="shrink-0 text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-medium active:scale-95 transition-all"
+              >
+                Tanlash
+              </button>
             </div>
           )}
 
@@ -1171,10 +1190,13 @@ export default function WebApp() {
                   }
                   const cId = clinicIdRef.current;
                   if (cId) {
+                    // Tanlangan klinikaning bron sahifasiga
                     window.location.href = `/webapp/clinics/${cId}`;
                   } else {
-                    const qs = new URLSearchParams({ mode: "booking" });
-                    window.location.href = `/webapp?${qs}`;
+                    // Klinika tanlanmagan — avval klinika tanlash
+                    const qs = new URLSearchParams();
+                    if (telegramId) qs.set("tgid", telegramId);
+                    window.location.href = `/webapp/clinics?${qs}`;
                   }
                 }}
                 className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm shadow-lg shadow-blue-200 active:scale-95 transition-all"

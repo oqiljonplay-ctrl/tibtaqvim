@@ -1,24 +1,12 @@
 'use client'
 
 import { useClinic } from '@/lib/clinic-context'
-import { usePathname, useRouter } from 'next/navigation'
-import { useEffect } from 'react'
 
-const PUBLIC_PATHS = ['/webapp/clinics', '/webapp/select-clinic']
-
+// ClinicGuard: faqat loading holati uchun spinner ko'rsatadi.
+// Redirect QILINMAYDI — bosh sahifa klinikasiz ham to'liq ko'rinishi kerak.
+// Klinika tanlash faqat: (a) "Klinikalar" tugmasi, (b) "Yangi bron" birinchi qadami.
 export function ClinicGuard({ children }: { children: React.ReactNode }) {
-  const { clinic, loading } = useClinic()
-  const pathname = usePathname()
-  const router = useRouter()
-
-  const isPublicPath = PUBLIC_PATHS.some((p) => pathname?.startsWith(p))
-
-  useEffect(() => {
-    if (loading) return
-    if (!clinic && !isPublicPath) {
-      router.replace('/webapp/clinics')
-    }
-  }, [clinic, loading, isPublicPath, router])
+  const { loading } = useClinic()
 
   if (loading) {
     return (
@@ -27,14 +15,6 @@ export function ClinicGuard({ children }: { children: React.ReactNode }) {
           <div className="text-4xl mb-3">🏥</div>
           <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
         </div>
-      </div>
-    )
-  }
-
-  if (!clinic && !isPublicPath) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-400 text-sm">Klinika tanlanmoqda...</p>
       </div>
     )
   }
