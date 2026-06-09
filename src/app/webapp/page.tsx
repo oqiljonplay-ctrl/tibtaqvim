@@ -245,7 +245,6 @@ export default function WebApp() {
       }
       const tgFirstName = getTelegramFirstName(tg);
 
-      setTelegramId(tgId);
       // tgId sessionStorage'da saqlash — boshqa sahifalarda URL/initData yo'q bo'lsa ishlatadi
       if (tgId) {
         try { sessionStorage.setItem("tgid", tgId); } catch {}
@@ -253,6 +252,8 @@ export default function WebApp() {
         // Fallback: sessionStorage'dan o'qish (mode=booking reload da URL'da tgid yo'q)
         try { const s = sessionStorage.getItem("tgid"); if (s) tgId = s; } catch {}
       }
+      // setTelegramId KEYIN — sessionStorage fallback'dan keyin to'g'ri qiymat o'rnatiladi
+      setTelegramId(tgId);
       if (tgFirstName) {
         setForm((f) => ({ ...f, name: f.name || tgFirstName }));
       }
@@ -756,13 +757,17 @@ export default function WebApp() {
     try {
       let resolvedTibId: string | null = tgUser?.tibId ?? null;
 
+      // sessionStorage fallback — SDK timeout yoki URL param yo'q bo'lsa
+      const effectiveTgId = telegramId ??
+        (() => { try { return sessionStorage.getItem("tgid") || null; } catch { return null; } })();
+
       const regRes = await fetch("/api/user/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone: form.phone,
           firstName: form.name,
-          ...(telegramId ? { telegramId } : {}),
+          ...(effectiveTgId ? { telegramId: effectiveTgId } : {}),
           ...(clinicIdRef.current ? { clinicId: clinicIdRef.current } : {}),
         }),
       });
