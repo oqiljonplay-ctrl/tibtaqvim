@@ -879,50 +879,25 @@ export default function WebApp() {
 
           <div className="flex-1 px-5 pt-7 pb-12">
             {!obShowManual ? (
-              <div className="space-y-3">
+              <button
+                onClick={obRequestContact}
+                disabled={obSaving}
+                className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-60"
+              >
+                {obSaving ? "⏳ Tekshirilmoqda..." : "📱 Telegram orqali ulash"}
+              </button>
+            ) : (
+              <div className="space-y-3 text-center">
+                <div className="text-4xl mb-2">📲</div>
+                <p className="text-gray-700 font-medium">Telegram ilovasidan foydalaning</p>
+                <p className="text-gray-400 text-sm">Raqamni ulash uchun sahifani Telegram ichidan oching</p>
                 <button
-                  onClick={obRequestContact}
-                  disabled={obSaving}
-                  className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-60"
+                  onClick={() => { setObShowManual(false); obRequestContact(); }}
+                  className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all mt-4"
                 >
-                  {obSaving ? "⏳ Tekshirilmoqda..." : "📱 Telegram orqali ulash"}
-                </button>
-                <button
-                  onClick={() => setObShowManual(true)}
-                  className="w-full py-3.5 rounded-2xl border-2 border-gray-200 text-gray-600 text-sm font-medium active:scale-95 transition-all"
-                >
-                  ✏️ Qo&apos;lda kiritish
+                  🔄 Qayta urinish
                 </button>
               </div>
-            ) : (
-              <form
-                onSubmit={(e) => { e.preventDefault(); obSavePhone(obPhoneInput); }}
-                className="space-y-3"
-              >
-                <input
-                  type="tel"
-                  className="input w-full"
-                  placeholder="+998 90 000 00 00"
-                  value={obPhoneInput}
-                  onChange={(e) => { setObPhoneInput(e.target.value); setObPhoneError(null); }}
-                  autoFocus
-                />
-                {obPhoneError && <p className="text-red-600 text-sm">{obPhoneError}</p>}
-                <button
-                  type="submit"
-                  disabled={obSaving || obPhoneInput.trim().length < 9}
-                  className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base disabled:opacity-60 active:scale-95 transition-all"
-                >
-                  {obSaving ? "Saqlanmoqda..." : "Davom etish →"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setObShowManual(false); setObPhoneError(null); setObPhoneInput(""); }}
-                  className="w-full py-2.5 text-blue-600 text-sm"
-                >
-                  ← Orqaga
-                </button>
-              </form>
             )}
 
             <button onClick={obSkip} className="w-full mt-6 py-3 text-gray-400 text-sm">
