@@ -289,6 +289,129 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
     return;
   }
 
+  // ─── Kontakt: barcha state'larda ishlaydi (WebApp, bot, qo'lda) ────────────
+  if (msg.contact) {
+    const rawPhone = msg.contact.phone_number || "";
+    const phone = normalizePhone(rawPhone);
+
+    if (!phone || !isValidUzbekPhone(phone)) {
+      await bot.sendMessage(
+        chatId,
+        "❌ Telefon raqami noto'g'ri formatda.\n\nIltimos, O'zbekiston raqamingizni yuboring (+998XXXXXXXXX).",
+        { reply_markup: mkContactKeyboard() as any }
+      );
+      return;
+    }
+
+    const tgId = String(chatId);
+    const firstName = state?.patientName || msg.contact.first_name || msg.from?.first_name || "Foydalanuvchi";
+    const lastName = msg.contact?.last_name || msg.from?.last_name || null;
+    const clinicId = state?.clinicId || process.env.DEFAULT_CLINIC_ID || "";
+
+    let tibId: string | null = null;
+    let userByTgId = await prisma.user.findUnique({
+      where: { telegramId: tgId },
+      select: { id: true, phone: true, tibId: true },
+    });
+
+    if (!userByTgId) {
+      const created = await prisma.user.create({
+        data: {
+          telegramId: tgId,
+          phone,
+          firstName,
+          lastName: lastName ?? undefined,
+          role: "patient",
+          clinicId: clinicId || undefined,
+        },
+        select: { id: true, phone: true, tibId: true },
+      });
+      userByTgId = created;
+      tibId = created.tibId;
+    } else {
+      const linkResult = await linkPhoneToTelegramUser(tgId, phone);
+      if (linkResult.status === "conflict_two_telegram") {
+        await bot.sendMessage(
+          chatId,
+          "❌ Bu telefon raqami boshqa Telegram foydalanuvchiga bog'langan.\n\nIltimos, klinikaga murojaat qiling."
+        );
+        return;
+      }
+      if (linkResult.status === "error") {
+        await bot.sendMessage(
+          chatId,
+          `❌ Telefon ulashda xato: ${linkResult.message}\n\nQayta urinib ko'ring.`,
+          { reply_markup: mkContactKeyboard() as any }
+        );
+        return;
+      }
+      const refreshed = await prisma.user.findUnique({ where: { telegramId: tgId }, select: { tibId: true } });
+      tibId = refreshed?.tibId ?? userByTgId.tibId;
+      if (firstName && firstName !== "Foydalanuvchi") {
+        prisma.user.update({
+          where: { telegramId: tgId },
+          data: { firstName, ...(lastName ? { lastName } : {}) },
+        }).catch(() => {});
+      }
+    }
+
+    await bot.sendMessage(
+      chatId,
+      `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 ID: *${tibId}*` : ""}`,
+      { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
+    );
+
+    // Bron oqimi: mid-booking (ism + sana allaqachon bor)
+    if (state?.step === "share_contact" && state?.patientName && state?.date) {
+      const updatedState = { ...state, patientPhone: phone, tibId };
+      if (state.serviceType === "home_service") {
+        const sent = await bot.sendMessage(
+          chatId,
+          `👤 Ism: *${firstName}*\n📞 Tel: *${phone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
+          { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkAddressKeyboard() } }
+        );
+        await userState.set(chatId, { ...updatedState, step: "enter_address", messageId: sent.message_id });
+      } else {
+        const confirmState = { ...updatedState, step: "confirm" };
+        const sent = await bot.sendMessage(
+          chatId,
+          mkConfirmText(confirmState),
+          { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkConfirmKeyboard() } }
+        );
+        await userState.set(chatId, { ...confirmState, messageId: sent.message_id });
+      }
+      return;
+    }
+
+    // Bron oqimi: dastlabki (bot clinic tanlash oqimidan kelgan, services bor)
+    if (state?.step === "share_contact") {
+      const services = (state._services as any[]) || [];
+      if (services.length) {
+        const { mkServiceKeyboard } = await import("../helpers/render");
+        const sent = await bot.sendMessage(
+          chatId,
+          "🏥 Qaysi xizmatdan foydalanmoqchisiz?",
+          { reply_markup: { inline_keyboard: mkServiceKeyboard(services) } }
+        );
+        await userState.set(chatId, {
+          ...state,
+          step: "select_service",
+          patientName: firstName,
+          patientPhone: phone,
+          tibId,
+          messageId: sent.message_id,
+          _createdAt: Date.now(),
+        });
+        return;
+      }
+      // share_contact edi lekin services yo'q (WebApp deep link oqimi) — state tozalaymiz
+      await userState.delete(chatId);
+    }
+
+    // WebApp polling ushlab oladi — bu yerda alohida xabar shart emas
+    return;
+  }
+
   if (!state || !state.step) {
     // Guruh chatlarda spam yubormaslik
     if (msg.chat.type === "group" || msg.chat.type === "supergroup") return;
@@ -298,143 +421,8 @@ export async function handleMessage(bot: TelegramBot, msg: Message) {
 
   const msgId: number | undefined = state.messageId;
 
-  // ─── Kontakt ulashish (ism kiritgandan keyin, yoki boshlang'ich) ──────────
+  // share_contact: faqat kontakt kutilmoqda — eslatma (msg.contact bo'lmasa bu yerga keladi)
   if (state.step === "share_contact") {
-    if (msg.contact) {
-      const rawPhone = msg.contact.phone_number || "";
-      const phone = normalizePhone(rawPhone);
-      const firstName = state.patientName || msg.contact.first_name || msg.from?.first_name || "Foydalanuvchi";
-      const lastName = msg.contact?.last_name || msg.from?.last_name || null;
-      const tgId = String(chatId);
-      const clinicId = state.clinicId || process.env.DEFAULT_CLINIC_ID || "";
-
-      // Phone validatsiyasi
-      if (!phone || !isValidUzbekPhone(phone)) {
-        await bot.sendMessage(
-          chatId,
-          "❌ Telefon raqami noto'g'ri formatda.\n\nIltimos, O'zbekiston raqamingizni yuboring (+998XXXXXXXXX).",
-          { reply_markup: mkContactKeyboard() as any }
-        );
-        return;
-      }
-
-      let tibId: string | null = null;
-
-      // ─── linkPhoneToTelegramUser: markaziy identity helper ────────────────
-      // Telegram user allaqachon bor deb hisoblanadi (start handler yaratgan)
-      // Agar yo'q bo'lsa — avval register qilamiz
-      let userByTgId = await prisma.user.findUnique({
-        where: { telegramId: tgId },
-        select: { id: true, phone: true, tibId: true },
-      });
-
-      if (!userByTgId) {
-        // Yangi user — yaratamiz
-        const created = await prisma.user.create({
-          data: {
-            telegramId: tgId,
-            phone,
-            firstName,
-            lastName: lastName ?? undefined,
-            role: "patient",
-            clinicId: clinicId || undefined,
-          },
-          select: { id: true, phone: true, tibId: true },
-        });
-        userByTgId = created;
-        tibId = created.tibId;
-      } else {
-        // Mavjud user — linkPhoneToTelegramUser orqali phone ulash
-        const linkResult = await linkPhoneToTelegramUser(tgId, phone);
-
-        if (linkResult.status === "conflict_two_telegram") {
-          await bot.sendMessage(
-            chatId,
-            "❌ Bu telefon raqami boshqa Telegram foydalanuvchiga bog'langan.\n\nIltimos, klinikaga murojaat qiling."
-          );
-          return;
-        }
-        if (linkResult.status === "error") {
-          await bot.sendMessage(
-            chatId,
-            `❌ Telefon ulashda xato: ${linkResult.message}\n\nQayta urinib ko'ring.`,
-            { reply_markup: mkContactKeyboard() as any }
-          );
-          return;
-        }
-        // "already", "already_has_different", "ok" — davom etamiz
-        // tibId ni eng so'nggi user'dan olamiz
-        const refreshed = await prisma.user.findUnique({
-          where: { telegramId: tgId },
-          select: { tibId: true },
-        });
-        tibId = refreshed?.tibId ?? userByTgId.tibId;
-
-        // Ism yangilash (agar Telegram'dan kelgan bo'lsa)
-        if (firstName && firstName !== "Foydalanuvchi") {
-          prisma.user.update({
-            where: { telegramId: tgId },
-            data: { firstName, ...(lastName ? { lastName } : {}) },
-          }).catch(() => {});
-        }
-      }
-
-      await bot.sendMessage(
-        chatId,
-        `✅ *Kontakt qabul qilindi!*\n\n👤 Ism: *${firstName}*\n📞 Tel: *${phone}*${tibId ? `\n🆔 ID: *${tibId}*` : ""}`,
-        { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } as any }
-      );
-
-      // Mid-booking context: patientName + booking data already in state
-      if (state.patientName && state.date) {
-        const updatedState = { ...state, patientPhone: phone, tibId };
-
-        if (state.serviceType === "home_service") {
-          const sent = await bot.sendMessage(
-            chatId,
-            `👤 Ism: *${firstName}*\n📞 Tel: *${phone}*\n\n📍 *To'liq manzilingizni kiriting:*\n\nMasalan: Toshkent, Yunusobod 5-mavze, 12-uy 👇`,
-            { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkAddressKeyboard() } }
-          );
-          await userState.set(chatId, { ...updatedState, step: "enter_address", messageId: sent.message_id });
-        } else {
-          const confirmState = { ...updatedState, step: "confirm" };
-          const sent = await bot.sendMessage(
-            chatId,
-            mkConfirmText(confirmState),
-            { parse_mode: "Markdown", reply_markup: { inline_keyboard: mkConfirmKeyboard() } }
-          );
-          await userState.set(chatId, { ...confirmState, messageId: sent.message_id });
-        }
-        return;
-      }
-
-      // Boshlang'ich flow: xizmat tanlash
-      const services = state._services || [];
-      if (!services.length) {
-        await bot.sendMessage(chatId, "⚠️ Hozirda mavjud xizmatlar yo'q. /start");
-        await userState.delete(chatId);
-        return;
-      }
-
-      const { mkServiceKeyboard } = await import("../helpers/render");
-      const sent = await bot.sendMessage(
-        chatId,
-        "🏥 Qaysi xizmatdan foydalanmoqchisiz?",
-        { reply_markup: { inline_keyboard: mkServiceKeyboard(services) } }
-      );
-      await userState.set(chatId, {
-        ...state,
-        step: "select_service",
-        patientName: firstName,
-        patientPhone: phone,
-        tibId,
-        messageId: sent.message_id,
-        _createdAt: Date.now(),
-      });
-      return;
-    }
-
-    // Kontakt yuborilmadi — eslatma
     await bot.sendMessage(
       chatId,
       "📱 Iltimos, *'Kontaktni ulashish'* tugmasini bosing:\n\n_Telegram raqamingiz avtomatik yuboriladi_",
