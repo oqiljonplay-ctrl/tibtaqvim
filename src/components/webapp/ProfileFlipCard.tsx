@@ -120,6 +120,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
   function cancelPolling() {
     pollingRef.current = false;
     setPollingForPhone(false);
+    setShowPhoneInput(true);
   }
 
   function handleRequestContact() {
