@@ -35,6 +35,24 @@ export async function handleStart(bot: TelegramBot, msg: Message) {
     return;
   }
 
+  // WebApp'dan "share_phone" deep link orqali kelgan — kontakt keyboard ko'rsatish
+  const startPayload = msg.text?.split(" ")[1]?.trim() ?? "";
+  if (startPayload === "share_phone") {
+    const { mkContactKeyboard } = await import("../helpers/render");
+    await bot.sendMessage(
+      chatId,
+      "📱 Telefon raqamingizni ulash uchun quyidagi tugmani bosing:",
+      { reply_markup: mkContactKeyboard() as any }
+    );
+    await userState.set(chatId, {
+      step: "share_contact",
+      clinicId: "",
+      _services: [],
+      _createdAt: Date.now(),
+    });
+    return;
+  }
+
   // Profilim tugmasi
   if (WEBAPP_URL) {
     await bot.sendMessage(chatId, "👤 *Profilingizni ko'rish uchun:*", {

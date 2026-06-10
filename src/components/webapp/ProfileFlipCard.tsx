@@ -3,6 +3,8 @@ import { useState, useRef, useLayoutEffect } from "react";
 import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
 import { normalizePhone } from "@/lib/utils/phone";
 
+const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME || "tibtaqvim_bot";
+
 interface ProfileData {
   firstName: string;
   lastName: string | null;
@@ -29,6 +31,8 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
   const [phoneInput, setPhoneInput] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [phoneSaving, setPhoneSaving] = useState(false);
+  const [pollingForPhone, setPollingForPhone] = useState(false);
+  const pollingRef = useRef(false);
 
   // Form state
   const [firstName, setFirstName] = useState(profile.firstName);
@@ -87,31 +91,77 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
     }
   }
 
-  function handleRequestContact() {
-    const tg = (window as any).Telegram?.WebApp;
-    const canRequest = typeof tg?.requestContact === "function";
-    if (canRequest) {
-      tg.requestContact((result: any) => {
-        if (result?.status === "sent" || result?.contact?.phone_number) {
-          const rawPhone =
-            result.contact?.phone_number ??
-            result.responseUnsafe?.contact?.phone_number ??
-            "";
-          const tgFirstName = result.contact?.first_name ?? "";
-          if (!rawPhone) { setShowPhoneInput(true); return; }
-          try {
-            const normalized = normalizePhone(rawPhone);
-            savePhone(normalized, tgFirstName);
-          } catch {
-            setShowPhoneInput(true);
-          }
-        } else {
-          setShowPhoneInput(true);
+  async function pollForPhone() {
+    pollingRef.current = true;
+    setPollingForPhone(true);
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      if (!pollingRef.current) return;
+      try {
+        const res = await fetch(`/api/user/by-telegram?telegramId=${telegramId}`);
+        const data = await res.json();
+        if (data?.data?.phone) {
+          pollingRef.current = false;
+          setPollingForPhone(false);
+          onUpdated({ phone: data.data.phone, firstName: data.data.firstName });
+          onPhoneAdded?.(data.data.phone);
+          return;
         }
-      });
-    } else {
+      } catch {}
+    }
+    // 30 soniya otti, hali ham yo'q → qo'lda kiritish
+    if (pollingRef.current) {
+      pollingRef.current = false;
+      setPollingForPhone(false);
       setShowPhoneInput(true);
     }
+  }
+
+  function cancelPolling() {
+    pollingRef.current = false;
+    setPollingForPhone(false);
+  }
+
+  function handleRequestContact() {
+    const tg = (window as any).Telegram?.WebApp;
+
+    // 1-yo'l: requestContact (Telegram v6.9+, yanvar 2024)
+    if (typeof tg?.requestContact === "function") {
+      try {
+        tg.requestContact((result: any) => {
+          // result: boolean (true/false) yoki {status:"sent"|"cancelled", contact?:{...}}
+          const isSent = result === true || result?.status === "sent";
+          // Phone callback'da yo'q bo'lsa tg.responseUnsafe'dan olamiz
+          const phone =
+            result?.contact?.phone_number ??
+            tg.responseUnsafe?.contact?.phone_number ??
+            "";
+          const firstName =
+            result?.contact?.first_name ??
+            tg.responseUnsafe?.contact?.first_name ??
+            "";
+
+          if (isSent && phone) {
+            try { savePhone(normalizePhone(phone), firstName); } catch { setShowPhoneInput(true); }
+          } else if (isSent) {
+            // Bot webhook orqali oladi → polling
+            pollForPhone();
+          }
+          // user bekor qildi → hech narsa qilmaymiz
+        });
+        return;
+      } catch {}
+    }
+
+    // 2-yo'l: openTelegramLink (Bot API 6.1+, iyun 2022) — eski Telegram uchun
+    if (typeof tg?.openTelegramLink === "function") {
+      tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=share_phone`);
+      pollForPhone();
+      return;
+    }
+
+    // 3-yo'l: so'nggi chora — qo'lda kiritish
+    setShowPhoneInput(true);
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -209,6 +259,16 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
           </div>
           {profile.phone ? (
             <p className="text-blue-200 text-xs mt-2">📞 {profile.phone}</p>
+          ) : pollingForPhone ? (
+            <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <span className="text-xs text-blue-200 animate-pulse">⏳ Botda tasdiqlang...</span>
+              <button
+                onClick={cancelPolling}
+                className="text-xs text-blue-300 underline"
+              >
+                Qo&apos;lda kiritish
+              </button>
+            </div>
           ) : showPhoneInput ? (
             <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
               <input
