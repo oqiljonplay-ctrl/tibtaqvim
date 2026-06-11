@@ -26,6 +26,7 @@ interface Service {
   prePaymentAmount: number | null;
   dailyLimit: number | null;
   isActive: boolean;
+  isHidden: boolean;
   doctors: DoctorItem[];
 }
 
@@ -130,6 +131,23 @@ export default function AdminServicesPage() {
     setSelectedDoctorIds(s.doctors.map((d) => d.id));
     setEditId(s.id);
     setShowForm(true);
+  }
+
+  async function toggleHidden(id: string, currentHidden: boolean) {
+    try {
+      const res = await fetch(`/api/admin/services/${id}/visibility`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isHidden: !currentHidden }),
+      });
+      if (res.ok) {
+        await fetchServices();
+      } else {
+        alert("Xatolik yuz berdi");
+      }
+    } catch {
+      alert("Server bilan bog'lanishda xatolik");
+    }
   }
 
   async function updateLimit(id: string, limit: string) {
@@ -321,9 +339,14 @@ export default function AdminServicesPage() {
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
             {services.map((s) => (
-              <div key={s.id} className="border border-gray-100 rounded-xl p-4">
+              <div key={s.id} className={`border border-gray-100 rounded-xl p-4 ${s.isHidden ? "opacity-60" : ""}`}>
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="font-medium text-gray-900">{s.name}</div>
+                  <div className="font-medium text-gray-900">
+                    {s.name}
+                    {s.isHidden && (
+                      <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Yashirilgan</span>
+                    )}
+                  </div>
                   <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
                     {typeLabels[s.type] ?? s.type}
                   </span>
@@ -363,6 +386,16 @@ export default function AdminServicesPage() {
                     Tahrirlash
                   </button>
                   <button
+                    onClick={() => toggleHidden(s.id, s.isHidden)}
+                    className={`flex-1 min-h-[44px] text-sm font-medium rounded-lg transition-colors ${
+                      s.isHidden
+                        ? "bg-green-50 text-green-700 hover:bg-green-100"
+                        : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    {s.isHidden ? "Ko'rsatish" : "Yashirish"}
+                  </button>
+                  <button
                     onClick={() => handleDeleteService(s)}
                     className="flex-1 min-h-[44px] text-sm font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
                   >
@@ -389,7 +422,7 @@ export default function AdminServicesPage() {
               </thead>
               <tbody>
                 {services.map((s) => (
-                  <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
+                  <tr key={s.id} className={`border-b border-gray-50 hover:bg-gray-50 ${s.isHidden ? "opacity-50" : ""}`}>
                     <td className="py-2 font-medium">{s.name}</td>
                     <td className="py-2">
                       <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">
@@ -424,6 +457,7 @@ export default function AdminServicesPage() {
                     </td>
                     <td className="py-2">
                       <div className="flex gap-1 flex-wrap">
+                        {s.isHidden && <span className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded">Yashirilgan</span>}
                         {/* TODO: Bosqich 2 - slot tizimi yoqilganda qaytariladi: {s.requiresSlot && <span>Uyacha</span>} */}
                         {s.requiresAddress && <span className="bg-orange-50 text-orange-700 text-xs px-2 py-0.5 rounded">Manzil</span>}
                         {s.requiresPrePayment && <span className="bg-yellow-50 text-yellow-700 text-xs px-2 py-0.5 rounded">Oldindan to&apos;lov</span>}
@@ -431,6 +465,12 @@ export default function AdminServicesPage() {
                     </td>
                     <td className="py-2">
                       <button onClick={() => startEdit(s)} className="text-blue-600 hover:underline text-xs mr-3">Tahrirlash</button>
+                      <button
+                        onClick={() => toggleHidden(s.id, s.isHidden)}
+                        className={`text-xs mr-3 ${s.isHidden ? "text-green-600 hover:text-green-700" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        {s.isHidden ? "Ko'rsatish" : "Yashirish"}
+                      </button>
                       <button onClick={() => handleDeleteService(s)} className="text-red-600 hover:text-red-700 text-xs font-medium">O&apos;chirish</button>
                     </td>
                   </tr>
