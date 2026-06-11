@@ -199,6 +199,7 @@ model Service {
   prePaymentAmount   Decimal?    @db.Decimal(12, 2)
   dailyLimit         Int?
   isActive           Boolean     @default(true)
+  isHidden           Boolean     @default(false)
   sortOrder          Int         @default(0)
   defaultQueueMode   QueueMode   @default(online)
   createdAt          DateTime    @default(now())
@@ -227,6 +228,7 @@ model Doctor {
   phone           String?
   photoUrl        String?
   isActive        Boolean  @default(true)
+  isHidden        Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
