@@ -23,6 +23,7 @@ interface Doctor {
   photoUrl: string | null;
   branch: { name: string } | null;
   isActive: boolean;
+  isHidden: boolean;
   services: ServiceItem[];
 }
 
@@ -325,6 +326,27 @@ export default function AdminDoctorsPage() {
     }
   }
 
+  async function toggleHidden(doctorId: string, currentHidden: boolean) {
+    try {
+      const res = await fetch(`/api/admin/doctors/${doctorId}/visibility`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isHidden: !currentHidden }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDoctors((prev) =>
+          prev.map((d) => (d.id === doctorId ? { ...d, isHidden: !currentHidden } : d))
+        );
+      } else {
+        alert(json.error?.message || "Xatolik");
+      }
+    } catch {
+      alert("Server bilan bog'lanishda xatolik");
+    }
+  }
+
   async function handleDelete(doctorId: string) {
     setDeleting(true);
     try {
@@ -538,8 +560,19 @@ export default function AdminDoctorsPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {doctors.map((d) => (
-              <div key={d.id} className="card relative">
+              <div key={d.id} className={`card relative ${d.isHidden ? "opacity-60 bg-gray-50" : ""}`}>
                 <div className="absolute top-3 right-3 flex gap-1">
+                  <button
+                    onClick={() => toggleHidden(d.id, d.isHidden)}
+                    className={`p-1.5 rounded transition ${
+                      d.isHidden
+                        ? "text-green-600 hover:text-green-700 hover:bg-green-50"
+                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title={d.isHidden ? "Ko'rsatish" : "Yashirish"}
+                  >
+                    {d.isHidden ? "👁️" : "🙈"}
+                  </button>
                   <button
                     onClick={() => handleResetPassword(d.id, `${d.lastName} ${d.firstName}`)}
                     disabled={resettingId === d.id}
@@ -565,6 +598,11 @@ export default function AdminDoctorsPage() {
                 </div>
 
                 <DoctorCard doctor={d} size="md" />
+                {d.isHidden && (
+                  <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+                    🙈 Bemorga ko&apos;rinmaydi
+                  </span>
+                )}
                 {d.phone && <p className="text-xs text-gray-400 mt-2 ml-15">{d.phone}</p>}
                 {d.branch ? (
                   <p className="text-xs text-gray-500 mt-1">🏥 {d.branch.name}</p>
