@@ -17,17 +17,18 @@ export async function GET(req: NextRequest) {
     const clinic = await prisma.clinic.findUnique({ where: { id: clinicId, isActive: true } });
     if (!clinic) return notFound("Clinic not found");
 
-    const services = await prisma.service.findMany({
+    const rawServices = await prisma.service.findMany({
       where: {
         clinicId,
         isActive: true,
+        isHidden: false,
         ...(type ? { type: type as any } : {}),
         // branchId berilsa: FAQAT o'sha filialga bog'langan xizmatlar (null = ko'rsatilmaydi)
         ...(branchId ? { branchId } : {}),
       },
       include: {
         doctors: {
-          where: { doctor: { isActive: true } },
+          where: { doctor: { isActive: true, isHidden: false } },
           include: {
             doctor: {
               select: { id: true, firstName: true, lastName: true, specialty: true, photoUrl: true },
@@ -38,6 +39,13 @@ export async function GET(req: NextRequest) {
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
+
+    // Kaskad: doctor_queue xizmatida 0 ta ko'rinadigan shifokor qolsa — xizmat chiqarilmaydi.
+    // diagnostic va home_service shifokorsiz ham ko'rinadi.
+    const DOCTOR_SELECT_TYPES = ["doctor_queue"];
+    const services = rawServices.filter(
+      (s) => !DOCTOR_SELECT_TYPES.includes(s.type) || s.doctors.length > 0
+    );
 
     const settings = await prisma.clinicSettings.findUnique({ where: { clinicId } });
     const enableWebapp = settings?.enableWebapp ?? true;
