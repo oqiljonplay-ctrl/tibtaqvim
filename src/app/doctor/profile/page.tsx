@@ -274,13 +274,22 @@ export default function DoctorProfilePage() {
               </p>
             )}
           </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 transition-colors"
-          >
-            {saving ? "Saqlanmoqda..." : "Saqlash"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/doctor/stats")}
+              className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              📊 Statistika
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 transition-colors"
+            >
+              {saving ? "Saqlanmoqda..." : "Saqlash"}
+            </button>
+          </div>
         </div>
 
         {saved && (
