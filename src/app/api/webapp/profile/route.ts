@@ -66,6 +66,9 @@ export async function PATCH(req: NextRequest) {
     if (linkResult.status === "conflict_two_telegram") {
       return error("Bu telefon raqami boshqa foydalanuvchiga tegishli", 409);
     }
+    if (linkResult.status === "conflict_staff_account") {
+      return error("Bu raqam xodim akkauntiga tegishli", 409);
+    }
     if (linkResult.status === "already_has_different") {
       return error("Profilingizda boshqa telefon ulangan", 409);
     }

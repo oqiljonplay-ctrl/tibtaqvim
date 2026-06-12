@@ -8,6 +8,7 @@ export type LinkPhoneResult =
   | { status: "already" }
   | { status: "already_has_different"; currentPhone: string }
   | { status: "conflict_two_telegram" }
+  | { status: "conflict_staff_account" }
   | { status: "error"; message: string };
 
 /**
@@ -63,6 +64,26 @@ export async function linkPhoneToTelegramUser(
     }
 
     if (g.telegramId === null) {
+      // HIMOYA: xodim akkauntini guest deb merge qilish TAQIQLANADI
+      const phoneOwner = await prisma.user.findUnique({
+        where: { id: g.id },
+        select: {
+          role: true,
+          employee: { select: { id: true } },
+          staff: { select: { id: true } },
+          doctor: { select: { id: true } },
+        },
+      });
+      if (
+        phoneOwner &&
+        (phoneOwner.role !== "patient" || phoneOwner.employee || phoneOwner.staff || phoneOwner.doctor)
+      ) {
+        logger.warn("[identity] merge blocked: phone belongs to staff account", {
+          telegramId, phone, guestId: g.id, role: phoneOwner.role,
+        });
+        return { status: "conflict_staff_account" } as const;
+      }
+
       // Guest (telegramId yo'q) — xavfsiz merge: avval guest o'chir, keyin phone set
       await mergeGuestToTelegramUser(u.id, g.id, phone);
       logger.info("[identity] guest merged to telegram user", { telegramId, phone, guestId: g.id });
