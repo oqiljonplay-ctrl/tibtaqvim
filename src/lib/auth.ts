@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
@@ -65,4 +66,18 @@ export function generateRandomPassword(length = 12): string {
   }
   if (!/[0-9]/.test(result)) result = result.slice(0, -1) + "7";
   return result;
+}
+
+/**
+ * EM'i bor xodim uchun em_key cookie tekshiruvi.
+ * Employee yo'q bo'lsa (admin) — o'tkazadi (true).
+ */
+export async function requireEmVerified(req: NextRequest, auth: JwtPayload): Promise<boolean> {
+  const employee = await prisma.employee.findUnique({
+    where: { userId: auth.userId },
+    select: { emId: true },
+  });
+  if (!employee) return true;
+  const cookie = req.cookies.get("em_key")?.value;
+  return cookie === employee.emId;
 }

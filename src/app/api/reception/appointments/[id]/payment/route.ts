@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, requireEmVerified } from "@/lib/auth";
 import { ok, error } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { markAsPaid, markAsUnpaid, cancelAppointment } from "@/lib/workflow/appointment-workflow";
@@ -19,6 +19,10 @@ export async function PATCH(
 
   const allowedRoles = ["receptionist", "clinic_admin", "branch_admin", "super_admin"];
   if (!allowedRoles.includes(auth.role)) return error("Bu amal uchun ruxsat yo'q", 403);
+
+  if (!(await requireEmVerified(req, auth))) {
+    return error({ code: "EM_REQUIRED", message: "EM id tasdiqlanmagan" }, 403);
+  }
 
   try {
     const body = await req.json();

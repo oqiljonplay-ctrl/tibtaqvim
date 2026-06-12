@@ -63,6 +63,10 @@ export default function DoctorQueueView({ context = "standalone" }: DoctorQueueV
         cache: "no-store",
       });
       const json = await res.json();
+      if (res.status === 403 && json.error?.code === "EM_REQUIRED") {
+        window.location.href = "/login";
+        return;
+      }
       if (json.success) {
         setData(json.data);
         setLastRefresh(new Date().toLocaleTimeString("uz-UZ"));

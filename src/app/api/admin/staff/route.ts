@@ -4,6 +4,7 @@ import { requireAuth, hashPassword, generateRandomPassword } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { normalizePhone } from "@/lib/utils/phone";
 import { getBranchScope, canCreateAdmin } from "@/lib/branch-scope";
+import { nextEmId } from "@/lib/services/em-id.service";
 
 // POST /api/admin/staff — xodim akkaunt yaratish (receptionist, clinic_admin, doctor)
 // Parol backend tomonidan avtomatik generatsiya qilinadi va javobda qaytariladi (bir marta).
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!["super_admin", "clinic_admin", "branch_admin"].includes(auth.role)) return forbidden();
 
   const body = await req.json();
-  const { firstName, lastName, phone: rawPhone, role, specialty, photoUrl, serviceIds } = body;
+  const { firstName, lastName, phone: rawPhone, role, specialty, photoUrl, serviceIds, profession } = body;
 
   if (!firstName || !rawPhone || !role) {
     return error("firstName, phone, role majburiy");
@@ -77,12 +78,35 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // EM id — faqat kasb egalariga (admin rollar EM olmaydi)
+      let employeeId: string | null = null;
+      let generatedEmId: string | null = null;
+      if (role === "doctor" || role === "receptionist") {
+        const emId = await nextEmId(tx);
+        const employee = await tx.employee.create({
+          data: {
+            emId,
+            firstName: firstName.trim(),
+            lastName: lastName?.trim() ?? null,
+            phone,
+            profession:
+              role === "doctor"
+                ? (specialty ?? "doctor")
+                : (profession ?? "receptionist"),
+            userId: newUser.id,
+          },
+        });
+        employeeId = employee.id;
+        generatedEmId = emId;
+      }
+
       if (role === "doctor") {
         await tx.doctor.create({
           data: {
             clinicId,
             branchId,
             userId: newUser.id,
+            employeeId,
             firstName: firstName.trim(),
             lastName: lastName?.trim() ?? "",
             specialty: String(specialty).trim(),
@@ -101,6 +125,7 @@ export async function POST(req: NextRequest) {
             clinicId,
             branchId,
             userId: newUser.id,
+            employeeId,
             firstName: firstName.trim(),
             lastName: lastName?.trim() ?? "",
             role: "receptionist",
@@ -118,17 +143,18 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return newUser;
+      return { user: newUser, generatedEmId };
     });
 
     return created({
-      id: user.id,
-      firstName: user.firstName,
-      phone: user.phone,
-      role: user.role,
-      clinicId: user.clinicId,
-      branchId: user.branchId,
+      id: user.user.id,
+      firstName: user.user.firstName,
+      phone: user.user.phone,
+      role: user.user.role,
+      clinicId: user.user.clinicId,
+      branchId: user.user.branchId,
       generatedPassword,
+      emId: user.generatedEmId,
     });
   } catch (err: unknown) {
     const e = err as { code?: string };
@@ -165,11 +191,16 @@ export async function GET(req: NextRequest) {
         branchId: true,
         createdAt: true,
         branch: { select: { id: true, name: true } },
+        employee: { select: { emId: true, profession: true } },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return ok(staff);
+    return ok(staff.map((s) => ({
+      ...s,
+      emId: s.employee?.emId ?? null,
+      profession: s.employee?.profession ?? null,
+    })));
   } catch {
     return error("Server xatosi", 500);
   }
