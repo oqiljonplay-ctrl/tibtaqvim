@@ -106,13 +106,8 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (auth.role !== "super_admin" && staff.clinicId !== auth.clinicId) return forbidden();
     if (auth.role === "branch_admin" && staff.branchId !== auth.branchId) return forbidden();
 
-    await prisma.$transaction(async (tx) => {
-      await tx.staff.update({ where: { id: params.id }, data: { isActive: false } });
-      // users ham bloklansin — login mumkin bo'lmasin
-      if (staff.userId) {
-        await tx.user.update({ where: { id: staff.userId }, data: { isActive: false } });
-      }
-    });
+    // Faqat staff yozuvi deaktivatsiya; users va employees yozuvlari TEGILMAYDI — karyera davom etadi
+    await prisma.staff.update({ where: { id: params.id }, data: { isActive: false } });
 
     await createAuditLog(
       auth.userId,
