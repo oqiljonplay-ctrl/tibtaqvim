@@ -38,6 +38,37 @@ export async function PATCH(
     switch (action) {
       case "arrived":
         result = await markAsArrived(params.id, actorClinicId);
+        // fire-and-forget: bemorga "baholash mumkin" xabari
+        if (result.success) {
+          (async () => {
+            try {
+              const appt = await prisma.appointment.findUnique({
+                where: { id: params.id },
+                select: { clinicId: true, user: { select: { telegramId: true } } },
+              });
+              const telegramId = appt?.user?.telegramId;
+              const clinicId   = appt?.clinicId;
+              const token = process.env.TELEGRAM_BOT_TOKEN;
+              const webappUrl = process.env.NEXT_PUBLIC_WEBAPP_URL;
+              if (!telegramId || !token || !webappUrl) return;
+              await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: telegramId,
+                  text: "✅ Qabulingiz yakunlandi. Shifokorni baholashingiz mumkin",
+                  reply_markup: {
+                    inline_keyboard: [[{
+                      text: "⭐ Shifokorni baholash",
+                      web_app: { url: clinicId ? `${webappUrl}?clinicId=${clinicId}` : webappUrl },
+                    }]],
+                  },
+                }),
+                signal: AbortSignal.timeout(5_000),
+              });
+            } catch {}
+          })();
+        }
         break;
       case "missed":
         result = await markAsMissed(params.id, actorClinicId);

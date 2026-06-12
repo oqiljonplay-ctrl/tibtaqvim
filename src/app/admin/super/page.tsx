@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
 interface Stats {
@@ -56,6 +56,192 @@ function StatCard({
         <div className="text-2xl font-bold text-gray-900">{value}</div>
         <div className="text-sm text-gray-500">{label}</div>
         {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Reyting boshqaruvi seksiyasi ────────────────────────────────────────────
+
+interface EmployeeRow { id: string; emId: string; firstName: string; lastName: string | null; profession: string | null; maxClinics: number; activeStints: number }
+interface EditWindow   { enabled: boolean; hours: number }
+interface RatingPrior  { value: number; dynamic: boolean; threshold: number; isReal: boolean }
+
+function RatingControls() {
+  const [editWindow, setEditWindow]   = useState<EditWindow>({ enabled: false, hours: 24 });
+  const [ratingPrior, setRatingPrior] = useState<RatingPrior | null>(null);
+  const [employees, setEmployees]     = useState<EmployeeRow[]>([]);
+  const [saving, setSaving]           = useState(false);
+  const [msg, setMsg]                 = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [emSaving, setEmSaving]       = useState<string | null>(null);
+  const [maxInputs, setMaxInputs]     = useState<Record<string, string>>({});
+
+  const loadAll = useCallback(() => {
+    Promise.all([
+      fetch("/api/admin/global-settings").then((r) => r.json()),
+      fetch("/api/admin/employees").then((r) => r.json()),
+    ]).then(([gs, emRes]) => {
+      if (gs.success && gs.data) {
+        setEditWindow(gs.data.ratingEditWindow);
+        setRatingPrior(gs.data.ratingPrior);
+      }
+      if (emRes.success && emRes.data) {
+        setEmployees(emRes.data);
+        const inputs: Record<string, string> = {};
+        (emRes.data as EmployeeRow[]).forEach((e) => { inputs[e.id] = String(e.maxClinics); });
+        setMaxInputs(inputs);
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  async function saveEditWindow() {
+    setSaving(true); setMsg(null);
+    try {
+      const res = await fetch("/api/admin/global-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "ratingEditWindow", value: editWindow }),
+      });
+      const data = await res.json();
+      if (data.success) setMsg({ type: "ok", text: "Saqlandi" });
+      else setMsg({ type: "err", text: data.error?.message ?? "Xatolik" });
+    } catch { setMsg({ type: "err", text: "Tarmoq xatosi" }); }
+    finally { setSaving(false); }
+  }
+
+  async function saveMaxClinics(employeeId: string) {
+    const val = parseInt(maxInputs[employeeId] ?? "", 10);
+    if (isNaN(val) || val < 1 || val > 10) return;
+    setEmSaving(employeeId);
+    try {
+      const res = await fetch(`/api/admin/employees/${employeeId}/limits`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxClinics: val }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEmployees((prev) => prev.map((e) => e.id === employeeId ? { ...e, maxClinics: val } : e));
+      }
+    } catch {}
+    finally { setEmSaving(null); }
+  }
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-semibold text-gray-900">Reyting boshqaruvi</h2>
+
+      {/* ratingEditWindow toggle */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 space-y-0.5">
+            <span className="text-sm font-medium text-gray-900">Bemor bahoni tahrirlashi mumkin</span>
+            <p className="text-xs text-gray-500">Yoqilsa, bemor bahoni vaqt oynasi ichida o&apos;zgartira oladi</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={editWindow.enabled}
+            onClick={() => setEditWindow((v) => ({ ...v, enabled: !v.enabled }))}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${editWindow.enabled ? "bg-blue-600" : "bg-gray-200"}`}
+          >
+            <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform ${editWindow.enabled ? "translate-x-5" : "translate-x-0"}`} />
+          </button>
+        </div>
+        {editWindow.enabled && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-600 shrink-0">Tahrirlash oynasi (soat):</label>
+            <input
+              type="number"
+              min={1}
+              max={168}
+              value={editWindow.hours}
+              onChange={(e) => setEditWindow((v) => ({ ...v, hours: parseInt(e.target.value, 10) || 24 }))}
+              className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
+        <button
+          onClick={saveEditWindow}
+          disabled={saving}
+          className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? "Saqlanmoqda..." : "Saqlash"}
+        </button>
+        {msg && (
+          <p className={`text-xs ${msg.type === "ok" ? "text-green-600" : "text-red-600"}`}>{msg.text}</p>
+        )}
+      </div>
+
+      {/* ratingPrior info */}
+      {ratingPrior && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700">
+          <span className="font-medium">Joriy prior: </span>
+          <span className="font-bold text-blue-700">{ratingPrior.value.toFixed(2)}</span>
+          <span className="ml-2 text-xs text-gray-500">
+            {ratingPrior.isReal ? "real o'rtacha (dinamik)" : "boshlang'ich qiymat"}
+            {` · threshold: ${ratingPrior.threshold}`}
+          </span>
+        </div>
+      )}
+
+      {/* EM limits table */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-800">EM limitlari</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">EM ID</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Ism</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Kasb</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Faol stintlar</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">maxClinics</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {employees.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-xs">
+                    Xodimlar topilmadi
+                  </td>
+                </tr>
+              )}
+              {employees.map((e) => (
+                <tr key={e.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-mono text-xs text-blue-700">{e.emId}</td>
+                  <td className="px-4 py-2 text-gray-800">{e.lastName ? `${e.lastName} ${e.firstName}` : e.firstName}</td>
+                  <td className="px-4 py-2 text-gray-500 text-xs">{e.profession ?? "—"}</td>
+                  <td className="px-4 py-2 text-center">{e.activeStints}</td>
+                  <td className="px-4 py-2 text-center">
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={maxInputs[e.id] ?? String(e.maxClinics)}
+                      onChange={(ev) => setMaxInputs((prev) => ({ ...prev, [e.id]: ev.target.value }))}
+                      className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    <button
+                      onClick={() => saveMaxClinics(e.id)}
+                      disabled={emSaving === e.id}
+                      className="px-2.5 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {emSaving === e.id ? "..." : "Saqlash"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -191,6 +377,9 @@ export default function SuperDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Reyting boshqaruvi */}
+      <RatingControls />
     </div>
   );
 }
