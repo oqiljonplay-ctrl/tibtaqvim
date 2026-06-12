@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, notFound, serverError } from "@/lib/api-response";
 import { canManageResources } from "@/lib/branch-scope";
 import { createAuditLog } from "@/lib/services/config.service";
+import { closeStint } from "@/lib/services/employment.service";
 
 type Params = { params: { id: string } };
 
@@ -187,9 +188,28 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (auth.role !== "super_admin" && doctor.clinicId !== auth.clinicId) return forbidden();
     if (auth.role === "branch_admin" && doctor.branchId !== auth.branchId) return forbidden();
 
-    await prisma.doctor.update({
-      where: { id: params.id },
-      data: { isActive: false },
+    await prisma.$transaction(async (tx) => {
+      await tx.doctor.update({
+        where: { id: params.id },
+        data: { isActive: false },
+      });
+
+      if (doctor.employeeId) {
+        await closeStint(tx, {
+          employeeId: doctor.employeeId,
+          clinicId: doctor.clinicId,
+          endReason: "fired_by_admin",
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorId: auth.userId,
+          clinicId: doctor.clinicId,
+          action: "doctor.fired",
+          payload: { doctorId: params.id, employeeId: doctor.employeeId },
+        },
+      });
     });
 
     return ok({ deletedId: params.id });

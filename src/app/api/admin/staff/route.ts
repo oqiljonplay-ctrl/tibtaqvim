@@ -4,7 +4,7 @@ import { requireAuth, hashPassword, generateRandomPassword } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { normalizePhone } from "@/lib/utils/phone";
 import { getBranchScope, canCreateAdmin } from "@/lib/branch-scope";
-import { nextEmId } from "@/lib/services/em-id.service";
+import { resolveOrCreateEmployee, openStint, ApiError } from "@/lib/services/employment.service";
 
 // POST /api/admin/staff — xodim akkaunt yaratish (receptionist, clinic_admin, doctor)
 // Parol backend tomonidan avtomatik generatsiya qilinadi va javobda qaytariladi (bir marta).
@@ -82,45 +82,68 @@ export async function POST(req: NextRequest) {
       let employeeId: string | null = null;
       let generatedEmId: string | null = null;
       if (role === "doctor" || role === "receptionist") {
-        const emId = await nextEmId(tx);
-        const employee = await tx.employee.create({
-          data: {
-            emId,
-            firstName: firstName.trim(),
-            lastName: lastName?.trim() ?? null,
-            phone,
-            profession:
-              role === "doctor"
-                ? (specialty ?? "doctor")
-                : (profession ?? "receptionist"),
-            userId: newUser.id,
-          },
+        const employee = await resolveOrCreateEmployee(tx, {
+          emIdInput: body.emId,
+          firstName: firstName.trim(),
+          lastName: lastName?.trim() ?? null,
+          phone,
+          profession:
+            role === "doctor"
+              ? (specialty ?? "doctor")
+              : (profession ?? "receptionist"),
+          targetClinicId: clinicId,
         });
+        // userId'ni yangilash: faqat yangi employee uchun (mavjud employee uchun userId saqlanadi)
+        if (!employee.userId) {
+          await tx.employee.update({ where: { id: employee.id }, data: { userId: newUser.id } });
+        }
         employeeId = employee.id;
-        generatedEmId = emId;
+        generatedEmId = employee.emId;
       }
 
       if (role === "doctor") {
-        await tx.doctor.create({
-          data: {
-            clinicId,
-            branchId,
-            userId: newUser.id,
-            employeeId,
-            firstName: firstName.trim(),
-            lastName: lastName?.trim() ?? "",
-            specialty: String(specialty).trim(),
-            phone,
-            photoUrl: photoUrl ?? null,
-            ...(Array.isArray(serviceIds) && serviceIds.length > 0
-              ? { services: { create: (serviceIds as string[]).map((serviceId) => ({ serviceId })) } }
-              : {}),
-          },
+        const existing = await tx.doctor.findFirst({
+          where: { employeeId: employeeId!, clinicId },
         });
+        let doc;
+        if (existing) {
+          doc = await tx.doctor.update({
+            where: { id: existing.id },
+            data: {
+              isActive: true,
+              isHidden: false,
+              branchId,
+              userId: newUser.id,
+              firstName: firstName.trim(),
+              lastName: lastName?.trim() ?? "",
+              specialty: String(specialty).trim(),
+              phone,
+              photoUrl: photoUrl ?? null,
+            },
+          });
+        } else {
+          doc = await tx.doctor.create({
+            data: {
+              clinicId,
+              branchId,
+              userId: newUser.id,
+              employeeId,
+              firstName: firstName.trim(),
+              lastName: lastName?.trim() ?? "",
+              specialty: String(specialty).trim(),
+              phone,
+              photoUrl: photoUrl ?? null,
+              ...(Array.isArray(serviceIds) && serviceIds.length > 0
+                ? { services: { create: (serviceIds as string[]).map((serviceId) => ({ serviceId })) } }
+                : {}),
+            },
+          });
+        }
+        await openStint(tx, { employeeId: employeeId!, clinicId, role: "doctor", doctorId: doc.id });
       }
 
       if (role === "receptionist") {
-        await tx.staff.create({
+        const staffRec = await tx.staff.create({
           data: {
             clinicId,
             branchId,
@@ -132,6 +155,7 @@ export async function POST(req: NextRequest) {
             phone,
           },
         });
+        await openStint(tx, { employeeId: employeeId!, clinicId, role: "receptionist", staffId: staffRec.id });
       }
 
       await tx.auditLog.create({
@@ -157,6 +181,9 @@ export async function POST(req: NextRequest) {
       emId: user.generatedEmId,
     });
   } catch (err: unknown) {
+    if (err instanceof ApiError) {
+      return error(err.message, err.statusCode);
+    }
     const e = err as { code?: string };
     if (e.code === "PHONE_TAKEN") {
       return error("Bu telefon raqam allaqachon ro'yxatdan o'tgan", 409);

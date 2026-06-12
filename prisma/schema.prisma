@@ -149,6 +149,8 @@ model Clinic {
   adChannels    AdChannel[]
   adCampaigns   AdCampaign[]
   promotions    ClinicPromotion[]
+  stints        EmploymentStint[]
+  doctorRatings DoctorRating[]
 
   @@index([isActive, city])
   @@index([subscriptionStatus])
@@ -252,6 +254,8 @@ model Doctor {
   experiences     DoctorExperience[]
   workplaces      DoctorWorkplace[]
   blockedDates    DoctorBlockedDate[]
+  stints          EmploymentStint[]
+  ratings         DoctorRating[]
 
   @@index([clinicId])
   @@index([employeeId])
@@ -354,6 +358,7 @@ model Staff {
   user                 User?         @relation(fields: [userId], references: [id])
   employee             Employee?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   assignedAppointments Appointment[] @relation("AssignedStaff")
+  stints               EmploymentStint[]
 
   @@index([clinicId])
   @@index([employeeId])
@@ -374,9 +379,19 @@ model Employee {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  compositeRating     Decimal?  @db.Decimal(3, 2)
+  ratingCount         Int       @default(0)
+  ratingPatientScore  Decimal?  @db.Decimal(3, 2)
+  ratingReturnRate    Decimal?  @db.Decimal(4, 3)
+  ratingArrivedRate   Decimal?  @db.Decimal(4, 3)
+  ratingActivityScore Decimal?  @db.Decimal(4, 3)
+  ratingLastUpdatedAt DateTime?
+
   user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   staff   Staff[]
   doctors Doctor[]
+  stints  EmploymentStint[]
+  ratings DoctorRating[]
 
   @@map("employees")
 }
@@ -412,6 +427,7 @@ model User {
   payments           Payment[]
   dependents         Dependent[]
   relayLogs          TelegramRelayLog[] @relation("StaffRelayLog")
+  doctorRatings      DoctorRating[]
 
   @@index([clinicId])
   @@index([branchId])
@@ -499,6 +515,8 @@ model Appointment {
   updatedAt    DateTime          @updatedAt
 
   dependentId  String?
+  arrivedAt    DateTime?
+  cancelledBy  String?
 
   clinic        Clinic     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   branch        Branch?    @relation(fields: [branchId], references: [id])
@@ -510,6 +528,7 @@ model Appointment {
   dependent     Dependent? @relation(fields: [dependentId], references: [id], onDelete: SetNull)
   payments      Payment[]
   relayLogs     TelegramRelayLog[]
+  rating        DoctorRating?
 
   @@index([clinicId])
   @@index([clinicId, date])
@@ -563,6 +582,7 @@ model ClinicSettings {
   dependentBookingLimit Int      @default(1)
   maxDependents         Int      @default(2)
   discountPercent       Int      @default(0)
+  showRatingCount       Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -847,4 +867,64 @@ model RateLimit {
   windowMs    BigInt
 
   @@map("rate_limits")
+}
+
+// ─── SHIFOKOR TITUL MODELLARI ─────────────────────────────────────────────────
+
+model EmploymentStint {
+  id         String    @id @default(cuid())
+  employeeId String
+  clinicId   String
+  doctorId   String?
+  staffId    String?
+  role       String
+  startDate  DateTime
+  endDate    DateTime?
+  endReason  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  clinic   Clinic   @relation(fields: [clinicId], references: [id])
+  doctor   Doctor?  @relation(fields: [doctorId], references: [id])
+  staffRec Staff?   @relation(fields: [staffId], references: [id])
+
+  @@index([employeeId])
+  @@index([clinicId])
+  @@map("employment_stints")
+}
+
+model DoctorRating {
+  id            String   @id @default(cuid())
+  employeeId    String
+  doctorId      String?
+  clinicId      String
+  appointmentId String   @unique
+  userId        String?
+  telegramId    String?
+  dependentId   String?
+  stars         Decimal  @db.Decimal(2, 1)
+  comment       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  employee    Employee    @relation(fields: [employeeId], references: [id])
+  doctor      Doctor?     @relation(fields: [doctorId], references: [id])
+  clinic      Clinic      @relation(fields: [clinicId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  user        User?       @relation(fields: [userId], references: [id])
+
+  @@index([employeeId])
+  @@index([clinicId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("doctor_ratings")
+}
+
+model GlobalSetting {
+  key       String   @id
+  value     Json     @db.JsonB
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("global_settings")
 }

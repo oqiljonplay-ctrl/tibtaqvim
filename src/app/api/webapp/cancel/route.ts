@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { status: "cancelled" },
+      data: { status: "cancelled", cancelledBy: "patient" },
     });
 
     try {

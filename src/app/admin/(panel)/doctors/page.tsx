@@ -41,7 +41,7 @@ interface Branch {
 }
 
 const emptyForm = {
-  firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "",
+  firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "", emId: "",
   role: "doctor" as StaffRole,
   branchId: "",
 };
@@ -266,6 +266,7 @@ export default function AdminDoctorsPage() {
       if (form.role === "doctor") {
         payload.specialty = form.specialty;
         payload.photoUrl = form.photoUrl || null;
+        if (form.emId?.trim()) payload.emId = form.emId.trim();
         payload.serviceIds = (() => {
           const ids = [...selectedServiceIds];
           const matched = services.find((s) => s.name === form.specialty);
@@ -523,6 +524,22 @@ export default function AdminDoctorsPage() {
               </div>
             )}
 
+            {form.role === "doctor" && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">EM ID (ixtiyoriy)</label>
+                <input
+                  className="input"
+                  type="text"
+                  value={form.emId}
+                  onChange={(e) => setForm({ ...form, emId: e.target.value })}
+                  placeholder="Masalan: EM000042"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Agar bu shifokor tizimda boshqa klinikada ishlagan bo&apos;lsa, EM ID sini kiriting — profili va reytinglari ulanadi. Bo&apos;sh qoldirsangiz yangi EM ID yaratiladi.
+                </p>
+              </div>
+            )}
+
             {form.role === "doctor" && services.length > 0 && (
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Qatnashadigan xizmatlar</label>
@@ -585,6 +602,13 @@ export default function AdminDoctorsPage() {
                     🔑
                   </button>
                   <button
+                    onClick={(e) => { e.stopPropagation(); router.push(`/admin/doctors/${d.id}/stats`); }}
+                    className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition"
+                    title="Statistika"
+                  >
+                    📉
+                  </button>
+                  <button
                     onClick={() => router.push(`/admin/doctors/${d.id}/edit`)}
                     className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
                     title="Tahrirlash"
@@ -594,7 +618,7 @@ export default function AdminDoctorsPage() {
                   <button
                     onClick={() => setConfirmDeleteId(d.id)}
                     className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-                    title="O'chirish"
+                    title="Ishdan bo'shatish"
                   >
                     🗑️
                   </button>
@@ -635,7 +659,7 @@ export default function AdminDoctorsPage() {
                     const d = doctors.find((x) => x.id === confirmDeleteId);
                     return d ? `${d.lastName} ${d.firstName}` : "";
                   })()}
-                  &nbsp;ni o&apos;chirmoqchimisiz? Bu amal aktiv holatdan chiqaradi.
+                  &nbsp;— Ushbu tugma orqali xodimni olib tashlaganingiz rasman ishdan bo&apos;shatish bilan tenglashtiriladi. Qayta ishga qabul qilinganda statistika uchun yangi bo&apos;lim ochiladi. Eski ko&apos;rsatkichlar saqlanadi.
                 </p>
                 <div className="flex gap-2 justify-end">
                   <button

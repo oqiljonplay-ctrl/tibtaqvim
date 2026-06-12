@@ -101,7 +101,8 @@ export async function markAsUnpaid(
 
 export async function cancelAppointment(
   appointmentId: string,
-  actorClinicId: string | null
+  actorClinicId: string | null,
+  cancelledBy: "staff" | "doctor" | "system" = "staff"
 ): Promise<WorkflowResult> {
   try {
     const appt = await prisma.appointment.findFirst({
@@ -114,7 +115,7 @@ export async function cancelAppointment(
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { status: "cancelled", paymentStatus: "cancelled", paidAmount: null, appliedDiscountPercent: 0, paidAt: null },
+      data: { status: "cancelled", cancelledBy, paymentStatus: "cancelled", paidAmount: null, appliedDiscountPercent: 0, paidAt: null },
     });
     return { success: true, appointment: updated };
   } catch (err: any) {
@@ -147,7 +148,7 @@ export async function markAsArrived(
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { status: "arrived" },
+      data: { status: "arrived", arrivedAt: new Date() },
     });
     return { success: true, appointment: updated };
   } catch (err: any) {
@@ -207,7 +208,7 @@ export async function resetToBooked(
 
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { status: "booked" },
+      data: { status: "booked", arrivedAt: null },
     });
     return { success: true, appointment: updated };
   } catch (err: any) {

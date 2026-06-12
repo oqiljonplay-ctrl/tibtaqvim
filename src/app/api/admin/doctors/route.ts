@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { getBranchScope, resolveBranchIdForCreate, canManageResources } from "@/lib/branch-scope";
-import { nextEmId } from "@/lib/services/em-id.service";
+import { resolveOrCreateEmployee, openStint, ApiError } from "@/lib/services/employment.service";
+import { createAuditLog } from "@/lib/services/config.service";
 
 export async function GET(req: NextRequest) {
   try {
@@ -60,41 +61,96 @@ export async function POST(req: NextRequest) {
     const branchId = resolveBranchIdForCreate(auth, body.branchId);
 
     const doctor = await prisma.$transaction(async (tx) => {
-      const emId = await nextEmId(tx);
-      const employee = await tx.employee.create({
-        data: {
-          emId,
-          firstName,
-          lastName,
-          phone: phone ?? null,
-          profession: specialty ?? "doctor",
-          userId: null,
-        },
+      const employee = await resolveOrCreateEmployee(tx, {
+        emIdInput: body.emId,
+        firstName,
+        lastName,
+        phone: phone ?? null,
+        profession: specialty ?? "doctor",
+        targetClinicId: clinicId,
       });
-      return tx.doctor.create({
-        data: {
-          clinicId,
-          firstName,
-          lastName,
-          specialty,
-          phone: phone ?? null,
-          branchId,
-          photoUrl: photoUrl ?? null,
-          employeeId: employee.id,
-          ...(Array.isArray(serviceIds) && serviceIds.length > 0
-            ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }
-            : {}),
-        },
-        include: {
-          branch: { select: { name: true } },
-          services: {
-            include: {
-              service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
-            },
+
+      // Reaktivatsiya tekshiruvi
+      const existing = await tx.doctor.findFirst({
+        where: { employeeId: employee.id, clinicId },
+      });
+
+      let doc;
+      if (existing) {
+        doc = await tx.doctor.update({
+          where: { id: existing.id },
+          data: {
+            isActive: true,
+            isHidden: false,
+            branchId,
+            firstName,
+            lastName,
+            specialty,
+            phone: phone ?? null,
+            photoUrl: photoUrl ?? null,
+            ...(Array.isArray(serviceIds) && serviceIds.length > 0
+              ? { services: { deleteMany: {}, create: serviceIds.map((serviceId: string) => ({ serviceId })) } }
+              : {}),
           },
-          employee: { select: { emId: true } },
+          include: {
+            branch: { select: { name: true } },
+            services: {
+              include: {
+                service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
+              },
+            },
+            employee: { select: { emId: true } },
+          },
+        });
+      } else {
+        doc = await tx.doctor.create({
+          data: {
+            clinicId,
+            firstName,
+            lastName,
+            specialty,
+            phone: phone ?? null,
+            branchId,
+            photoUrl: photoUrl ?? null,
+            employeeId: employee.id,
+            ...(Array.isArray(serviceIds) && serviceIds.length > 0
+              ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }
+              : {}),
+          },
+          include: {
+            branch: { select: { name: true } },
+            services: {
+              include: {
+                service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
+              },
+            },
+            employee: { select: { emId: true } },
+          },
+        });
+      }
+
+      await openStint(tx, {
+        employeeId: employee.id,
+        clinicId,
+        role: "doctor",
+        doctorId: doc.id,
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: auth.userId,
+          clinicId,
+          action: "doctor.hired",
+          payload: {
+            doctorId: doc.id,
+            employeeId: employee.id,
+            emId: employee.emId,
+            reactivated: !!existing,
+          },
         },
       });
+
+      return doc;
     });
 
     return created({
@@ -106,7 +162,10 @@ export async function POST(req: NextRequest) {
         queueMode: sd.queueMode,
       })),
     });
-  } catch {
+  } catch (err: unknown) {
+    if (err instanceof ApiError) {
+      return error(err.message, err.statusCode);
+    }
     return error("Server error", 500);
   }
 }

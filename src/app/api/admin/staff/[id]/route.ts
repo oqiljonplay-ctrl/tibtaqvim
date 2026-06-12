@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, notFound, serverError } from "@/lib/api-response";
 import { canManageResources } from "@/lib/branch-scope";
 import { createAuditLog } from "@/lib/services/config.service";
+import { closeStint } from "@/lib/services/employment.service";
 
 type Params = { params: { id: string } };
 
@@ -107,14 +108,26 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (auth.role === "branch_admin" && staff.branchId !== auth.branchId) return forbidden();
 
     // Faqat staff yozuvi deaktivatsiya; users va employees yozuvlari TEGILMAYDI — karyera davom etadi
-    await prisma.staff.update({ where: { id: params.id }, data: { isActive: false } });
+    await prisma.$transaction(async (tx) => {
+      await tx.staff.update({ where: { id: params.id }, data: { isActive: false } });
 
-    await createAuditLog(
-      auth.userId,
-      "staff.delete",
-      { staffId: params.id, userId: staff.userId },
-      staff.clinicId
-    ).catch(() => {});
+      if (staff.employeeId) {
+        await closeStint(tx, {
+          employeeId: staff.employeeId,
+          clinicId: staff.clinicId,
+          endReason: "fired_by_admin",
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorId: auth.userId,
+          clinicId: staff.clinicId,
+          action: "staff.fired",
+          payload: { staffId: params.id, userId: staff.userId, employeeId: staff.employeeId },
+        },
+      });
+    });
 
     return ok({ deletedId: params.id });
   } catch {
