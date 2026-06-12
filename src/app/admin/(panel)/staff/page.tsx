@@ -18,12 +18,15 @@ interface StaffMember {
   role: string;
   branchId: string | null;
   branch: { id: string; name: string } | null;
+  emId?: string | null;
+  profession?: string | null;
 }
 
 interface Credentials {
   phone: string | null;
   password: string;
   name: string;
+  emId?: string | null;
 }
 
 const emptyForm = {
@@ -32,6 +35,7 @@ const emptyForm = {
   phone: "",
   photoUrl: "",
   branchId: "",
+  profession: "",
 };
 
 export default function AdminStaffPage() {
@@ -101,6 +105,7 @@ export default function AdminStaffPage() {
           phone: form.phone,
           role: "receptionist",
           branchId: form.branchId,
+          ...(form.profession ? { profession: form.profession } : {}),
         }),
       });
       const json = await res.json();
@@ -114,6 +119,7 @@ export default function AdminStaffPage() {
           phone: json.data.phone,
           password: json.data.generatedPassword,
           name: `${form.firstName} ${form.lastName}`.trim(),
+          emId: json.data.emId ?? null,
         });
         fetchStaff();
       } else {
@@ -246,6 +252,16 @@ export default function AdminStaffPage() {
               />
             </div>
 
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kasbi (ixtiyoriy)</label>
+              <input
+                className="input"
+                value={form.profession}
+                onChange={(e) => setForm({ ...form, profession: e.target.value })}
+                placeholder="masalan: laborant, anesteziolog, MRT operatori"
+              />
+            </div>
+
             <div className="md:col-span-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
               <p className="text-xs text-blue-700">
                 🔑 Login uchun parol avtomatik generatsiya qilinadi va qo&apos;shishdan so&apos;ng bir marta ko&apos;rsatiladi.
@@ -305,7 +321,15 @@ export default function AdminStaffPage() {
               </div>
 
               <StaffCard staff={s} size="md" />
-              {s.phone && <p className="text-xs text-gray-400 mt-2">{s.phone}</p>}
+              {s.emId && (
+                <span className="inline-block mt-2 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-mono">
+                  {s.emId}
+                </span>
+              )}
+              {s.profession && (
+                <p className="text-xs text-gray-500 mt-1">{s.profession}</p>
+              )}
+              {s.phone && <p className="text-xs text-gray-400 mt-1">{s.phone}</p>}
               {s.branch ? (
                 <p className="text-xs text-gray-500 mt-1">🏥 {s.branch.name}</p>
               ) : (
@@ -365,7 +389,12 @@ export default function AdminStaffPage() {
                   Login: <span className="font-bold text-gray-900">{credentials.phone}</span>
                 </div>
               )}
-              <div>Parol: <span className="font-bold text-gray-900">{credentials.password}</span></div>
+              <div className="mb-1">Parol: <span className="font-bold text-gray-900">{credentials.password}</span></div>
+              {credentials.emId && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  Xodim ID: <span className="font-bold text-blue-700">{credentials.emId}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-start gap-2 mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
               <span className="flex-shrink-0">⚠️</span>

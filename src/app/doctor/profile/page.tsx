@@ -23,6 +23,7 @@ interface DoctorProfile {
   directions:  { name: string }[];
   experiences: { place: string; startYear: number; endYear: number | null }[];
   workplaces:  { place: string }[];
+  emId?: string | null;
 }
 
 function ListEditor({
@@ -171,6 +172,8 @@ export default function DoctorProfilePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
+  const [emId, setEmId] = useState<string | null>(null);
+  const [emCopied, setEmCopied] = useState(false);
 
   // Form state
   const [education, setEducation]             = useState("");
@@ -191,6 +194,7 @@ export default function DoctorProfilePage() {
         if (json.success && json.data) {
           const d: DoctorProfile = json.data;
           setProfile(d);
+          setEmId(d.emId ?? null);
           setEducation(d.education ?? "");
           setPosition(d.position ?? "");
           setDepartment(d.department ?? "");
@@ -287,6 +291,27 @@ export default function DoctorProfilePage() {
         {errorMsg && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-sm">
             ⚠️ {errorMsg}
+          </div>
+        )}
+
+        {/* EM ID karta */}
+        {emId && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-blue-600 mb-0.5">Mening xodim ID raqamim</p>
+              <p className="text-2xl font-mono font-bold text-blue-800">{emId}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(emId);
+                setEmCopied(true);
+                setTimeout(() => setEmCopied(false), 2000);
+              }}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+            >
+              {emCopied ? "✓ Nusxalandi" : "Nusxalash"}
+            </button>
           </div>
         )}
 

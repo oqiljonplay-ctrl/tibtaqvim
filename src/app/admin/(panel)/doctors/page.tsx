@@ -25,12 +25,14 @@ interface Doctor {
   isActive: boolean;
   isHidden: boolean;
   services: ServiceItem[];
+  emId?: string | null;
 }
 
 interface Credentials {
   phone: string | null;
   password: string;
   name: string;
+  emId?: string | null;
 }
 
 interface Branch {
@@ -290,6 +292,7 @@ export default function AdminDoctorsPage() {
           phone: json.data.phone,
           password: json.data.generatedPassword,
           name: `${form.firstName} ${form.lastName}`.trim(),
+          emId: json.data.emId ?? null,
         });
         if (form.role === "doctor") fetchDoctors();
       } else {
@@ -598,11 +601,18 @@ export default function AdminDoctorsPage() {
                 </div>
 
                 <DoctorCard doctor={d} size="md" />
-                {d.isHidden && (
-                  <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
-                    🙈 Bemorga ko&apos;rinmaydi
-                  </span>
-                )}
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {d.emId && (
+                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-mono">
+                      {d.emId}
+                    </span>
+                  )}
+                  {d.isHidden && (
+                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+                      🙈 Bemorga ko&apos;rinmaydi
+                    </span>
+                  )}
+                </div>
                 {d.phone && <p className="text-xs text-gray-400 mt-2 ml-15">{d.phone}</p>}
                 {d.branch ? (
                   <p className="text-xs text-gray-500 mt-1">🏥 {d.branch.name}</p>
@@ -664,7 +674,12 @@ export default function AdminDoctorsPage() {
               {credentials.phone && (
                 <div className="mb-1">Login: <span className="font-bold text-gray-900">{credentials.phone}</span></div>
               )}
-              <div>Parol: <span className="font-bold text-gray-900">{credentials.password}</span></div>
+              <div className="mb-1">Parol: <span className="font-bold text-gray-900">{credentials.password}</span></div>
+              {credentials.emId && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  Xodim ID: <span className="font-bold text-blue-700">{credentials.emId}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-start gap-2 mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
               <span className="flex-shrink-0">⚠️</span>
