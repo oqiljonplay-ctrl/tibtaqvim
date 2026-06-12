@@ -25,6 +25,17 @@ export async function GET(req: NextRequest) {
 
     if (!user) return ok([]);
 
+    // clinic_settings va ratingEditWindow — bitta marta o'qiladi
+    const [clinicSettingsRow, editWindowRow] = await Promise.all([
+      prisma.clinicSettings.findUnique({
+        where: { clinicId },
+        select: { showRatingCount: true },
+      }),
+      prisma.globalSetting.findUnique({ where: { key: "ratingEditWindow" } }),
+    ]);
+    const showRatingCount = clinicSettingsRow?.showRatingCount ?? false;
+    const editWindow = editWindowRow?.value as { enabled?: boolean; hours?: number } | null;
+
     const phoneFilter = user.phone ? { patientPhone: user.phone } : null;
     const userIdFilter = { userId: user.id };
 
@@ -47,18 +58,55 @@ export async function GET(req: NextRequest) {
         paymentStatus: true,
         patientName: true,
         serviceId: true,
+        userId: true,
         service: { select: { name: true, type: true } },
         slot: { select: { startTime: true, endTime: true } },
         doctor: {
           select: {
             id: true, firstName: true, lastName: true,
             specialty: true, photoUrl: true, workSchedule: true,
+            employee: { select: { compositeRating: true, ratingCount: true } },
           },
         },
+        rating: { select: { id: true, stars: true, createdAt: true } },
       },
     });
 
-    return ok(appointments);
+    const mapped = appointments.map((a) => ({
+      id: a.id,
+      clinicId: a.clinicId,
+      date: a.date,
+      status: a.status,
+      dependentId: a.dependentId,
+      queueNumber: a.queueNumber,
+      queueMode: a.queueMode,
+      paymentStatus: a.paymentStatus,
+      patientName: a.patientName,
+      serviceId: a.serviceId,
+      service: a.service,
+      slot: a.slot,
+      doctor: a.doctor ? {
+        id: a.doctor.id,
+        firstName: a.doctor.firstName,
+        lastName: a.doctor.lastName,
+        specialty: a.doctor.specialty,
+        photoUrl: a.doctor.photoUrl,
+        workSchedule: a.doctor.workSchedule,
+      } : null,
+      doctorRating: a.doctor?.employee?.compositeRating != null
+        ? Number(a.doctor.employee.compositeRating)
+        : null,
+      doctorRatingCount: showRatingCount && a.doctor?.employee
+        ? a.doctor.employee.ratingCount
+        : null,
+      myStars: a.rating ? Number(a.rating.stars) : null,
+      myRatingId: a.rating?.id ?? null,
+      canRate: a.status === "arrived" && !a.rating && !!a.userId,
+      canEditRating: !!(a.rating && editWindow?.enabled === true
+        && (Date.now() - new Date(a.rating.createdAt).getTime()) < (editWindow.hours ?? 24) * 3_600_000),
+    }));
+
+    return ok(mapped);
   } catch {
     return error("Server error", 500);
   }

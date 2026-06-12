@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { StarRating } from "./StarRating";
 
 // Modes with payment button placeholder (extend when real API is ready)
 const PAYMENT_ENABLED_MODES = ["online"];
@@ -36,6 +37,12 @@ export interface BookingAppt {
   queueMode?: string | null;
   slot?: { startTime: string; endTime: string } | null;
   doctor?: DocData | null;
+  doctorRating?: number | null;
+  doctorRatingCount?: number | null;
+  myStars?: number | null;
+  myRatingId?: string | null;
+  canRate?: boolean;
+  canEditRating?: boolean;
 }
 
 interface Props {
@@ -130,6 +137,85 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
   const [fullDoc, setFullDoc] = useState<DocData | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const doc = a.doctor;
+
+  // Rating state
+  const [ratingOpen, setRatingOpen] = useState(!!a.canRate);
+  const [ratingStars, setRatingStars] = useState(0);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
+  const [ratingDone, setRatingDone] = useState(false);
+  const [ratingThanks, setRatingThanks] = useState(false);
+  const [currentRating, setCurrentRating] = useState<number | null>(a.doctorRating ?? null);
+  const [currentRatingCount, setCurrentRatingCount] = useState<number | null>(a.doctorRatingCount ?? null);
+  const [myStars, setMyStars] = useState<number | null>(a.myStars ?? null);
+  const [myRatingId] = useState<string | null>(a.myRatingId ?? null);
+  const canEdit = !!(a.canEditRating && myStars !== null);
+
+  useEffect(() => {
+    if (!ratingThanks) return;
+    const t = setTimeout(() => setRatingThanks(false), 2000);
+    return () => clearTimeout(t);
+  }, [ratingThanks]);
+
+  async function submitRating(telegramId?: string | null) {
+    if (ratingStars === 0 || ratingSubmitting) return;
+    setRatingSubmitting(true);
+    setRatingError(null);
+    try {
+      const body = JSON.stringify({ telegramId, appointmentId: a.id, stars: ratingStars });
+      const res = await fetch("/api/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      const json = await res.json();
+      if (json.success || json.ok) {
+        setRatingOpen(false);
+        setRatingDone(true);
+        setRatingThanks(true);
+        setMyStars(ratingStars);
+        if (json.data?.compositeRating != null || json.compositeRating != null) {
+          setCurrentRating(json.data?.compositeRating ?? json.compositeRating);
+        }
+        if (json.data?.ratingCount != null || json.ratingCount != null) {
+          setCurrentRatingCount(json.data?.ratingCount ?? json.ratingCount);
+        }
+      } else {
+        setRatingError(json.error?.message || "Xatolik yuz berdi");
+      }
+    } catch {
+      setRatingError("Server bilan bog'lanishda xatolik");
+    } finally {
+      setRatingSubmitting(false);
+    }
+  }
+
+  async function updateRating(telegramId?: string | null) {
+    if (ratingStars === 0 || ratingSubmitting || !myRatingId) return;
+    setRatingSubmitting(true);
+    setRatingError(null);
+    try {
+      const res = await fetch(`/api/ratings/${myRatingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telegramId, stars: ratingStars }),
+      });
+      const json = await res.json();
+      if (json.success || json.ok) {
+        setRatingOpen(false);
+        setMyStars(ratingStars);
+        if (json.data?.compositeRating != null || json.compositeRating != null) {
+          setCurrentRating(json.data?.compositeRating ?? json.compositeRating);
+        }
+      } else {
+        setRatingError(json.error?.message || "Xatolik yuz berdi");
+      }
+    } catch {
+      setRatingError("Server bilan bog'lanishda xatolik");
+    } finally {
+      setRatingSubmitting(false);
+    }
+  }
 
   useEffect(() => {
     if (!paymentNotice) return;
@@ -313,6 +399,70 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
               )}
             </div>
           </div>
+
+          {/* ── Doimiy yulduz qatori ── */}
+          {currentRating !== null && (
+            <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <StarRating value={currentRating} readOnly size={16} />
+              <span className="text-xs text-gray-600 font-medium">
+                {currentRating.toFixed(1)}
+              </span>
+              {currentRatingCount !== null && (
+                <span className="text-xs text-gray-400">({currentRatingCount} baho)</span>
+              )}
+              {canEdit && !ratingOpen && !ratingDone && (
+                <button
+                  className="text-xs text-blue-500 underline ml-1"
+                  onClick={(e) => { e.stopPropagation(); setRatingStars(myStars ?? 0); setRatingOpen(true); }}
+                >
+                  O'zgartirish
+                </button>
+              )}
+              {ratingThanks && (
+                <span className="text-xs text-green-600 font-medium">✓ Rahmat!</span>
+              )}
+            </div>
+          )}
+
+          {/* ── Baholash paneli (grid-rows animatsiya) ── */}
+          {(a.canRate || ratingDone === false) && !myStars && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: ratingOpen ? "1fr" : "0fr",
+                transition: "grid-template-rows 0.35s ease",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ overflow: "hidden" }}>
+                <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-700">Shifokorni baholang</p>
+                  <StarRating value={ratingStars} onChange={setRatingStars} size={36} />
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Hurmatli bemor, ushbu baholash faqat ushbu shifokorga taalluqli. Boshqa xizmatlar va xodimlar sababli noxolis baho qo&apos;yishdan ehtiyot bo&apos;ling. Yulduzcha to&apos;liq yonishi uchun ikki marta bosing.
+                  </p>
+                  {ratingError && (
+                    <p className="text-xs text-red-500">{ratingError}</p>
+                  )}
+                  {ratingStars > 0 && (
+                    <button
+                      disabled={ratingSubmitting}
+                      onClick={() => {
+                        const tgId = typeof window !== "undefined"
+                          ? (window as unknown as Record<string, string | null | undefined>).__tgId
+                          : null;
+                        if (myRatingId) updateRating(tgId);
+                        else submitRating(tgId);
+                      }}
+                      className="w-full py-2.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {ratingSubmitting ? "Yuborilmoqda..." : myRatingId ? "Saqlash" : "Baholash"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── ORQA TOMON: absolute inset-0, overflow-y-auto ── */}

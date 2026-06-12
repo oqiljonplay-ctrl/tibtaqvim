@@ -12,27 +12,41 @@ export async function GET(
   if (!id) return error("doctorId majburiy");
   if (!clinicId) return error("clinicId majburiy", 400);
 
-  const doctor = await prisma.doctor.findFirst({
-    where: { id, clinicId },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      specialty: true,
-      photoUrl: true,
-      education: true,
-      position: true,
-      department: true,
-      workSchedule: true,
-      operationsCount: true,
-      bio: true,
-      specialties: { select: { name: true }, orderBy: { sortOrder: "asc" } },
-      directions:  { select: { name: true }, orderBy: { sortOrder: "asc" } },
-      experiences: { select: { place: true, startYear: true, endYear: true }, orderBy: { sortOrder: "asc" } },
-      workplaces:  { select: { place: true }, orderBy: { sortOrder: "asc" } },
-    },
-  });
+  const [doctor, clinicSettingsRow] = await Promise.all([
+    prisma.doctor.findFirst({
+      where: { id, clinicId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        specialty: true,
+        photoUrl: true,
+        education: true,
+        position: true,
+        department: true,
+        workSchedule: true,
+        operationsCount: true,
+        bio: true,
+        specialties: { select: { name: true }, orderBy: { sortOrder: "asc" } },
+        directions:  { select: { name: true }, orderBy: { sortOrder: "asc" } },
+        experiences: { select: { place: true, startYear: true, endYear: true }, orderBy: { sortOrder: "asc" } },
+        workplaces:  { select: { place: true }, orderBy: { sortOrder: "asc" } },
+        employee: { select: { compositeRating: true, ratingCount: true } },
+      },
+    }),
+    prisma.clinicSettings.findUnique({
+      where: { clinicId },
+      select: { showRatingCount: true },
+    }),
+  ]);
 
   if (!doctor) return error("Shifokor topilmadi", 404);
-  return ok(doctor);
+
+  const showRatingCount = clinicSettingsRow?.showRatingCount ?? false;
+  return ok({
+    ...doctor,
+    compositeRating: doctor.employee?.compositeRating != null ? Number(doctor.employee.compositeRating) : null,
+    ratingCount: showRatingCount ? (doctor.employee?.ratingCount ?? null) : null,
+    employee: undefined,
+  });
 }
