@@ -507,6 +507,68 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-06-12 — SHIFOKOR TITUL: Reyting, statistika, stint tizimi
+
+**Maqsad:** Har bir employee uchun kompozit reyting (4 omil), baho UI (webapp), admin/doctor statistika sahifalari, klinikalararo EM ID biriktirish, ish davrlari (stints).
+
+**DB migrations (Supabase apply_migration):**
+- `employment_stints` jadvali: employee/klinika/role bo'yicha ish davrlari, `uq_one_active_stint` UNIQUE index
+- `doctor_ratings` jadvali: baho, appointmentId UNIQUE, stars CHECK, telegramId zaxira
+- `employees` +7 ustun: `compositeRating, ratingCount, ratingPatientScore, ratingReturnRate, ratingArrivedRate, ratingActivityScore, ratingLastUpdatedAt`
+- `appointments` +2 ustun: `arrivedAt, cancelledBy`
+- `global_settings` key-value jadvali: `ratingPrior {value:4.5}`, `ratingEditWindow {enabled:false, hours:24}`
+- `clinic_settings` +1 ustun: `showRatingCount BOOLEAN DEFAULT false`
+- Backfill: stintlar doktorlar/staff'dan, arrivedAt = updatedAt
+
+**Yangi fayllar:**
+- `src/lib/services/employment.service.ts` — `resolveOrCreateEmployee`, `openStint`, `closeStint`
+- `src/lib/services/rating.service.ts` — Bayesian composite formula, `recomputeEmployeeRating`, `recomputeAllRatings`
+- `src/app/api/ratings/route.ts` — POST: baho qo'yish (arrived check, IDOR, P2002→409)
+- `src/app/api/ratings/[id]/route.ts` — PATCH: tahrirlash (editWindow check)
+- `src/app/api/cron/rating-recompute/route.ts` — GET cron, 01:00 UTC kunlik
+- `src/components/webapp/StarRating.tsx` — SVG clipPath, 0.5-qadam, toggle mantiq
+- `src/app/api/admin/doctors/[id]/stats/route.ts` — stint statistikasi (stintId/combined)
+- `src/app/admin/(panel)/doctors/[id]/stats/page.tsx` — 📉 UI: KPI+Recharts+top xizmatlar
+- `src/app/api/doctor/stats/route.ts` — shifokor o'z statistikasi (revenue YO'Q)
+- `src/app/doctor/stats/page.tsx` — klinika tablar + Umumiy + omillar mini-jadvali
+- `src/app/api/admin/global-settings/route.ts` — GET/PATCH ratingEditWindow (super_admin)
+- `src/app/api/admin/employees/route.ts` — GET barcha xodimlar ro'yxati
+- `src/app/api/admin/employees/[id]/limits/route.ts` — PATCH maxClinics
+
+**O'zgartirilgan fayllar:**
+- `prisma/schema.prisma` — EmploymentStint, DoctorRating, GlobalSetting modellari + mos FK'lar
+- `src/app/api/admin/doctors/route.ts` — resolveOrCreateEmployee + openStint + reaktivatsiya
+- `src/app/api/admin/doctors/[id]/route.ts` — DELETE: closeStint + audit doctor.fired
+- `src/app/api/admin/staff/route.ts` — resolveOrCreateEmployee + openStint
+- `src/app/api/admin/staff/[id]/route.ts` — DELETE: closeStint + audit staff.fired
+- `src/lib/workflow/appointment-workflow.ts` — markAsArrived: arrivedAt; cancelAppointment: cancelledBy param
+- `src/app/api/webapp/cancel/route.ts` — cancelledBy:'patient'
+- `src/app/api/webapp/appointments/route.ts` — rating maydonlari (showRatingCount, editWindow)
+- `src/app/api/webapp/doctor/[id]/route.ts` — compositeRating, ratingCount
+- `src/app/api/services/route.ts` — employee rating, sort by compositeRating, showRatingCount
+- `src/app/api/admin/clinic-settings/route.ts` — showRatingCount GET/PUT
+- `src/components/webapp/BookingFlipCard.tsx` — doimiy yulduz qatori + baholash paneli (grid animation)
+- `src/app/admin/(panel)/doctors/page.tsx` — EM ID input, 📉 tugma, yangilangan delete matn
+- `src/app/admin/(panel)/settings/page.tsx` — showRatingCount toggle
+- `src/app/admin/super/page.tsx` — RatingControls seksiyasi (editWindow toggle, prior info, EM limits)
+- `src/app/doctor/layout.tsx` — Statistika nav link
+- `src/app/doctor/profile/page.tsx` — Statistika tugmasi
+- `src/app/api/doctor/appointments/[id]/attendance/route.ts` — arrived: Telegram notify (fire-and-forget)
+- `src/lib/services/user-merge.service.ts` — doctorRating.updateMany reassign
+- `vercel.json` — rating-recompute cron 0 1 * * *
+
+**Muhim qoidalar (O'ZGARTIRMA):**
+- `revenue` faqat admin stats'da (paidAmount), shifokor stats'da UMUMAN YO'Q
+- `compositeRating = NULL` ratingCount=0 bo'lsa (4.5 ko'rsatilmaydi)
+- `employment_stints` — kelajak Job Request tizimining poydevori
+- Barcha Decimal → Number konversiya majburiy (JSON'da string keladi)
+
+**DB holati (2026-06-12):** stints: 15 total, 11 active; ratings: 0 (hali yangi); global_settings: 2 qator ✅
+
+**Commitlar:** f648ee1, 4fc2161, c85adb4, 166864c, efa7d4e, ecebef1, 989f37c
+
+---
+
 ### 2026-06-12 — EM ID TIZIMI: Xodim identifikatori va ikki bosqichli login
 
 **Maqsad:** Doktor va qabulxona xodimlariga `EM000001`–`EM999999` formatidagi portativ global ID tayinlash. Login ikki bosqichli: 1) telefon+parol, 2) EM ID kiritish. EM tasdiqlangandan keyin `em_key` cookie orqali xodim panellariga kirish.
