@@ -68,7 +68,8 @@ Doctor Panel → bugungi bemorlar ro'yxati
 │    POST /api/arrived                                    │
 │    POST /api/webhook/telegram  (prod webhook)           │
 │    GET  /api/health                                     │
-│    POST /api/auth/login                                 │
+│    POST /api/auth/login  (needsEmVerify flag)           │
+│    POST /api/auth/verify-em  (em_key cookie)           │
 │    GET  /api/user/tib                                   │
 │    GET  /api/user/by-tibid                              │
 │    GET  /api/user/by-telegram                           │
@@ -178,7 +179,7 @@ nextBOT/
 │   │
 │   └── lib/
 │       ├── prisma.ts              # Singleton PrismaClient + withRetry
-│       ├── auth.ts                # JWT, bcrypt, requireAuth, validatePasswordStrength
+│       ├── auth.ts                # JWT, bcrypt, requireAuth, validatePasswordStrength, requireEmVerified
 │       ├── api-response.ts        # ok(), error(), unauthorized() helpers
 │       ├── rate-limit.ts          # In-memory rate limiter
 │       ├── logger.ts              # Structured logger + generateRequestId
@@ -202,7 +203,8 @@ nextBOT/
 │       │   ├── reminder.service.ts      # Cron reminder sender
 │       │   ├── tib-id.service.ts        # assignTibId, getTibIdByPhone
 │       │   ├── confirmation.service.ts  # buildConfirmationMessage, sendTelegramConfirmation
-│       │   └── appointment.service.ts
+│       │   ├── appointment.service.ts
+│       │   └── em-id.service.ts         # nextEmId(tx), normalizeEmId(), getEmployeeByUserId()
 │       ├── validators/
 │       │   └── booking.ts         # validateBookingInput + sanitizeText
 │       └── utils/
@@ -286,6 +288,24 @@ startTime  String   ← "09:00"
 endTime    String   ← "09:30"
 capacity   Int @default(1)
 ```
+
+### Employee
+```
+id             String   @id @default(cuid())
+emId           String   @unique   ← EM000001 format (global sequential, next_em_id() DB funksiyasi)
+firstName      String
+lastName       String?
+phone          String?
+profession     String?  ← "doctor" | "receptionist" | "laborant" | ixtiyoriy kasblar
+userId         String?  @unique   ← User bilan bog'liq (null bo'lishi mumkin)
+maxJobRequests Int      @default(1)
+maxClinics     Int      @default(1)
+isActive       Boolean  @default(true)
+```
+- Doctor va Staff modellarida `employeeId String?` FK (optional, index bor)
+- Admin delete FAQAT `staff.isActive=false` — Employee va User TEGILMAYDI
+- Login: xodim bo'lsa `needsEmVerify: true` qaytadi → `/api/auth/verify-em` → `em_key` cookie
+- `requireEmVerified` guard: 5 ta doctor/reception route'da → cookie `em_key === employee.emId` tekshiriladi
 
 ---
 
@@ -486,6 +506,55 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 ---
 
 ## 12. RECENT CHANGES LOG
+
+### 2026-06-12 — EM ID TIZIMI: Xodim identifikatori va ikki bosqichli login
+
+**Maqsad:** Doktor va qabulxona xodimlariga `EM000001`–`EM999999` formatidagi portativ global ID tayinlash. Login ikki bosqichli: 1) telefon+parol, 2) EM ID kiritish. EM tasdiqlangandan keyin `em_key` cookie orqali xodim panellariga kirish.
+
+**DB:** Allaqachon Supabase'da mavjud edi — `employees` jadvali, `em_id_seq` sequence, `next_em_id()` funksiyasi. Prisma schema'ga faqat model qo'shildi (`prisma generate`, migration YO'Q).
+
+**Muhim cheklovlar (o'zgartirma):**
+- `prisma migrate` / DDL ISHLATILMAYDI — DB schema to'g'ridan Supabase'da boshqariladi
+- `UserRole` enum'ga qiymat qo'shilmaydi — `laborant`, `uzi` kabi kasblar `profession` String maydonida
+- `tibId`, `processBooking`, `isActive`, bron oqimi TEGILMADI
+- `prisma.employee.delete` hech qaysi admin endpointda yo'q
+
+**Yangi fayllar:**
+- `src/lib/services/em-id.service.ts` — `nextEmId(tx)` (DB sequence), `normalizeEmId()`, `getEmployeeByUserId()`
+- `src/app/api/auth/verify-em/route.ts` — `POST` endpoint: rate limit 5/min, JWT auth, EM taqqoslash, `em_key` httpOnly cookie
+
+**O'zgartirilgan fayllar:**
+- `prisma/schema.prisma` — `Employee` model, Doctor/Staff `employeeId FK`, User back-relation
+- `src/app/api/admin/staff/route.ts` — POST: `$transaction` ichida Employee yaratadi + `emId` response'da; GET: `employee.emId` qo'shildi; `profession` field qabul qiladi
+- `src/app/api/admin/doctors/route.ts` — POST: `$transaction` ichida Employee yaratadi (`userId=null`); GET: `employee.emId` qo'shildi
+- `src/app/api/admin/staff/[id]/route.ts` — DELETE: FAQAT `staff.isActive=false` (user/employee tegilmaydi)
+- `src/lib/auth.ts` — `requireEmVerified(req, auth)` funksiyasi: `em_key` cookie vs `employee.emId` taqqoslash; admin → `true` (EM talab qilinmaydi)
+- `src/app/api/auth/login/route.ts` — `needsEmVerify` flag response'ga qo'shildi
+- 5 ta route — `requireEmVerified` guard qo'shildi:
+  - `src/app/api/doctor/appointments/route.ts`
+  - `src/app/api/doctor/appointments/[id]/attendance/route.ts`
+  - `src/app/api/doctor/profile/route.ts`
+  - `src/app/api/reception/appointments/route.ts`
+  - `src/app/api/reception/appointments/[id]/payment/route.ts`
+- `src/app/login/page.tsx` — 2 bosqichli login UI: `"login" | "em"` state; EM input (uppercase); noto'g'ri → xato xabar; "Orqaga" tugmasi
+- `src/components/pages/DoctorQueueView.tsx` + `ReceptionView.tsx` — 403 `EM_REQUIRED` → `/login` redirect
+- `src/app/doctor/profile/page.tsx` — EM ID karta (nusxalash tugmasi bilan)
+- `src/app/admin/(panel)/staff/page.tsx` — EM badge + profession maydoni + credentials modal'da emId
+- `src/app/admin/(panel)/doctors/page.tsx` — EM badge + credentials modal'da emId
+- `src/lib/identity/index.ts` — `conflict_staff_account` himoya: telefon egasi xodim bo'lsa merge bloklandi
+- `src/app/api/webapp/profile/route.ts` — `conflict_staff_account` → 409 "Bu raqam xodim akkauntiga tegishli"
+
+**Test natijalari:**
+- Admin login: `needsEmVerify: false` ✅
+- Receptionist login: `needsEmVerify: true` → `verify-em EM000015` → `em_key` cookie ✅
+- Noto'g'ri `em_key` → reception `403 EM_REQUIRED` ✅
+- To'g'ri `em_key` → reception `200` ✅
+- Yangi staff yaratish `profession=laborant` → `emId: EM000015` ✅
+- Staff/doctors listda EM badge'lar ko'rinmoqda ✅
+
+**Commit:** 7 ta commit (feat/em-id-system). Deploy: https://tibtaqvim.vercel.app ✅
+
+---
 
 ### 2026-06-09 — ONBOARDING: 3 ekranli to'liq onboarding tizimi
 
