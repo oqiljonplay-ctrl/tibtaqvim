@@ -17,10 +17,11 @@ export async function GET(req: NextRequest) {
       dependentBookingLimit: true,
       maxDependents: true,
       discountPercent: true,
+      showRatingCount: true,
     },
   });
 
-  return ok(settings ?? { patientSelfLimit: 4, dependentBookingLimit: 1, maxDependents: 2, discountPercent: 0 });
+  return ok(settings ?? { patientSelfLimit: 4, dependentBookingLimit: 1, maxDependents: 2, discountPercent: 0, showRatingCount: false });
 }
 
 // PUT /api/admin/clinic-settings — 3 limit sozlamani yangilash
@@ -38,7 +39,7 @@ export async function PUT(req: NextRequest) {
     return error("JSON format noto'g'ri", 400);
   }
 
-  const { patientSelfLimit, dependentBookingLimit, maxDependents, discountPercent } = body as Record<string, unknown>;
+  const { patientSelfLimit, dependentBookingLimit, maxDependents, discountPercent, showRatingCount } = body as Record<string, unknown>;
 
   if (typeof patientSelfLimit !== "number" || patientSelfLimit < 1 || patientSelfLimit > 10)
     return error("patientSelfLimit 1 dan 10 gacha bo'lishi kerak", 400);
@@ -48,22 +49,29 @@ export async function PUT(req: NextRequest) {
     return error("maxDependents 0 dan 5 gacha bo'lishi kerak", 400);
   if (typeof discountPercent !== "number" || !Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 100)
     return error("discountPercent 0 dan 100 gacha butun son bo'lishi kerak", 400);
+  if (showRatingCount !== undefined && typeof showRatingCount !== "boolean")
+    return error("showRatingCount boolean bo'lishi kerak", 400);
 
   const updated = await prisma.clinicSettings.upsert({
     where: { clinicId: auth.clinicId },
-    update: { patientSelfLimit, dependentBookingLimit, maxDependents, discountPercent },
+    update: {
+      patientSelfLimit, dependentBookingLimit, maxDependents, discountPercent,
+      ...(showRatingCount !== undefined ? { showRatingCount: showRatingCount as boolean } : {}),
+    },
     create: {
       clinicId: auth.clinicId,
       patientSelfLimit,
       dependentBookingLimit,
       maxDependents,
       discountPercent,
+      showRatingCount: (showRatingCount as boolean | undefined) ?? false,
     },
     select: {
       patientSelfLimit: true,
       dependentBookingLimit: true,
       maxDependents: true,
       discountPercent: true,
+      showRatingCount: true,
     },
   });
 

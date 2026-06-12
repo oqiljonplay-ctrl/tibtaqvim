@@ -8,6 +8,10 @@ interface LimitSettings {
   discountPercent: number;
 }
 
+interface FullSettings extends LimitSettings {
+  showRatingCount: boolean;
+}
+
 type SettingsKey = keyof LimitSettings;
 
 interface FieldMeta {
@@ -54,11 +58,12 @@ const FIELDS: FieldMeta[] = [
   },
 ];
 
-const DEFAULT_SETTINGS: LimitSettings = {
+const DEFAULT_SETTINGS: FullSettings = {
   patientSelfLimit: 4,
   dependentBookingLimit: 1,
   maxDependents: 2,
   discountPercent: 0,
+  showRatingCount: false,
 };
 
 function toInputMap(s: LimitSettings): Record<SettingsKey, string> {
@@ -71,11 +76,12 @@ function toInputMap(s: LimitSettings): Record<SettingsKey, string> {
 }
 
 export default function AdminSettingsPage() {
-  const [settings, setSettings] = useState<LimitSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<FullSettings>(DEFAULT_SETTINGS);
   // inputValues — foydalanuvchi yozayotgan raw string (bo'sh bo'lishi mumkin)
   const [inputValues, setInputValues] = useState<Record<SettingsKey, string>>(
     toInputMap(DEFAULT_SETTINGS)
   );
+  const [showRatingCount, setShowRatingCount] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -87,6 +93,7 @@ export default function AdminSettingsPage() {
         if (res.success && res.data) {
           setSettings(res.data);
           setInputValues(toInputMap(res.data));
+          setShowRatingCount(res.data.showRatingCount ?? false);
         }
       })
       .catch(() => {})
@@ -120,12 +127,13 @@ export default function AdminSettingsPage() {
       const res = await fetch("/api/admin/clinic-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({ ...settings, showRatingCount }),
       });
       const data = await res.json();
       if (data.success) {
         setSettings(data.data);
         setInputValues(toInputMap(data.data));
+        setShowRatingCount(data.data.showRatingCount ?? false);
         setMessage({ type: "ok", text: "Sozlamalar saqlandi!" });
       } else {
         setMessage({ type: "err", text: data.error?.message ?? "Xatolik yuz berdi" });
@@ -196,6 +204,36 @@ export default function AdminSettingsPage() {
             </div>
           );
         })}
+
+        {/* showRatingCount toggle */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 md:p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-1">
+              <span className="block text-sm font-medium text-gray-900">
+                Reyting sonini ko'rsatish
+              </span>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Yoqilsa, shifokor reytingi yonida baholashlar soni (masalan 4.8 ★ · 23) ko'rinadi.
+                O'chirilsa, faqat yulduz ko'rinadi, son yashiriladi.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showRatingCount}
+              onClick={() => setShowRatingCount((v) => !v)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                showRatingCount ? "bg-blue-600" : "bg-gray-200"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform ${
+                  showRatingCount ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
 
         {message && (
           <div

@@ -17,6 +17,13 @@ export async function GET(req: NextRequest) {
     const clinic = await prisma.clinic.findUnique({ where: { id: clinicId, isActive: true } });
     if (!clinic) return notFound("Clinic not found");
 
+    // showRatingCount — bitta marta o'qiladi, barcha doctor mapping uchun ishlatiladi
+    const clinicSettingsRow = await prisma.clinicSettings.findUnique({
+      where: { clinicId },
+      select: { showRatingCount: true },
+    });
+    const showRatingCount = clinicSettingsRow?.showRatingCount ?? false;
+
     const rawServices = await prisma.service.findMany({
       where: {
         clinicId,
@@ -31,7 +38,10 @@ export async function GET(req: NextRequest) {
           where: { doctor: { isActive: true, isHidden: false } },
           include: {
             doctor: {
-              select: { id: true, firstName: true, lastName: true, specialty: true, photoUrl: true },
+              select: {
+                id: true, firstName: true, lastName: true, specialty: true, photoUrl: true,
+                employee: { select: { compositeRating: true, ratingCount: true } },
+              },
             },
           },
         },
@@ -56,10 +66,20 @@ export async function GET(req: NextRequest) {
       prePaymentAmount: s.prePaymentAmount ? Number(s.prePaymentAmount) : null,
       defaultQueueMode: s.defaultQueueMode,
       branchName: s.branch?.name ?? "Bosh ofis",
-      doctors: s.doctors.map((sd) => ({
-        ...sd.doctor,
-        queueMode: sd.queueMode,
-      })),
+      doctors: s.doctors
+        .map((sd) => ({
+          id: sd.doctor.id,
+          firstName: sd.doctor.firstName,
+          lastName: sd.doctor.lastName,
+          specialty: sd.doctor.specialty,
+          photoUrl: sd.doctor.photoUrl,
+          queueMode: sd.queueMode,
+          compositeRating: sd.doctor.employee?.compositeRating != null
+            ? Number(sd.doctor.employee.compositeRating)
+            : null,
+          ratingCount: showRatingCount ? (sd.doctor.employee?.ratingCount ?? null) : null,
+        }))
+        .sort((a, b) => (b.compositeRating ?? -1) - (a.compositeRating ?? -1)),
       ...extra,
     });
 
