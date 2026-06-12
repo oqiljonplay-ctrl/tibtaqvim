@@ -222,6 +222,7 @@ model Doctor {
   clinicId        String
   branchId        String?
   userId          String?  @unique
+  employeeId      String?
   firstName       String
   lastName        String
   specialty       String
@@ -243,6 +244,7 @@ model Doctor {
   clinic          Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   branch          Branch?           @relation(fields: [branchId], references: [id])
   user            User?             @relation(fields: [userId], references: [id])
+  employee        Employee?         @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   appointments    Appointment[]
   services        ServiceDoctor[]
   specialties     DoctorSpecialty[]
@@ -252,6 +254,7 @@ model Doctor {
   blockedDates    DoctorBlockedDate[]
 
   @@index([clinicId])
+  @@index([employeeId])
   @@map("doctors")
 }
 
@@ -336,6 +339,7 @@ model Staff {
   clinicId   String
   branchId   String?
   userId     String?  @unique
+  employeeId String?
   firstName  String
   lastName   String
   role       UserRole @default(receptionist)
@@ -348,10 +352,33 @@ model Staff {
   clinic               Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   branch               Branch?       @relation(fields: [branchId], references: [id])
   user                 User?         @relation(fields: [userId], references: [id])
+  employee             Employee?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   assignedAppointments Appointment[] @relation("AssignedStaff")
 
   @@index([clinicId])
+  @@index([employeeId])
   @@map("staff")
+}
+
+model Employee {
+  id             String   @id @default(cuid())
+  emId           String   @unique
+  firstName      String
+  lastName       String?
+  phone          String?
+  profession     String?
+  userId         String?  @unique
+  maxJobRequests Int      @default(1)
+  maxClinics     Int      @default(1)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  staff   Staff[]
+  doctors Doctor[]
+
+  @@map("employees")
 }
 
 model User {
@@ -378,6 +405,7 @@ model User {
   branch             Branch?             @relation(fields: [branchId], references: [id])
   doctor             Doctor?
   staff              Staff?
+  employee           Employee?
   appointments       Appointment[]
   telegramIdHistory  TelegramIdHistory[]
   userClinics        UserClinic[]
