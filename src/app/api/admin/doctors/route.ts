@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { getBranchScope, resolveBranchIdForCreate, canManageResources } from "@/lib/branch-scope";
+import { nextEmId } from "@/lib/services/em-id.service";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,12 +22,14 @@ export async function GET(req: NextRequest) {
             service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
           },
         },
+        employee: { select: { emId: true } },
       },
       orderBy: { lastName: "asc" },
     });
 
     return ok(doctors.map((d) => ({
       ...d,
+      emId: d.employee?.emId ?? null,
       services: d.services.map((sd) => ({
         ...sd.service,
         price: Number(sd.service.price),
@@ -56,31 +59,47 @@ export async function POST(req: NextRequest) {
 
     const branchId = resolveBranchIdForCreate(auth, body.branchId);
 
-    const doctor = await prisma.doctor.create({
-      data: {
-        clinicId,
-        firstName,
-        lastName,
-        specialty,
-        phone: phone ?? null,
-        branchId,
-        photoUrl: photoUrl ?? null,
-        ...(Array.isArray(serviceIds) && serviceIds.length > 0
-          ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }
-          : {}),
-      },
-      include: {
-        branch: { select: { name: true } },
-        services: {
-          include: {
-            service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
-          },
+    const doctor = await prisma.$transaction(async (tx) => {
+      const emId = await nextEmId(tx);
+      const employee = await tx.employee.create({
+        data: {
+          emId,
+          firstName,
+          lastName,
+          phone: phone ?? null,
+          profession: specialty ?? "doctor",
+          userId: null,
         },
-      },
+      });
+      return tx.doctor.create({
+        data: {
+          clinicId,
+          firstName,
+          lastName,
+          specialty,
+          phone: phone ?? null,
+          branchId,
+          photoUrl: photoUrl ?? null,
+          employeeId: employee.id,
+          ...(Array.isArray(serviceIds) && serviceIds.length > 0
+            ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }
+            : {}),
+        },
+        include: {
+          branch: { select: { name: true } },
+          services: {
+            include: {
+              service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
+            },
+          },
+          employee: { select: { emId: true } },
+        },
+      });
     });
 
     return created({
       ...doctor,
+      emId: doctor.employee?.emId ?? null,
       services: doctor.services.map((sd) => ({
         ...sd.service,
         price: Number(sd.service.price),
