@@ -40,6 +40,12 @@ export async function mergeGuestToTelegramUser(
       data:  { userId: telegramUserId },
     });
 
+    // 3.5. DoctorRatings reassign (telegramId ustuni zaxira himoya sifatida saqlanadi)
+    await tx.doctorRating.updateMany({
+      where: { userId: guestUserId },
+      data:  { userId: telegramUserId },
+    });
+
     // 4. UserClinic reassign — @@unique([userId, clinicId]) conflict e'tibor
     const guestClinics = await tx.userClinic.findMany({
       where: { userId: guestUserId },
