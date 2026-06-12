@@ -5,6 +5,7 @@ import { comparePassword, signToken } from "@/lib/auth";
 import { error, unauthorized } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
 import { normalizePhone } from "@/lib/utils/phone";
+import { getEmployeeByUserId } from "@/lib/services/em-id.service";
 
 // Brute-force himoyasi: 2-qavatli — 5/daqiqa + 20/soat
 // 5/min: qisqa portlarni bloklaydi; 20/soat: uzoq sessiya brute-force'ni bloklaydi
@@ -83,9 +84,15 @@ export async function POST(req: NextRequest) {
       role: user.role,
     });
 
+    const employee = await getEmployeeByUserId(user.id);
+    const needsEmVerify = !!employee;
+
     const response = NextResponse.json({
       success: true,
-      data: { user: { id: user.id, role: user.role, clinicId: user.clinicId, branchId: user.branchId ?? null, firstName: user.firstName } },
+      data: {
+        user: { id: user.id, role: user.role, clinicId: user.clinicId, branchId: user.branchId ?? null, firstName: user.firstName },
+        needsEmVerify,
+      },
     });
     response.cookies.set("auth_token", token, {
       httpOnly: true,

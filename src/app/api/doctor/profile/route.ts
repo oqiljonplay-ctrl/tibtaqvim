@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, requireEmVerified } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, notFound, serverError } from "@/lib/api-response";
 
 function doctorProfileInclude() {
@@ -18,13 +18,20 @@ export async function GET(req: NextRequest) {
     if (!auth) return unauthorized();
     if (auth.role !== "doctor") return forbidden();
 
+    if (!(await requireEmVerified(req, auth))) {
+      return error({ code: "EM_REQUIRED", message: "EM id tasdiqlanmagan" }, 403);
+    }
+
     const doctor = await prisma.doctor.findFirst({
       where: { userId: auth.userId, isActive: true },
-      include: doctorProfileInclude(),
+      include: {
+        ...doctorProfileInclude(),
+        employee: { select: { emId: true } },
+      },
     });
 
     if (!doctor) return notFound("Shifokor topilmadi");
-    return ok(doctor);
+    return ok({ ...doctor, emId: doctor.employee?.emId ?? null });
   } catch {
     return serverError();
   }
@@ -35,6 +42,10 @@ export async function PUT(req: NextRequest) {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
     if (auth.role !== "doctor") return forbidden();
+
+    if (!(await requireEmVerified(req, auth))) {
+      return error({ code: "EM_REQUIRED", message: "EM id tasdiqlanmagan" }, 403);
+    }
 
     const doctor = await prisma.doctor.findFirst({
       where: { userId: auth.userId, isActive: true },

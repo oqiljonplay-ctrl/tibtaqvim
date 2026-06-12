@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, requireEmVerified } from "@/lib/auth";
 import { ok, error } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { getBranchScope } from "@/lib/branch-scope";
@@ -19,6 +19,10 @@ export async function GET(req: NextRequest) {
 
   const allowedRoles = ["receptionist", "clinic_admin", "branch_admin", "super_admin"];
   if (!allowedRoles.includes(auth.role)) return error("Ruxsat yo'q", 403);
+
+  if (!(await requireEmVerified(req, auth))) {
+    return error({ code: "EM_REQUIRED", message: "EM id tasdiqlanmagan" }, 403);
+  }
 
   try {
     const { searchParams } = new URL(req.url);

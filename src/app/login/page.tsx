@@ -10,14 +10,25 @@ const roleRedirects: Record<string, string> = {
   receptionist: "/reception",
 };
 
+interface PendingUser {
+  id: string;
+  role: string;
+  clinicId: string | null;
+  branchId: string | null;
+  firstName: string;
+}
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl");
+  const [step, setStep] = useState<"login" | "em">("login");
   const [form, setForm] = useState({ identifier: "", password: "" });
+  const [emInput, setEmInput] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingUser, setPendingUser] = useState<PendingUser | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleLoginSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -40,20 +51,113 @@ function LoginForm() {
         return;
       }
 
-      const { user } = json.data;
+      const { user, needsEmVerify } = json.data;
       localStorage.setItem("user_role", user.role);
       localStorage.setItem("user_name", user.firstName);
       if (user.clinicId) localStorage.setItem("clinicId", user.clinicId);
       if (user.branchId) localStorage.setItem("branchId", user.branchId);
       else localStorage.removeItem("branchId");
 
-      const redirect = returnUrl || roleRedirects[user.role] || "/";
+      if (needsEmVerify) {
+        setPendingUser(user);
+        setStep("em");
+      } else {
+        const redirect = returnUrl || roleRedirects[user.role] || "/";
+        window.location.href = redirect;
+      }
+    } catch {
+      setError("Server bilan bog'lanishda xatolik");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleEmSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/verify-em", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emId: emInput }),
+      });
+
+      const json = await res.json();
+
+      if (!json.success) {
+        setError("EM id noto'g'ri");
+        return;
+      }
+
+      const redirect = returnUrl || roleRedirects[pendingUser!.role] || "/";
       window.location.href = redirect;
     } catch {
       setError("Server bilan bog'lanishda xatolik");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (step === "em") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+          <div className="text-center mb-8">
+            <div className="text-5xl mb-3">🪪</div>
+            <h1 className="text-2xl font-bold text-gray-900">Xodim ID</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Salom, <span className="font-medium text-gray-700">{pendingUser?.firstName}</span>! Kirish uchun xodim ID raqamingizni kiriting.
+            </p>
+          </div>
+
+          <form onSubmit={handleEmSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Xodim ID raqami
+              </label>
+              <input
+                type="text"
+                className="input text-center font-mono text-lg tracking-widest uppercase"
+                placeholder="EM000001"
+                value={emInput}
+                onChange={(e) => setEmInput(e.target.value.toUpperCase())}
+                required
+                autoFocus
+                autoComplete="off"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Admin tomonidan berilgan EM raqamingizni kiriting (masalan: EM000015)
+              </p>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !emInput}
+              className="btn-primary w-full py-3 text-base"
+            >
+              {loading ? "Tekshirilmoqda..." : "Kirish"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setStep("login"); setError(""); setEmInput(""); }}
+              className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
+            >
+              ← Orqaga
+            </button>
+          </form>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -65,7 +169,7 @@ function LoginForm() {
           <p className="text-gray-500 text-sm mt-1">Tizimga kirish</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleLoginSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Login yoki telefon
