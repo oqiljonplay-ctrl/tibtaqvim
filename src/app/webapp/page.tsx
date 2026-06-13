@@ -25,6 +25,8 @@ type BookingStep = "services" | "doctor" | "date" | "slots" | "form" | "confirm"
 interface ServiceDoctor {
   id: string; firstName: string; lastName: string; specialty: string; photoUrl: string | null;
   queueMode?: "live" | "online" | "slot";
+  compositeRating?: number | null;
+  ratingCount?: number | null;
 }
 interface Service {
   id: string; name: string; type: string; price: number;
@@ -1114,6 +1116,7 @@ export default function WebApp() {
                     onCancel={cancelAppointment}
                     onRebook={startRebook}
                     cancellingId={cancellingId}
+                    telegramId={telegramId}
                   />
                 ))}
               </div>
@@ -1138,6 +1141,7 @@ export default function WebApp() {
                     onCancel={cancelAppointment}
                     onRebook={startRebook}
                     cancellingId={cancellingId}
+                    telegramId={telegramId}
                   />
                 ))}
               </div>
@@ -1156,6 +1160,7 @@ export default function WebApp() {
                     onCancel={cancelAppointment}
                     onRebook={startRebook}
                     cancellingId={cancellingId}
+                    telegramId={telegramId}
                   />
                 ))}
               </div>

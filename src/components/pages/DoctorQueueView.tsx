@@ -45,13 +45,25 @@ export default function DoctorQueueView({ context = "standalone" }: DoctorQueueV
   const [lastRefresh, setLastRefresh] = useState("");
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [showBlockManager, setShowBlockManager] = useState(false);
+  const [isInactive, setIsInactive] = useState(false);
+  const [inactiveEmId, setInactiveEmId] = useState<string | null>(null);
   const dateRef = useRef(date);
 
   useEffect(() => {
-    if (context === "admin") return; // admin'ning shaxsiy doctorId'si yo'q
+    if (context === "admin") return;
     fetch("/api/doctor/profile", { credentials: "include" })
       .then((r) => r.json())
-      .then((j) => { if (j.success) setDoctorId(j.data.id); })
+      .then((j) => {
+        if (j.success) {
+          if (j.data.inactive) {
+            setIsInactive(true);
+            setInactiveEmId(j.data.emId ?? null);
+            setLoading(false);
+          } else {
+            setDoctorId(j.data.id);
+          }
+        }
+      })
       .catch(() => {});
   }, [context]);
 
@@ -115,6 +127,37 @@ export default function DoctorQueueView({ context = "standalone" }: DoctorQueueV
     } finally {
       setActionLoading(null);
     }
+  }
+
+  // Bo'shatilgan shifokor — faol klinika yo'q holat ekrani
+  if (isInactive) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+        <div className="text-5xl mb-4">🏥</div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">Faol ish joyi yo&apos;q</h2>
+        <p className="text-gray-500 text-sm leading-relaxed max-w-sm mb-4">
+          Siz hozirda hech qaysi klinikada faol xodim emassiz.
+          {inactiveEmId && (
+            <> <span className="font-semibold text-blue-600">EM ID: {inactiveEmId}</span>.</>
+          )}{" "}
+          Profil ma&apos;lumotlaringiz va statistikangiz saqlangan. Yangi klinikaga ishga kirish — klinika administratori sizni EM ID orqali ishga oladi.
+        </p>
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <a
+            href="/doctor/profile"
+            className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold text-center"
+          >
+            📋 Profilni ko&apos;rish
+          </a>
+          <a
+            href="/doctor/stats"
+            className="w-full py-3 rounded-xl border border-gray-200 text-gray-700 text-sm font-medium text-center"
+          >
+            📊 Tarixiy statistika
+          </a>
+        </div>
+      </div>
+    );
   }
 
   const isToday = date === new Date().toLocaleDateString("sv-SE");

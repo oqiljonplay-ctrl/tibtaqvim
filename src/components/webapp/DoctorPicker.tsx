@@ -47,6 +47,9 @@ export function DoctorPicker({ doctors, onSelect }: Props) {
             {doc.specialty && (
               <div className="text-xs text-blue-600 mt-0.5">{doc.specialty}</div>
             )}
+            {doc.compositeRating != null && (
+              <div className="text-xs text-amber-500 font-medium mt-0.5">★ {doc.compositeRating.toFixed(1)}</div>
+            )}
             {doc.queueMode && (
               <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                 {queueLabels[doc.queueMode] ?? doc.queueMode}
@@ -90,6 +93,9 @@ export function DoctorPicker({ doctors, onSelect }: Props) {
                 </div>
                 {doc.specialty && (
                   <div className="text-xs text-gray-500 mt-0.5">{doc.specialty}</div>
+                )}
+                {doc.compositeRating != null && (
+                  <div className="text-xs text-amber-500 font-medium mt-0.5">★ {doc.compositeRating.toFixed(1)}</div>
                 )}
                 {doc.queueMode && (
                   <span className="inline-block mt-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">

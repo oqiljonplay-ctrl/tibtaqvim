@@ -50,6 +50,7 @@ interface Props {
   onRebook: (serviceId: string) => void;
   onCancel: (appointmentId: string) => void;
   cancellingId?: string | null;
+  telegramId?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -131,7 +132,7 @@ function ChipList({ icon, label, items }: { icon: string; label: string; items: 
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancellingId }: Props) {
+export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancellingId, telegramId }: Props) {
   const [flipped, setFlipped] = useState(false);
   const [paymentNotice, setPaymentNotice] = useState(false);
   const [fullDoc, setFullDoc] = useState<DocData | null>(null);
@@ -157,7 +158,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
     return () => clearTimeout(t);
   }, [ratingThanks]);
 
-  async function submitRating(telegramId?: string | null) {
+  async function submitRating() {
     if (ratingStars === 0 || ratingSubmitting) return;
     setRatingSubmitting(true);
     setRatingError(null);
@@ -190,7 +191,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
     }
   }
 
-  async function updateRating(telegramId?: string | null) {
+  async function updateRating() {
     if (ratingStars === 0 || ratingSubmitting || !myRatingId) return;
     setRatingSubmitting(true);
     setRatingError(null);
@@ -425,7 +426,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
           )}
 
           {/* ── Baholash paneli (grid-rows animatsiya) ── */}
-          {(a.canRate || ratingDone === false) && !myStars && (
+          {a.canRate && !ratingDone && !myStars && (
             <div
               style={{
                 display: "grid",
@@ -448,11 +449,8 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
                     <button
                       disabled={ratingSubmitting}
                       onClick={() => {
-                        const tgId = typeof window !== "undefined"
-                          ? (window as unknown as Record<string, string | null | undefined>).__tgId
-                          : null;
-                        if (myRatingId) updateRating(tgId);
-                        else submitRating(tgId);
+                        if (myRatingId) updateRating();
+                        else submitRating();
                       }}
                       className="w-full py-2.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
                     >

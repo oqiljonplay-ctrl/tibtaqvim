@@ -22,16 +22,55 @@ export async function GET(req: NextRequest) {
       return error({ code: "EM_REQUIRED", message: "EM id tasdiqlanmagan" }, 403);
     }
 
+    // Faol shifokorni qidir
     const doctor = await prisma.doctor.findFirst({
       where: { userId: auth.userId, isActive: true },
       include: {
         ...doctorProfileInclude(),
-        employee: { select: { emId: true } },
+        employee: {
+          select: {
+            emId: true,
+            stints: { where: { endDate: null }, select: { id: true }, take: 1 },
+          },
+        },
       },
     });
 
-    if (!doctor) return notFound("Shifokor topilmadi");
-    return ok({ ...doctor, emId: doctor.employee?.emId ?? null });
+    if (doctor) {
+      // Faol stintlar bormi?
+      const hasActiveStint = (doctor.employee?.stints?.length ?? 0) > 0;
+      if (!hasActiveStint) {
+        // Doctor DB'da bor lekin faol klinikasi yo'q — portativ holat
+        return ok({
+          id: doctor.id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          emId: doctor.employee?.emId ?? null,
+          inactive: true,
+        });
+      }
+      return ok({ ...doctor, emId: doctor.employee?.emId ?? null, inactive: false });
+    }
+
+    // isActive=false bo'lgan doctor — bo'shatilgan
+    const inactiveDoctor = await prisma.doctor.findFirst({
+      where: { userId: auth.userId },
+      select: {
+        id: true, firstName: true, lastName: true,
+        employee: { select: { emId: true } },
+      },
+    });
+    if (inactiveDoctor) {
+      return ok({
+        id: inactiveDoctor.id,
+        firstName: inactiveDoctor.firstName,
+        lastName: inactiveDoctor.lastName,
+        emId: inactiveDoctor.employee?.emId ?? null,
+        inactive: true,
+      });
+    }
+
+    return notFound("Shifokor topilmadi");
   } catch {
     return serverError();
   }

@@ -174,6 +174,7 @@ export default function DoctorProfilePage() {
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [emId, setEmId] = useState<string | null>(null);
   const [emCopied, setEmCopied] = useState(false);
+  const [isInactive, setIsInactive] = useState(false);
 
   // Form state
   const [education, setEducation]             = useState("");
@@ -192,6 +193,12 @@ export default function DoctorProfilePage() {
       .then((r) => r.json())
       .then((json) => {
         if (json.success && json.data) {
+          if (json.data.inactive) {
+            setIsInactive(true);
+            setEmId(json.data.emId ?? null);
+            setLoading(false);
+            return;
+          }
           const d: DoctorProfile = json.data;
           setProfile(d);
           setEmId(d.emId ?? null);
@@ -258,6 +265,21 @@ export default function DoctorProfilePage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-gray-400 animate-pulse">Yuklanmoqda...</p>
+      </div>
+    );
+  }
+
+  if (isInactive) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+        <div className="text-5xl mb-4">🏥</div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">Faol ish joyi yo&apos;q</h2>
+        {emId && (
+          <p className="text-sm text-blue-600 font-semibold mb-3">EM ID: {emId}</p>
+        )}
+        <p className="text-gray-500 text-sm max-w-sm leading-relaxed">
+          Siz hozirda faol xodim emassiz. Profil ma&apos;lumotlaringiz saqlangan. Yangi klinikaga ishga kirish uchun klinika administratori sizni EM ID orqali qo&apos;shadi.
+        </p>
       </div>
     );
   }

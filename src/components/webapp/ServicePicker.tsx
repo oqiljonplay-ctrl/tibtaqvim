@@ -7,6 +7,8 @@ export interface ServiceDoctor {
   specialty: string;
   photoUrl: string | null;
   queueMode?: "live" | "online" | "slot";
+  compositeRating?: number | null;
+  ratingCount?: number | null;
 }
 
 export interface Service {
@@ -102,6 +104,9 @@ export function ServicePicker({ services, loading, onSelect, userLoading }: Prop
                       )}
                       <span className="text-xs text-gray-500">
                         {doc.specialty} — {doc.lastName} {doc.firstName}
+                        {doc.compositeRating != null && (
+                          <span className="ml-1 text-amber-500 font-medium">★ {doc.compositeRating.toFixed(1)}</span>
+                        )}
                       </span>
                     </div>
                   ))}
