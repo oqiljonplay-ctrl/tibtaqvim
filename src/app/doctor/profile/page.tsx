@@ -275,11 +275,23 @@ export default function DoctorProfilePage() {
         <div className="text-5xl mb-4">🏥</div>
         <h2 className="text-xl font-bold text-gray-800 mb-2">Faol ish joyi yo&apos;q</h2>
         {emId && (
-          <p className="text-sm text-blue-600 font-semibold mb-3">EM ID: {emId}</p>
+          <button
+            onClick={() => { navigator.clipboard.writeText(emId); }}
+            className="text-sm text-blue-600 font-semibold mb-3 hover:text-blue-800"
+            title="Nusxalash"
+          >
+            EM ID: {emId} 📋
+          </button>
         )}
-        <p className="text-gray-500 text-sm max-w-sm leading-relaxed">
-          Siz hozirda faol xodim emassiz. Profil ma&apos;lumotlaringiz saqlangan. Yangi klinikaga ishga kirish uchun klinika administratori sizni EM ID orqali qo&apos;shadi.
+        <p className="text-gray-500 text-sm max-w-sm leading-relaxed mb-6">
+          Siz hozirda faol xodim emassiz. Profil ma&apos;lumotlaringiz saqlangan va keyingi klinikada davom etadi.
         </p>
+        <button
+          onClick={() => router.push("/doctor/clinics")}
+          className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+        >
+          🔍 Klinika qidirish va ishga so&apos;rov yuborish
+        </button>
       </div>
     );
   }
@@ -296,7 +308,14 @@ export default function DoctorProfilePage() {
               </p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => router.push("/doctor/clinics")}
+              className="px-3 py-2 border border-blue-200 rounded-xl text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+            >
+              ➕ Yangi klinikaga
+            </button>
             <button
               type="button"
               onClick={() => router.push("/doctor/stats")}

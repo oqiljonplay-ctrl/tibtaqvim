@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface SidebarItem {
@@ -15,6 +15,7 @@ const ALL_ADMIN_ITEMS: SidebarItem[] = [
   { href: "/admin/services",       label: "Xizmatlar" },
   { href: "/admin/doctors",        label: "Shifokorlar" },
   { href: "/admin/staff",          label: "Xodimlar",         roles: ["super_admin", "clinic_admin", "branch_admin"] },
+  { href: "/admin/job-requests",   label: "Xodim so'rovlari", roles: ["super_admin", "clinic_admin", "branch_admin"] },
   { href: "/admin/branches",       label: "Filiallar",        roles: ["super_admin", "clinic_admin"] },
   { href: "/admin/promotions",     label: "Telegram postlar", roles: ["super_admin", "clinic_admin", "branch_admin"] },
   { href: "/admin/broadcast",      label: "Broadcast",        roles: ["clinic_admin"] },
@@ -29,9 +30,10 @@ function isActive(itemHref: string, currentPath: string): boolean {
   return currentPath === itemHref || currentPath.startsWith(itemHref + "/");
 }
 
-function SidebarLinks({ items, path, onNavigate }: {
+function SidebarLinks({ items, path, jobRequestCount, onNavigate }: {
   items: SidebarItem[];
   path: string;
+  jobRequestCount: number;
   onNavigate?: () => void;
 }) {
   return (
@@ -41,13 +43,18 @@ function SidebarLinks({ items, path, onNavigate }: {
           key={item.href}
           href={item.href}
           onClick={onNavigate}
-          className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
             isActive(item.href, path)
               ? "bg-blue-50 text-blue-700"
               : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
           }`}
         >
-          {item.label}
+          <span>{item.label}</span>
+          {item.href === "/admin/job-requests" && jobRequestCount > 0 && (
+            <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs font-bold bg-red-500 text-white rounded-full">
+              {jobRequestCount > 9 ? "9+" : jobRequestCount}
+            </span>
+          )}
         </Link>
       ))}
     </nav>
@@ -58,12 +65,26 @@ export default function AdminSidebar() {
   const path = usePathname();
   const { user, loading } = useCurrentUser();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [jobRequestCount, setJobRequestCount] = useState(0);
 
   const items = loading || !user
     ? []
     : ALL_ADMIN_ITEMS.filter(
         (item) => !item.roles || item.roles.includes(user.role)
       );
+
+  useEffect(() => {
+    if (!user || !["super_admin", "clinic_admin", "branch_admin"].includes(user.role)) return;
+    const fetchCount = () => {
+      fetch("/api/admin/job-requests/count", { credentials: "include" })
+        .then((r) => r.json())
+        .then((j) => { if (j.success) setJobRequestCount(j.data?.count ?? 0); })
+        .catch(() => {});
+    };
+    fetchCount();
+    const id = setInterval(fetchCount, 60_000);
+    return () => clearInterval(id);
+  }, [user]);
 
   const skeletons = (
     Array.from({ length: 4 }).map((_, i) => (
@@ -76,7 +97,7 @@ export default function AdminSidebar() {
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-56 flex-shrink-0 bg-white border-r border-gray-200 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto flex-col">
         {loading ? skeletons : (
-          <SidebarLinks items={items} path={path} />
+          <SidebarLinks items={items} path={path} jobRequestCount={jobRequestCount} />
         )}
       </aside>
 
@@ -108,7 +129,7 @@ export default function AdminSidebar() {
               </button>
             </div>
             {loading ? skeletons : (
-              <SidebarLinks items={items} path={path} onNavigate={() => setMobileOpen(false)} />
+              <SidebarLinks items={items} path={path} jobRequestCount={jobRequestCount} onNavigate={() => setMobileOpen(false)} />
             )}
           </aside>
         </>
