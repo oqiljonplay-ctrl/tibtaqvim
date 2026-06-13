@@ -99,3 +99,123 @@ export async function closeStint(
     data: { endDate: new Date(), endReason: p.endReason },
   });
 }
+
+export async function attachEmployeeToClinic(
+  tx: Tx,
+  p: {
+    emId: string;
+    clinicId: string;
+    role: "doctor" | "receptionist";
+    branchId?: string | null;
+    serviceIds?: string[];
+  }
+) {
+  const emId = normalizeEmId(p.emId.trim());
+  const employee = await tx.employee.findUnique({ where: { emId } });
+  if (!employee) throw new ApiError(404, `EM ID topilmadi: ${emId}`);
+  if (!employee.isActive) throw new ApiError(400, "Bu EM ID faol emas");
+
+  const activeElsewhere = await tx.employmentStint.count({
+    where: { employeeId: employee.id, endDate: null, clinicId: { not: p.clinicId } },
+  });
+  if (activeElsewhere >= employee.maxClinics) {
+    throw new ApiError(403, "EM klinika limiti to'lgan (maxClinics).");
+  }
+
+  if (p.role === "doctor") {
+    const existing = await tx.doctor.findFirst({
+      where: { employeeId: employee.id, clinicId: p.clinicId },
+    });
+
+    let doc;
+    if (existing) {
+      doc = await tx.doctor.update({
+        where: { id: existing.id },
+        data: {
+          isActive: true, isHidden: false,
+          branchId: p.branchId ?? existing.branchId,
+          firstName: employee.firstName,
+          lastName: employee.lastName ?? existing.lastName,
+          specialty: employee.specialty ?? existing.specialty,
+          photoUrl: employee.photoUrl ?? existing.photoUrl,
+          ...(Array.isArray(p.serviceIds) && p.serviceIds.length > 0
+            ? { services: { deleteMany: {}, create: p.serviceIds.map((serviceId) => ({ serviceId })) } }
+            : {}),
+        },
+      });
+    } else {
+      doc = await tx.doctor.create({
+        data: {
+          clinicId: p.clinicId,
+          branchId: p.branchId ?? null,
+          employeeId: employee.id,
+          firstName: employee.firstName,
+          lastName: employee.lastName ?? "",
+          specialty: employee.specialty ?? "Shifokor",
+          photoUrl: employee.photoUrl ?? null,
+          isActive: true,
+          ...(Array.isArray(p.serviceIds) && p.serviceIds.length > 0
+            ? { services: { create: p.serviceIds.map((serviceId) => ({ serviceId })) } }
+            : {}),
+        },
+      });
+    }
+
+    await openStint(tx, { employeeId: employee.id, clinicId: p.clinicId, role: "doctor", doctorId: doc.id });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: "system",
+        clinicId: p.clinicId,
+        action: "employee.attached",
+        payload: { emId, employeeId: employee.id, doctorId: doc.id, reactivated: !!existing },
+      },
+    });
+
+    return { doctorId: doc.id, reactivated: !!existing, employee };
+  }
+
+  // role === receptionist
+  const existing = await tx.staff.findFirst({
+    where: { employeeId: employee.id, clinicId: p.clinicId },
+  });
+
+  let staffRec;
+  if (existing) {
+    staffRec = await tx.staff.update({
+      where: { id: existing.id },
+      data: {
+        isActive: true,
+        branchId: p.branchId ?? existing.branchId,
+        firstName: employee.firstName,
+        lastName: employee.lastName ?? existing.lastName,
+        photoUrl: employee.photoUrl ?? existing.photoUrl,
+      },
+    });
+  } else {
+    staffRec = await tx.staff.create({
+      data: {
+        clinicId: p.clinicId,
+        branchId: p.branchId ?? null,
+        employeeId: employee.id,
+        firstName: employee.firstName,
+        lastName: employee.lastName ?? "",
+        role: "receptionist",
+        photoUrl: employee.photoUrl ?? null,
+      },
+    });
+  }
+
+  await openStint(tx, { employeeId: employee.id, clinicId: p.clinicId, role: "receptionist", staffId: staffRec.id });
+
+  await tx.auditLog.create({
+    data: {
+      actorId: "system",
+      clinicId: p.clinicId,
+      action: "employee.attached",
+      payload: { emId, employeeId: employee.id, staffId: staffRec.id, reactivated: !!existing },
+    },
+  });
+
+  return { staffId: staffRec.id, reactivated: !!existing, employee };
+}

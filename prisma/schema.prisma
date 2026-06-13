@@ -151,6 +151,7 @@ model Clinic {
   promotions    ClinicPromotion[]
   stints        EmploymentStint[]
   doctorRatings DoctorRating[]
+  jobRequests   JobRequest[]
 
   @@index([isActive, city])
   @@index([subscriptionStatus])
@@ -279,48 +280,60 @@ model DoctorBlockedDate {
 }
 
 model DoctorSpecialty {
-  id        String  @id @default(cuid())
-  doctorId  String
-  name      String
-  sortOrder Int     @default(0)
-  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  doctorId   String
+  employeeId String?
+  name       String
+  sortOrder  Int       @default(0)
+  doctor     Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([doctorId])
+  @@index([employeeId])
   @@map("doctor_specialties")
 }
 
 model DoctorDirection {
-  id        String  @id @default(cuid())
-  doctorId  String
-  name      String
-  sortOrder Int     @default(0)
-  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  doctorId   String
+  employeeId String?
+  name       String
+  sortOrder  Int       @default(0)
+  doctor     Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([doctorId])
+  @@index([employeeId])
   @@map("doctor_directions")
 }
 
 model DoctorExperience {
-  id        String  @id @default(cuid())
-  doctorId  String
-  place     String
-  startYear Int
-  endYear   Int?
-  sortOrder Int     @default(0)
-  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  doctorId   String
+  employeeId String?
+  place      String
+  startYear  Int
+  endYear    Int?
+  sortOrder  Int       @default(0)
+  doctor     Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([doctorId])
+  @@index([employeeId])
   @@map("doctor_experiences")
 }
 
 model DoctorWorkplace {
-  id        String  @id @default(cuid())
-  doctorId  String
-  place     String
-  sortOrder Int     @default(0)
-  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  doctorId   String
+  employeeId String?
+  place      String
+  sortOrder  Int       @default(0)
+  doctor     Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([doctorId])
+  @@index([employeeId])
   @@map("doctor_workplaces")
 }
 
@@ -379,6 +392,16 @@ model Employee {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  // Portativ profil maydonlari (EM_ID'ga tegishli, klinikaga emas)
+  photoUrl        String?
+  specialty       String?
+  education       String?
+  position        String?
+  department      String?
+  bio             String?  @db.Text
+  workSchedule    String?
+  operationsCount Int?
+
   compositeRating     Decimal?  @db.Decimal(3, 2)
   ratingCount         Int       @default(0)
   ratingPatientScore  Decimal?  @db.Decimal(3, 2)
@@ -387,13 +410,39 @@ model Employee {
   ratingActivityScore Decimal?  @db.Decimal(4, 3)
   ratingLastUpdatedAt DateTime?
 
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  staff   Staff[]
-  doctors Doctor[]
-  stints  EmploymentStint[]
-  ratings DoctorRating[]
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  staff       Staff[]
+  doctors     Doctor[]
+  stints      EmploymentStint[]
+  ratings     DoctorRating[]
+  specialties DoctorSpecialty[]
+  directions  DoctorDirection[]
+  experiences DoctorExperience[]
+  workplaces  DoctorWorkplace[]
+  jobRequests JobRequest[]
 
   @@map("employees")
+}
+
+model JobRequest {
+  id          String    @id @default(cuid())
+  employeeId  String
+  clinicId    String
+  role        String    @default("doctor")
+  status      String    @default("pending")
+  message     String?
+  decidedBy   String?
+  decidedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  clinic      Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, clinicId], name: "uq_pending_request")
+  @@index([clinicId])
+  @@index([employeeId])
+  @@map("job_requests")
 }
 
 model User {

@@ -40,7 +40,13 @@ export async function GET(req: NextRequest) {
             doctor: {
               select: {
                 id: true, firstName: true, lastName: true, specialty: true, photoUrl: true,
-                employee: { select: { compositeRating: true, ratingCount: true } },
+                employee: {
+                  select: {
+                    compositeRating: true, ratingCount: true,
+                    photoUrl: true, specialty: true,
+                    firstName: true, lastName: true,
+                  },
+                },
               },
             },
           },
@@ -69,10 +75,10 @@ export async function GET(req: NextRequest) {
       doctors: s.doctors
         .map((sd) => ({
           id: sd.doctor.id,
-          firstName: sd.doctor.firstName,
-          lastName: sd.doctor.lastName,
-          specialty: sd.doctor.specialty,
-          photoUrl: sd.doctor.photoUrl,
+          firstName: sd.doctor.employee?.firstName ?? sd.doctor.firstName,
+          lastName: sd.doctor.employee?.lastName ?? sd.doctor.lastName,
+          specialty: sd.doctor.employee?.specialty ?? sd.doctor.specialty,
+          photoUrl: sd.doctor.employee?.photoUrl ?? sd.doctor.photoUrl,
           queueMode: sd.queueMode,
           compositeRating: sd.doctor.employee?.compositeRating != null
             ? Number(sd.doctor.employee.compositeRating)
