@@ -19,11 +19,17 @@ export async function GET(req: NextRequest) {
     const clinicIdParam = searchParams.get("clinicId");
     const combined      = searchParams.get("combined") === "true";
 
-    // Doctor → employeeId
-    const doctor = await prisma.doctor.findFirst({
-      where: { userId: auth.userId, isActive: true },
-      select: { id: true, clinicId: true, employeeId: true },
-    });
+    // Doctor → employeeId. Faol doctor birinchi, aks holda employeeId bo'lgan eng so'nggi yozuv.
+    const doctor =
+      (await prisma.doctor.findFirst({
+        where: { userId: auth.userId, isActive: true },
+        select: { id: true, clinicId: true, employeeId: true },
+      })) ??
+      (await prisma.doctor.findFirst({
+        where: { userId: auth.userId, employeeId: { not: null } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, clinicId: true, employeeId: true },
+      }));
     if (!doctor) return notFound("Shifokor topilmadi");
     if (!doctor.employeeId) return error("EM bog'lanmagan", 404);
 

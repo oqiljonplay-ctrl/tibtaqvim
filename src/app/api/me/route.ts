@@ -42,6 +42,22 @@ export async function GET(req: NextRequest) {
 
   if (!user) return error("User not found", 404);
 
+  // Shifokor uchun: klinika/filial faqat FAOL doctor yozuvidan olinadi.
+  // Doctor.isActive=false bo'lsa (0 faol stint) → clinic/branch null qaytadi.
+  let resolvedClinic = user.clinic ?? null;
+  let resolvedBranch = user.branch ?? null;
+  if (user.role === "doctor") {
+    const activeDoctor = await prisma.doctor.findFirst({
+      where: { userId: user.id, isActive: true },
+      select: {
+        clinic: { select: { id: true, name: true, logoUrl: true, city: true } },
+        branch: { select: { id: true, name: true } },
+      },
+    });
+    resolvedClinic = activeDoctor?.clinic ?? null;
+    resolvedBranch = activeDoctor?.branch ?? null;
+  }
+
   return ok({
     id: user.id,
     firstName: user.firstName,
@@ -53,8 +69,8 @@ export async function GET(req: NextRequest) {
     role: user.role,
     clinicId: user.clinicId,
     branchId: user.branchId,
-    clinic: user.clinic ?? null,
-    branch: user.branch ?? null,
+    clinic: resolvedClinic,
+    branch: resolvedBranch,
     createdAt: user.createdAt,
     dependents: user.dependents,
     dependentsCount: user.dependents.length,

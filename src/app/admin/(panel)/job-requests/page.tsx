@@ -60,7 +60,8 @@ export default function AdminJobRequestsPage() {
       const json = await res.json();
       if (json.success) {
         showToast("So'rov tasdiqlandi. Xodim biriktirildi.", "success");
-        fetchRequests();
+        window.dispatchEvent(new CustomEvent("job-request-updated"));
+        setTab("approved");
       } else {
         showToast(json.error?.message || "Xatolik", "error");
       }
@@ -84,7 +85,8 @@ export default function AdminJobRequestsPage() {
       const json = await res.json();
       if (json.success) {
         showToast("So'rov rad etildi", "success");
-        fetchRequests();
+        window.dispatchEvent(new CustomEvent("job-request-updated"));
+        setTab("rejected");
       } else {
         showToast(json.error?.message || "Xatolik", "error");
       }

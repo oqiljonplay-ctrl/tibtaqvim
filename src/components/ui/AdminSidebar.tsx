@@ -83,7 +83,12 @@ export default function AdminSidebar() {
     };
     fetchCount();
     const id = setInterval(fetchCount, 60_000);
-    return () => clearInterval(id);
+    // Approve/reject qilinganda sahifadan event keladi — darhol yangilash
+    window.addEventListener("job-request-updated", fetchCount);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("job-request-updated", fetchCount);
+    };
   }, [user]);
 
   const skeletons = (
