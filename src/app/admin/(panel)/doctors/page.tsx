@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DoctorCard } from "@/components/DoctorCard";
 
@@ -41,7 +41,7 @@ interface Branch {
 }
 
 const emptyForm = {
-  firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "", emId: "",
+  firstName: "", lastName: "", specialty: "", phone: "", photoUrl: "",
   role: "doctor" as StaffRole,
   branchId: "",
 };
@@ -195,6 +195,16 @@ export default function AdminDoctorsPage() {
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [isBranchAdmin, setIsBranchAdmin] = useState(false);
 
+  // ID bilan kiritish modal
+  const [showAttach, setShowAttach] = useState(false);
+  const [attachEmId, setAttachEmId] = useState("");
+  const [attachRole, setAttachRole] = useState<"doctor" | "receptionist">("doctor");
+  const [attachBranchId, setAttachBranchId] = useState("");
+  const [attachServiceIds, setAttachServiceIds] = useState<string[]>([]);
+  const [attachSubmitting, setAttachSubmitting] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const attachInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     fetchDoctors();
     fetchServices();
@@ -266,7 +276,6 @@ export default function AdminDoctorsPage() {
       if (form.role === "doctor") {
         payload.specialty = form.specialty;
         payload.photoUrl = form.photoUrl || null;
-        if (form.emId?.trim()) payload.emId = form.emId.trim();
         payload.serviceIds = (() => {
           const ids = [...selectedServiceIds];
           const matched = services.find((s) => s.name === form.specialty);
@@ -372,23 +381,69 @@ export default function AdminDoctorsPage() {
     }
   }
 
+  async function handleAttach(e: React.FormEvent) {
+    e.preventDefault();
+    if (attachSubmitting) return;
+    if (!attachEmId.trim()) { setAttachError("EM ID kiriting"); return; }
+    setAttachSubmitting(true);
+    setAttachError(null);
+    try {
+      const endpoint = attachRole === "doctor" ? "/api/admin/doctors/attach" : "/api/admin/staff/attach";
+      const payload: Record<string, unknown> = { emId: attachEmId.trim(), branchId: attachBranchId || null };
+      if (attachRole === "doctor") payload.serviceIds = attachServiceIds;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setShowAttach(false);
+        setAttachEmId(""); setAttachServiceIds([]);
+        fetchDoctors();
+      } else {
+        setAttachError(json.error?.message || "Xatolik yuz berdi");
+      }
+    } catch {
+      setAttachError("Server bilan bog'lanishda xatolik");
+    } finally {
+      setAttachSubmitting(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Shifokorlar</h1>
-        <button
-          onClick={() => {
-            const defaultBranchId = isBranchAdmin
-              ? (localStorage.getItem("branchId") || "")
-              : branches.length === 1 ? branches[0].id : "";
-            setForm({ ...emptyForm, branchId: defaultBranchId });
-            setSelectedServiceIds([]);
-            setShowForm(true);
-          }}
-          className="btn-primary"
-        >
-          + Yangi xodim
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setAttachEmId(""); setAttachError(null);
+              setAttachRole("doctor"); setAttachServiceIds([]);
+              setAttachBranchId(isBranchAdmin ? (localStorage.getItem("branchId") || "") : branches.length === 1 ? branches[0].id : "");
+              setShowAttach(true);
+              setTimeout(() => attachInputRef.current?.focus(), 100);
+            }}
+            className="px-3 py-2 text-sm font-medium border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
+          >
+            🔗 ID bilan kiritish
+          </button>
+          <button
+            onClick={() => {
+              const defaultBranchId = isBranchAdmin
+                ? (localStorage.getItem("branchId") || "")
+                : branches.length === 1 ? branches[0].id : "";
+              setForm({ ...emptyForm, branchId: defaultBranchId });
+              setSelectedServiceIds([]);
+              setShowForm(true);
+            }}
+            className="btn-primary"
+          >
+            + Yangi xodim
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -524,21 +579,6 @@ export default function AdminDoctorsPage() {
               </div>
             )}
 
-            {form.role === "doctor" && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">EM ID (ixtiyoriy)</label>
-                <input
-                  className="input"
-                  type="text"
-                  value={form.emId}
-                  onChange={(e) => setForm({ ...form, emId: e.target.value })}
-                  placeholder="Masalan: EM000042"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Agar bu shifokor tizimda boshqa klinikada ishlagan bo&apos;lsa, EM ID sini kiriting — profili va reytinglari ulanadi. Bo&apos;sh qoldirsangiz yangi EM ID yaratiladi.
-                </p>
-              </div>
-            )}
 
             {form.role === "doctor" && services.length > 0 && (
               <div className="md:col-span-2">
@@ -681,6 +721,84 @@ export default function AdminDoctorsPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ID bilan kiritish modali */}
+      {showAttach && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="font-semibold text-lg mb-1">🔗 EM ID bilan ulash</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Tizimda mavjud xodimning EM ID'sini kiriting — profili, reytingi va barcha ma'lumotlari bilan biriktiriladi.
+            </p>
+            <form onSubmit={handleAttach} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+                <div className="flex gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" checked={attachRole === "doctor"} onChange={() => setAttachRole("doctor")} className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm">👨‍⚕️ Shifokor</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" checked={attachRole === "receptionist"} onChange={() => setAttachRole("receptionist")} className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm">🏥 Qabulxona</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">EM ID *</label>
+                <input
+                  ref={attachInputRef}
+                  className="input font-mono"
+                  value={attachEmId}
+                  onChange={(e) => setAttachEmId(e.target.value.toUpperCase())}
+                  placeholder="EM000042"
+                  required
+                />
+              </div>
+
+              {!isBranchAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Filial</label>
+                  <select className="input" value={attachBranchId} onChange={(e) => setAttachBranchId(e.target.value)}>
+                    <option value="">-- Tanlang (ixtiyoriy) --</option>
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {attachRole === "doctor" && services.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Xizmatlar (ixtiyoriy)</label>
+                  <div className="grid grid-cols-1 gap-1 max-h-36 overflow-y-auto border rounded-lg p-2 bg-gray-50">
+                    {services.map((svc) => (
+                      <label key={svc.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={attachServiceIds.includes(svc.id)}
+                          onChange={(e) => setAttachServiceIds((prev) => e.target.checked ? [...prev, svc.id] : prev.filter((x) => x !== svc.id))}
+                        />
+                        <span className="truncate">{svc.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {attachError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{attachError}</div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button type="submit" disabled={attachSubmitting} className="flex-1 btn-primary disabled:opacity-50">
+                  {attachSubmitting ? "Ulanmoqda..." : "Ulash"}
+                </button>
+                <button type="button" className="flex-1 btn-secondary" onClick={() => setShowAttach(false)}>Bekor</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Credentials modali — yangi xodim yoki parol tiklash */}
