@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
           select: {
             id: true, firstName: true, lastName: true,
             specialty: true, photoUrl: true, workSchedule: true,
-            employee: { select: { compositeRating: true, ratingCount: true } },
+            employee: { select: { compositeRating: true, ratingCount: true, photoUrl: true, firstName: true, lastName: true, specialty: true } },
           },
         },
         rating: { select: { id: true, stars: true, createdAt: true } },
@@ -87,10 +87,10 @@ export async function GET(req: NextRequest) {
       slot: a.slot,
       doctor: a.doctor ? {
         id: a.doctor.id,
-        firstName: a.doctor.firstName,
-        lastName: a.doctor.lastName,
-        specialty: a.doctor.specialty,
-        photoUrl: a.doctor.photoUrl,
+        firstName: a.doctor.employee?.firstName ?? a.doctor.firstName,
+        lastName: a.doctor.employee?.lastName ?? a.doctor.lastName,
+        specialty: a.doctor.employee?.specialty ?? a.doctor.specialty,
+        photoUrl: a.doctor.employee?.photoUrl ?? a.doctor.photoUrl,
         workSchedule: a.doctor.workSchedule,
       } : null,
       doctorRating: a.doctor?.employee?.compositeRating != null

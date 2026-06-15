@@ -102,12 +102,13 @@ export async function recomputeEmployeeRating(
   const { patientScore, ratingCount } = await computePatientScore(employeeId, prior);
 
   if (ratingCount === 0) {
+    // Baho bo'lmasa ham prior (4.5) ko'rsatiladi — NULL emas
     await prisma.employee.update({
       where: { id: employeeId },
       data: {
-        compositeRating: null,
+        compositeRating: prior,
         ratingCount: 0,
-        ratingPatientScore: null,
+        ratingPatientScore: prior,
         ratingReturnRate: null,
         ratingArrivedRate: null,
         ratingActivityScore: null,
@@ -183,6 +184,8 @@ export async function recomputeAllRatings(): Promise<{
 
   const employees = await prisma.$queryRaw<{ employeeId: string }[]>`
     SELECT DISTINCT "employeeId" FROM employment_stints WHERE role = 'doctor'
+    UNION
+    SELECT DISTINCT "employeeId" FROM doctors WHERE "employeeId" IS NOT NULL AND "isActive" = true
   `;
 
   for (const { employeeId } of employees) {

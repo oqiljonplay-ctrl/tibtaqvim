@@ -426,7 +426,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
           )}
 
           {/* ── Baholash paneli (grid-rows animatsiya) ── */}
-          {a.canRate && !ratingDone && !myStars && (
+          {a.canRate && !ratingDone && myStars === null && (
             <div
               style={{
                 display: "grid",

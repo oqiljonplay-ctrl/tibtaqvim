@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
             service: { select: { id: true, name: true, type: true, price: true, defaultQueueMode: true } },
           },
         },
-        employee: { select: { emId: true } },
+        employee: { select: { emId: true, photoUrl: true, firstName: true, lastName: true, specialty: true } },
       },
       orderBy: { lastName: "asc" },
     });
@@ -31,6 +31,10 @@ export async function GET(req: NextRequest) {
     return ok(doctors.map((d) => ({
       ...d,
       emId: d.employee?.emId ?? null,
+      photoUrl: d.employee?.photoUrl ?? d.photoUrl,
+      firstName: d.employee?.firstName ?? d.firstName,
+      lastName: d.employee?.lastName ?? d.lastName,
+      specialty: d.employee?.specialty ?? d.specialty,
       services: d.services.map((sd) => ({
         ...sd.service,
         price: Number(sd.service.price),

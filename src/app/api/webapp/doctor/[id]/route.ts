@@ -31,7 +31,7 @@ export async function GET(
         directions:  { select: { name: true }, orderBy: { sortOrder: "asc" } },
         experiences: { select: { place: true, startYear: true, endYear: true }, orderBy: { sortOrder: "asc" } },
         workplaces:  { select: { place: true }, orderBy: { sortOrder: "asc" } },
-        employee: { select: { compositeRating: true, ratingCount: true } },
+        employee: { select: { compositeRating: true, ratingCount: true, photoUrl: true, firstName: true, lastName: true, specialty: true } },
       },
     }),
     prisma.clinicSettings.findUnique({
@@ -45,6 +45,10 @@ export async function GET(
   const showRatingCount = clinicSettingsRow?.showRatingCount ?? false;
   return ok({
     ...doctor,
+    firstName: doctor.employee?.firstName ?? doctor.firstName,
+    lastName: doctor.employee?.lastName ?? doctor.lastName,
+    specialty: doctor.employee?.specialty ?? doctor.specialty,
+    photoUrl: doctor.employee?.photoUrl ?? doctor.photoUrl,
     compositeRating: doctor.employee?.compositeRating != null ? Number(doctor.employee.compositeRating) : null,
     ratingCount: showRatingCount ? (doctor.employee?.ratingCount ?? null) : null,
     employee: undefined,
