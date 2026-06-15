@@ -47,6 +47,9 @@ export default function DoctorQueueView({ context = "standalone" }: DoctorQueueV
   const [showBlockManager, setShowBlockManager] = useState(false);
   const [isInactive, setIsInactive] = useState(false);
   const [inactiveEmId, setInactiveEmId] = useState<string | null>(null);
+  const [inactivePhotoUrl, setInactivePhotoUrl] = useState<string | null>(null);
+  const [inactiveFirstName, setInactiveFirstName] = useState<string>("");
+  const [inactiveLastName, setInactiveLastName] = useState<string>("");
   const dateRef = useRef(date);
 
   useEffect(() => {
@@ -58,6 +61,9 @@ export default function DoctorQueueView({ context = "standalone" }: DoctorQueueV
           if (j.data.inactive) {
             setIsInactive(true);
             setInactiveEmId(j.data.emId ?? null);
+            setInactivePhotoUrl(j.data.photoUrl ?? null);
+            setInactiveFirstName(j.data.firstName ?? "");
+            setInactiveLastName(j.data.lastName ?? "");
             setLoading(false);
           } else {
             setDoctorId(j.data.id);
@@ -131,9 +137,28 @@ export default function DoctorQueueView({ context = "standalone" }: DoctorQueueV
 
   // Bo'shatilgan shifokor — faol klinika yo'q holat ekrani
   if (isInactive) {
+    const avatarInitials = [inactiveFirstName.charAt(0), inactiveLastName.charAt(0)]
+      .filter(Boolean).join("").toUpperCase() || "👤";
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-        <div className="text-5xl mb-4">🏥</div>
+        {/* EM rasmi yoki initials — hech qachon klinika logosi emas */}
+        {inactivePhotoUrl ? (
+          <img
+            src={inactivePhotoUrl}
+            alt=""
+            className="w-20 h-20 rounded-full object-cover mb-3 border-2 border-gray-200"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-2xl font-bold mb-3">
+            {avatarInitials}
+          </div>
+        )}
+        {inactiveFirstName && (
+          <p className="font-semibold text-gray-800 mb-1">
+            {inactiveLastName} {inactiveFirstName}
+          </p>
+        )}
         <h2 className="text-xl font-bold text-gray-800 mb-2">Faol ish joyi yo&apos;q</h2>
         <p className="text-gray-500 text-sm leading-relaxed max-w-sm mb-4">
           Siz hozirda hech qaysi klinikada faol xodim emassiz.

@@ -74,6 +74,14 @@ export async function POST(req: NextRequest) {
         targetClinicId: clinicId,
       });
 
+      // photoUrl har doim EM'ga yoziladi (portativ profil prinsipi)
+      if (photoUrl !== undefined && photoUrl !== null) {
+        await tx.employee.update({
+          where: { id: employee.id },
+          data: { photoUrl },
+        });
+      }
+
       // Reaktivatsiya tekshiruvi
       const existing = await tx.doctor.findFirst({
         where: { employeeId: employee.id, clinicId },
@@ -91,7 +99,6 @@ export async function POST(req: NextRequest) {
             lastName,
             specialty,
             phone: phone ?? null,
-            photoUrl: photoUrl ?? null,
             ...(Array.isArray(serviceIds) && serviceIds.length > 0
               ? { services: { deleteMany: {}, create: serviceIds.map((serviceId: string) => ({ serviceId })) } }
               : {}),
@@ -115,7 +122,6 @@ export async function POST(req: NextRequest) {
             specialty,
             phone: phone ?? null,
             branchId,
-            photoUrl: photoUrl ?? null,
             employeeId: employee.id,
             ...(Array.isArray(serviceIds) && serviceIds.length > 0
               ? { services: { create: serviceIds.map((serviceId: string) => ({ serviceId })) } }

@@ -13,6 +13,7 @@ interface DoctorProfile {
   firstName: string;
   lastName: string;
   specialty: string;
+  photoUrl?: string | null;
   education: string | null;
   position: string | null;
   department: string | null;
@@ -196,6 +197,17 @@ export default function DoctorProfilePage() {
           if (json.data.inactive) {
             setIsInactive(true);
             setEmId(json.data.emId ?? null);
+            // Portativ profil: ishsiz holatda ham rasm va ism saqlanadi
+            setProfile({
+              firstName: json.data.firstName ?? "",
+              lastName: json.data.lastName ?? "",
+              specialty: json.data.specialty ?? "",
+              photoUrl: json.data.photoUrl ?? null,
+              education: null, position: null, department: null,
+              workSchedule: null, operationsCount: 0, bio: null,
+              specialties: [], directions: [], experiences: [], workplaces: [],
+              emId: json.data.emId ?? null,
+            });
             setLoading(false);
             return;
           }
@@ -270,9 +282,29 @@ export default function DoctorProfilePage() {
   }
 
   if (isInactive) {
+    const inactivePhoto = profile?.photoUrl ?? null;
+    const inactiveInitials = [profile?.firstName?.charAt(0), profile?.lastName?.charAt(0)]
+      .filter(Boolean).join("").toUpperCase() || "👤";
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-        <div className="text-5xl mb-4">🏥</div>
+        {/* EM rasmi yoki initials — hech qachon klinika logosi emas */}
+        {inactivePhoto ? (
+          <img
+            src={inactivePhoto}
+            alt=""
+            className="w-20 h-20 rounded-full object-cover mb-3 border-2 border-gray-200"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-2xl font-bold mb-3">
+            {inactiveInitials}
+          </div>
+        )}
+        {profile?.firstName && (
+          <p className="font-semibold text-gray-800 mb-1">
+            {profile.lastName} {profile.firstName}
+          </p>
+        )}
         <h2 className="text-xl font-bold text-gray-800 mb-2">Faol ish joyi yo&apos;q</h2>
         {emId && (
           <button

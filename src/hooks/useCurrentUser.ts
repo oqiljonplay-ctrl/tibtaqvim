@@ -13,6 +13,7 @@ export interface CurrentUser {
   branchId: string | null;
   clinic: { id: string; name: string; logoUrl: string | null; city: string | null } | null;
   branch: { id: string; name: string } | null;
+  photoUrl: string | null;
 }
 
 interface State {

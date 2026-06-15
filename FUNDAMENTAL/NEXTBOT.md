@@ -559,13 +559,14 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 **Muhim qoidalar (O'ZGARTIRMA):**
 - `revenue` faqat admin stats'da (paidAmount), shifokor stats'da UMUMAN YO'Q
-- `compositeRating = NULL` ratingCount=0 bo'lsa (4.5 ko'rsatilmaydi)
+- `compositeRating` HECH QACHON NULL emas — ratingCount=0 bo'lsa ham prior (4.5) yoziladi
+- Avatar manba: `employee.photoUrl ?? doctor.photoUrl` — klinika logosi HECH QACHON fallback emas
 - `employment_stints` — kelajak Job Request tizimining poydevori
 - Barcha Decimal → Number konversiya majburiy (JSON'da string keladi)
 
-**DB holati (2026-06-12):** stints: 15 total, 11 active; ratings: 0 (hali yangi); global_settings: 2 qator ✅
+**DB holati (2026-06-15):** stints: 15 total; ratings: 3; compositeRating null=0 (barcha 13 doctor-employee 4.5 yoki haqiqiy baho) ✅
 
-**Commitlar:** f648ee1, 4fc2161, c85adb4, 166864c, efa7d4e, ecebef1, 989f37c
+**Commitlar:** f648ee1, 4fc2161, c85adb4, 166864c, efa7d4e, ecebef1, 989f37c, 7e62ed6
 
 ---
 

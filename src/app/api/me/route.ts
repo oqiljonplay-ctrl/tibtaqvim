@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
       clinic: { select: { id: true, name: true, logoUrl: true, city: true } },
       branch: { select: { id: true, name: true } },
       createdAt: true,
+      // Portativ profil rasmi uchun (shifokor va xodimlar)
+      employee: { select: { photoUrl: true } },
       dependents: {
         where: { deletedAt: null },
         select: {
@@ -58,6 +60,9 @@ export async function GET(req: NextRequest) {
     resolvedBranch = activeDoctor?.branch ?? null;
   }
 
+  // photoUrl: EM'dan (ishsiz holatda ham ko'rinadi)
+  const photoUrl = user.employee?.photoUrl ?? null;
+
   return ok({
     id: user.id,
     firstName: user.firstName,
@@ -71,6 +76,7 @@ export async function GET(req: NextRequest) {
     branchId: user.branchId,
     clinic: resolvedClinic,
     branch: resolvedBranch,
+    photoUrl,
     createdAt: user.createdAt,
     dependents: user.dependents,
     dependentsCount: user.dependents.length,

@@ -55,6 +55,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json();
     const { firstName, lastName, specialty, phone, photoUrl, serviceIds, serviceQueueModes, branchId } = body;
 
+    // photoUrl EM'ga yoziladi (portativ profil printsipi)
+    if (photoUrl !== undefined && photoUrl !== null && doctor.employeeId) {
+      await prisma.employee.update({
+        where: { id: doctor.employeeId },
+        data: { photoUrl },
+      });
+    }
+
     // clinic_admin faqat o'z klinikasining filialini belgilashi mumkin
     if (branchId !== undefined && branchId !== null && auth.role === "clinic_admin") {
       const branch = await prisma.branch.findFirst({
@@ -120,7 +128,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           lastName,
           specialty,
           phone: phone || null,
-          photoUrl: photoUrl || null,
           ...(branchId !== undefined && { branchId: branchId || null }),
           ...(Array.isArray(serviceIds)
             ? {

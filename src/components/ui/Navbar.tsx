@@ -28,6 +28,7 @@ export default function Navbar({ items, title }: { items: NavItem[]; title: stri
   const { user, loading } = useCurrentUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [avatarImgError, setAvatarImgError] = useState(false);
 
   async function handleLogout() {
     if (loggingOut) return;
@@ -133,12 +134,21 @@ export default function Navbar({ items, title }: { items: NavItem[]; title: stri
               onClick={() => setMenuOpen((v) => !v)}
               className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-gray-100 transition"
             >
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
-                style={{ backgroundColor: roleMeta?.accentColor ?? "#6b7280" }}
-              >
-                {user ? user.firstName.charAt(0).toUpperCase() : "?"}
-              </div>
+              {user?.photoUrl && !avatarImgError ? (
+                <img
+                  src={user.photoUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                  onError={() => setAvatarImgError(true)}
+                />
+              ) : (
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
+                  style={{ backgroundColor: roleMeta?.accentColor ?? "#6b7280" }}
+                >
+                  {user ? user.firstName.charAt(0).toUpperCase() : "?"}
+                </div>
+              )}
               <span className="hidden md:block text-sm text-gray-700 max-w-[100px] truncate">
                 {user?.fullName ?? ""}
               </span>
