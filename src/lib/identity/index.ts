@@ -70,13 +70,13 @@ export async function linkPhoneToTelegramUser(
         select: {
           role: true,
           employee: { select: { id: true } },
-          staff: { select: { id: true } },
-          doctor: { select: { id: true } },
+          staffRecords: { select: { id: true } },
+          doctors: { select: { id: true } },
         },
       });
       if (
         phoneOwner &&
-        (phoneOwner.role !== "patient" || phoneOwner.employee || phoneOwner.staff || phoneOwner.doctor)
+        (phoneOwner.role !== "patient" || phoneOwner.employee || phoneOwner.staffRecords.length > 0 || phoneOwner.doctors.length > 0)
       ) {
         logger.warn("[identity] merge blocked: phone belongs to staff account", {
           telegramId, phone, guestId: g.id, role: phoneOwner.role,

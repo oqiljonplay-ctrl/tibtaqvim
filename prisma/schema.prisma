@@ -224,7 +224,7 @@ model Doctor {
   id              String   @id @default(cuid())
   clinicId        String
   branchId        String?
-  userId          String?  @unique
+  userId          String?
   employeeId      String?
   firstName       String
   lastName        String
@@ -258,6 +258,7 @@ model Doctor {
   stints          EmploymentStint[]
   ratings         DoctorRating[]
 
+  @@unique([userId, clinicId])
   @@index([clinicId])
   @@index([employeeId])
   @@map("doctors")
@@ -355,7 +356,7 @@ model Staff {
   id         String   @id @default(cuid())
   clinicId   String
   branchId   String?
-  userId     String?  @unique
+  userId     String?
   employeeId String?
   firstName  String
   lastName   String
@@ -373,6 +374,7 @@ model Staff {
   assignedAppointments Appointment[] @relation("AssignedStaff")
   stints               EmploymentStint[]
 
+  @@unique([userId, clinicId])
   @@index([clinicId])
   @@index([employeeId])
   @@map("staff")
@@ -467,8 +469,8 @@ model User {
 
   clinic             Clinic?             @relation(fields: [clinicId], references: [id])
   branch             Branch?             @relation(fields: [branchId], references: [id])
-  doctor             Doctor?
-  staff              Staff?
+  doctors            Doctor[]
+  staffRecords       Staff[]
   employee           Employee?
   appointments       Appointment[]
   telegramIdHistory  TelegramIdHistory[]

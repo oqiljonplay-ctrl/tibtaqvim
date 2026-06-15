@@ -84,7 +84,7 @@ export async function getStaffInfo(userId: string): Promise<StaffInfo | null> {
       firstName: true,
       lastName: true,
       role: true,
-      doctor: { select: { specialty: true } },
+      doctors: { select: { specialty: true }, take: 1 },
       clinic: { select: { name: true } },
     },
   });
@@ -95,7 +95,7 @@ export async function getStaffInfo(userId: string): Promise<StaffInfo | null> {
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
-    specialty: user.doctor?.specialty || null,
+    specialty: user.doctors[0]?.specialty || null,
     clinicName: user.clinic?.name || null,
   };
 }

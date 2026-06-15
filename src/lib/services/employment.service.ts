@@ -134,6 +134,7 @@ export async function attachEmployeeToClinic(
         data: {
           isActive: true, isHidden: false,
           branchId: p.branchId ?? existing.branchId,
+          ...(employee.userId ? { userId: employee.userId } : {}),
           firstName: employee.firstName,
           lastName: employee.lastName ?? existing.lastName,
           specialty: employee.specialty ?? existing.specialty,
@@ -149,6 +150,7 @@ export async function attachEmployeeToClinic(
           clinicId: p.clinicId,
           branchId: p.branchId ?? null,
           employeeId: employee.id,
+          userId: employee.userId,
           firstName: employee.firstName,
           lastName: employee.lastName ?? "",
           specialty: employee.specialty ?? "Shifokor",
@@ -187,6 +189,7 @@ export async function attachEmployeeToClinic(
       data: {
         isActive: true,
         branchId: p.branchId ?? existing.branchId,
+        ...(employee.userId ? { userId: employee.userId } : {}),
         firstName: employee.firstName,
         lastName: employee.lastName ?? existing.lastName,
         photoUrl: employee.photoUrl ?? existing.photoUrl,
@@ -198,6 +201,7 @@ export async function attachEmployeeToClinic(
         clinicId: p.clinicId,
         branchId: p.branchId ?? null,
         employeeId: employee.id,
+        userId: employee.userId,
         firstName: employee.firstName,
         lastName: employee.lastName ?? "",
         role: "receptionist",
