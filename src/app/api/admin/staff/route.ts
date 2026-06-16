@@ -4,7 +4,7 @@ import { requireAuth, hashPassword, generateRandomPassword } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { normalizePhone } from "@/lib/utils/phone";
 import { getBranchScope, canCreateAdmin } from "@/lib/branch-scope";
-import { resolveOrCreateEmployee, openStint, ApiError } from "@/lib/services/employment.service";
+import { resolveOrCreateEmployee, openStint, assertClinicCapacity, ApiError } from "@/lib/services/employment.service";
 
 // POST /api/admin/staff — xodim akkaunt yaratish (receptionist, clinic_admin, doctor)
 // Parol backend tomonidan avtomatik generatsiya qilinadi va javobda qaytariladi (bir marta).
@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
       let employeeId: string | null = null;
       let generatedEmId: string | null = null;
       if (role === "doctor" || role === "receptionist") {
+        await assertClinicCapacity(tx, clinicId);
         const employee = await resolveOrCreateEmployee(tx, {
           emIdInput: body.emId,
           firstName: firstName.trim(),

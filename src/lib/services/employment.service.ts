@@ -100,6 +100,31 @@ export async function closeStint(
   });
 }
 
+export async function assertClinicCapacity(tx: Tx, clinicId: string) {
+  const clinic = await tx.clinic.findUnique({
+    where: { id: clinicId },
+    select: { maxEmployees: true, name: true },
+  });
+  if (!clinic) throw new ApiError(404, "Klinika topilmadi");
+
+  if (clinic.maxEmployees === 0) {
+    throw new ApiError(
+      403,
+      "Bu klinikada yangi xodim qo'shish o'chiq (limit 0). Superadmin limitni belgilashi kerak."
+    );
+  }
+
+  const activeCount = await tx.employmentStint.count({
+    where: { clinicId, endDate: null },
+  });
+  if (activeCount >= clinic.maxEmployees) {
+    throw new ApiError(
+      403,
+      `Klinika xodim limiti to'ldi (${activeCount}/${clinic.maxEmployees}). Yangi xodim qabul qilinmaydi.`
+    );
+  }
+}
+
 export async function attachEmployeeToClinic(
   tx: Tx,
   p: {
@@ -110,6 +135,8 @@ export async function attachEmployeeToClinic(
     serviceIds?: string[];
   }
 ) {
+  await assertClinicCapacity(tx, p.clinicId);
+
   const emId = normalizeEmId(p.emId.trim());
   const employee = await tx.employee.findUnique({ where: { emId } });
   if (!employee) throw new ApiError(404, `EM ID topilmadi: ${emId}`);

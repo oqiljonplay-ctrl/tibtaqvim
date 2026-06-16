@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { getBranchScope, resolveBranchIdForCreate, canManageResources } from "@/lib/branch-scope";
-import { resolveOrCreateEmployee, openStint, ApiError } from "@/lib/services/employment.service";
+import { resolveOrCreateEmployee, openStint, assertClinicCapacity, ApiError } from "@/lib/services/employment.service";
 import { createAuditLog } from "@/lib/services/config.service";
 
 export async function GET(req: NextRequest) {
@@ -65,6 +65,8 @@ export async function POST(req: NextRequest) {
     const branchId = resolveBranchIdForCreate(auth, body.branchId);
 
     const doctor = await prisma.$transaction(async (tx) => {
+      await assertClinicCapacity(tx, clinicId);
+
       const employee = await resolveOrCreateEmployee(tx, {
         emIdInput: body.emId,
         firstName,

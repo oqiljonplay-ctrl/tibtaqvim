@@ -115,6 +115,9 @@ export default function ClinicBuilderPage() {
   const [features, setFeatures] = useState<FlagItem[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
 
+  const [limits, setLimits] = useState<{ maxEmployees: number; activeCount: number } | null>(null);
+  const [limitsInput, setLimitsInput] = useState(0);
+
   const [tab, setTab] = useState<Tab>("settings");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -127,21 +130,26 @@ export default function ClinicBuilderPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [cRes, sRes, mRes, fRes, aRes] = await Promise.all([
+    const [cRes, sRes, mRes, fRes, aRes, lRes] = await Promise.all([
       fetch(`/api/admin/super/clinics/${id}`),
       fetch(`/api/admin/super/clinics/${id}/settings`),
       fetch(`/api/admin/super/clinics/${id}/modules`),
       fetch(`/api/admin/super/clinics/${id}/features`),
       fetch(`/api/admin/super/audit?clinicId=${id}&take=20`),
+      fetch(`/api/admin/super/clinics/${id}/limits`),
     ]);
-    const [cJ, sJ, mJ, fJ, aJ] = await Promise.all([
-      cRes.json(), sRes.json(), mRes.json(), fRes.json(), aRes.json(),
+    const [cJ, sJ, mJ, fJ, aJ, lJ] = await Promise.all([
+      cRes.json(), sRes.json(), mRes.json(), fRes.json(), aRes.json(), lRes.json(),
     ]);
     if (cJ.success) setClinic(cJ.data);
     if (sJ.success) setSettings(sJ.data);
     if (mJ.success) setModules(mJ.data);
     if (fJ.success) setFeatures(fJ.data);
     if (aJ.success) setAudit(aJ.data);
+    if (lJ.success) {
+      setLimits(lJ.data);
+      setLimitsInput(lJ.data.maxEmployees);
+    }
     setLoading(false);
   }, [id]);
 
@@ -160,6 +168,25 @@ export default function ClinicBuilderPage() {
     const j = await res.json();
     setSaving(false);
     j.success ? showToast("Sozlamalar saqlandi ✓") : showToast(j.error?.message ?? "Xatolik", "err");
+  }
+
+  // ─── Save limits ────────────────────────────────────────────────────────────
+
+  async function saveLimits() {
+    setSaving(true);
+    const res = await fetch(`/api/admin/super/clinics/${id}/limits`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ maxEmployees: limitsInput }),
+    });
+    const j = await res.json();
+    setSaving(false);
+    if (j.success) {
+      setLimits(j.data);
+      showToast("Xodim limiti saqlandi ✓");
+    } else {
+      showToast(j.error?.message ?? "Xatolik", "err");
+    }
   }
 
   // ─── Save modules ───────────────────────────────────────────────────────────
@@ -498,6 +525,51 @@ export default function ClinicBuilderPage() {
             </button>
           </div>
           </div>{/* grid end */}
+
+          {/* ── Xodim limiti ── */}
+          {limits !== null && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900 text-sm">Xodim limiti</h3>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                  Hozir faol: <span className="font-semibold text-gray-700">{limits.activeCount}</span>
+                  {limits.maxEmployees > 0 && (
+                    <> / <span className="font-semibold text-gray-700">{limits.maxEmployees}</span></>
+                  )}
+                </span>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Maksimal xodim soni
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={10000}
+                    className="input w-full max-w-xs"
+                    value={limitsInput}
+                    onChange={(e) => setLimitsInput(parseInt(e.target.value) || 0)}
+                  />
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Bu klinika EM ID orqali nechta xodim (shifokor va qabulxona) chaqirib olishi mumkinligi.
+                    0 = ID bilan chaqirish o&apos;chiq. Masalan 50 qo&apos;ysangiz, klinikada jami 50 ta faol
+                    xodim bo&apos;lguncha yangi xodim qabul qilinadi. Limit to&apos;lgach yangi so&apos;rov/taklif
+                    qabul qilinmaydi. Klinika hajmiga qarab belgilang.
+                  </p>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveLimits}
+                    disabled={saving}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium px-5 py-2 rounded-lg text-sm transition-colors"
+                  >
+                    {saving ? "Saqlanmoqda..." : "Limitni saqlash"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

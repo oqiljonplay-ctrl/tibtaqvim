@@ -507,6 +507,33 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-06-15 — TUZATISH-05+06: Portativ profil rasmi tizimi
+
+**Maqsad:** `photoUrl` FAQAT `employees.photoUrl`dan o'qiladi va yoziladi. Ishsiz holat (0 faol stint) — header va "Faol ish joyi yo'q" ekranida EM rasmi ko'rsatiladi.
+
+**Diagnoz:** Kategoriya (c) — frontend o'qimaydi. `DoctorQueueView` inactive holatda API'dan `photoUrl`ni olar edi, lekin state'ga SAQLAMAGAN. `/api/me` esa umuman `photoUrl` qaytarmagan.
+
+**O'zgartirilgan fayllar (8 ta, commit `d11319e`):**
+- `src/app/api/admin/doctors/route.ts` — POST: `doctor.create`dan `photoUrl` olinib, `employee.update({photoUrl})`ga o'tkazildi
+- `src/app/api/admin/doctors/[id]/route.ts` — PATCH: `doctor.update`dan `photoUrl` olinib, `employee.update`ga o'tkazildi
+- `src/app/api/me/route.ts` — `employee: { select: { photoUrl: true } }` qo'shildi; `photoUrl: user.employee?.photoUrl ?? null` response'da
+- `src/hooks/useCurrentUser.ts` — `CurrentUser` interfeysi `photoUrl: string | null` qo'shildi
+- `src/components/ui/Navbar.tsx` — `user?.photoUrl` bo'lsa `<img>`, xato bo'lsa initials (klinika logosi YO'Q)
+- `src/components/pages/DoctorQueueView.tsx` — inactive state'ga `inactivePhotoUrl`/`inactiveFirstName`/`inactiveLastName` qo'shildi; ekran rasm yoki initials ko'rsatadi
+- `src/app/doctor/profile/page.tsx` — `DoctorProfile.photoUrl` qo'shildi; inactive screen EM avatar+ism
+- `FUNDAMENTAL/NEXTBOT.md` — yangilandi
+
+**Muhim qoidalar:**
+- `photoUrl` YOZISH: `employees.photoUrl` (admin POST/PATCH doctor routes)
+- `photoUrl` O'QISH: `/api/me` → `user.employee?.photoUrl`; `DoctorQueueView` → `j.data.photoUrl`; Navbar → `user?.photoUrl`
+- Klinika logosi avatar sifatida HECH QACHON ishlatilmaydi
+
+**Real isbot:** EM000004 (Oqil Sayfiyev, 0 active stints) — `/api/me` HTTP 200, `photoUrl` to'lgan, `clinic: null` ✓; `/api/doctor/profile` HTTP 200, `inactive: true`, `photoUrl` to'lgan ✓
+
+**Commit:** `d11319e`. Deploy: `dpl_HhMvGXcJEboWgW24rgwnTruAFKa8` (READY) → https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-06-12 — SHIFOKOR TITUL: Reyting, statistika, stint tizimi
 
 **Maqsad:** Har bir employee uchun kompozit reyting (4 omil), baho UI (webapp), admin/doctor statistika sahifalari, klinikalararo EM ID biriktirish, ish davrlari (stints).

@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
       : auth.clinicId;
     if (!clinicId) return ok({ count: 0 });
 
-    const count = await prisma.jobRequest.count({ where: { clinicId, status: "pending" } });
+    // Faqat xodim boshlagan so'rovlar (admin harakat qilishi kerak bo'lganlar)
+    const count = await prisma.jobRequest.count({ where: { clinicId, status: "pending", initiatedBy: "employee" } });
     return ok({ count });
   } catch {
     return error("Server xatosi", 500);

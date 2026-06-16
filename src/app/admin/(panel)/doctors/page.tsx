@@ -402,7 +402,17 @@ export default function AdminDoctorsPage() {
       if (json.success) {
         setShowAttach(false);
         setAttachEmId(""); setAttachServiceIds([]);
-        fetchDoctors();
+        if (json.data?.mutual) {
+          // Ikkala tomon xohlagan — darhol ulandi
+          alert("✅ Xodim ham so'rov yuborgan edi — darhol ulandi!");
+          fetchDoctors();
+        } else if (json.data?.invited) {
+          // Taklif yuborildi — xodim tasdiqlashi kutilmoqda
+          alert("📬 Taklif yuborildi. Xodim ilovada tasdiqlashi kutilmoqda.");
+        } else {
+          // Receptionist to'g'ridan ulangan
+          fetchDoctors();
+        }
       } else {
         setAttachError(json.error?.message || "Xatolik yuz berdi");
       }
@@ -727,9 +737,11 @@ export default function AdminDoctorsPage() {
       {showAttach && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 className="font-semibold text-lg mb-1">🔗 EM ID bilan ulash</h3>
+            <h3 className="font-semibold text-lg mb-1">🔗 EM ID bilan taklif yuborish</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Tizimda mavjud xodimning EM ID'sini kiriting — profili, reytingi va barcha ma'lumotlari bilan biriktiriladi.
+              {attachRole === "doctor"
+                ? "Shifokorning EM ID'sini kiriting — taklif yuboriladi, xodim ilovada tasdiqlashi kerak bo'ladi."
+                : "Qabulxona xodimining EM ID'sini kiriting — tizimga darhol biriktiriladi."}
             </p>
             <form onSubmit={handleAttach} className="space-y-4">
               <div>
@@ -792,7 +804,9 @@ export default function AdminDoctorsPage() {
 
               <div className="flex gap-2 pt-2">
                 <button type="submit" disabled={attachSubmitting} className="flex-1 btn-primary disabled:opacity-50">
-                  {attachSubmitting ? "Ulanmoqda..." : "Ulash"}
+                  {attachSubmitting
+                    ? (attachRole === "doctor" ? "Yuklanmoqda..." : "Ulanmoqda...")
+                    : (attachRole === "doctor" ? "Taklif yuborish" : "Ulash")}
                 </button>
                 <button type="button" className="flex-1 btn-secondary" onClick={() => setShowAttach(false)}>Bekor</button>
               </div>

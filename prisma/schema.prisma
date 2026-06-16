@@ -128,6 +128,9 @@ model Clinic {
   telegramChannelUsername String?  // masalan "buyuktabib" (@ siz)
   telegramGroupUsername   String?  // public guruh username (@ siz)
 
+  // ── Xodim limiti (superadmin belgilaydi, 0 = qo'shish o'chiq) ───────────
+  maxEmployees Int @default(0)
+
   // ── Kelajak: Bosqich 2 (to'lov) va Bosqich 3 (abonement) ─────────────────
   paymentConfig         Json?             @db.JsonB
   subscriptionPlan      SubscriptionPlan  @default(starter)
@@ -432,6 +435,7 @@ model JobRequest {
   clinicId    String
   role        String    @default("doctor")
   status      String    @default("pending")
+  initiatedBy String    @default("employee")   // 'employee' | 'clinic'
   message     String?
   decidedBy   String?
   decidedAt   DateTime?
@@ -441,7 +445,7 @@ model JobRequest {
   employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   clinic      Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
-  @@unique([employeeId, clinicId], name: "uq_pending_request")
+  // Partial unique (pending) — DB'da qo'lda yaratilgan (uq_jobreq_pending), Prisma'da @@unique yo'q
   @@index([clinicId])
   @@index([employeeId])
   @@map("job_requests")

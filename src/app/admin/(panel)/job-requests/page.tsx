@@ -17,6 +17,7 @@ interface JobRequest {
   clinicId: string;
   role: string;
   status: string;
+  initiatedBy: string;
   message: string | null;
   createdAt: string;
   employee: JobRequestEmployee;
@@ -141,7 +142,29 @@ export default function AdminJobRequestsPage() {
             const emp = req.employee;
             const name = `${emp.firstName} ${emp.lastName ?? ""}`.trim();
             return (
-              <div key={req.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <div key={req.id} className={`bg-white rounded-xl border p-4 shadow-sm ${
+                req.initiatedBy === "clinic" ? "border-indigo-200" : "border-gray-200"
+              }`}>
+                {/* Yo'nalish belgisi */}
+                <div className="flex items-center gap-2 mb-3">
+                  {req.initiatedBy === "clinic" ? (
+                    <span className="text-xs font-medium bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full">
+                      📤 Biz yuborgan taklif
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full">
+                      📥 Xodim so&apos;rovi
+                    </span>
+                  )}
+                  {req.status !== "pending" && (
+                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
+                      req.status === "approved" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {req.status === "approved" ? "✓ Tasdiqlandi" : "✗ Rad etildi"}
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex items-start gap-3">
                   {emp.photoUrl ? (
                     <img
@@ -179,7 +202,8 @@ export default function AdminJobRequestsPage() {
                   </div>
                 </div>
 
-                {tab === "pending" && (
+                {/* Tugmalar: faqat xodim so'rovi uchun (clinic taklifi xodim tomonidan tasdiqlaydi) */}
+                {tab === "pending" && req.initiatedBy === "employee" && (
                   <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
                     <button
                       onClick={() => handleApprove(req.id)}
@@ -195,6 +219,13 @@ export default function AdminJobRequestsPage() {
                     >
                       ✗ Rad etish
                     </button>
+                  </div>
+                )}
+                {tab === "pending" && req.initiatedBy === "clinic" && (
+                  <div className="mt-3 pt-3 border-t border-indigo-100">
+                    <p className="text-xs text-indigo-500 text-center">
+                      ⏳ Xodim javobini kutmoqda
+                    </p>
                   </div>
                 )}
               </div>
