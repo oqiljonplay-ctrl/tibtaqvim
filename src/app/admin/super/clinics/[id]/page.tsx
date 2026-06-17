@@ -551,6 +551,14 @@ export default function ClinicBuilderPage() {
                     value={limitsInput}
                     onChange={(e) => setLimitsInput(parseInt(e.target.value) || 0)}
                   />
+                  {limitsInput > 0 && limitsInput < (limits?.activeCount ?? 0) && (
+                    <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <span className="text-amber-500 text-sm mt-0.5 flex-shrink-0">⚠️</span>
+                      <p className="text-xs text-amber-800">
+                        Diqqat: joriy faol xodim ({limits?.activeCount}) limitdan ko&apos;p. Mavjud xodimlar saqlanadi, lekin yangi qo&apos;shilmaydi.
+                      </p>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-400 mt-1.5">
                     Bu klinika EM ID orqali nechta xodim (shifokor va qabulxona) chaqirib olishi mumkinligi.
                     0 = ID bilan chaqirish o&apos;chiq. Masalan 50 qo&apos;ysangiz, klinikada jami 50 ta faol
