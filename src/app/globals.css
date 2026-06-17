@@ -99,7 +99,7 @@
 
 .anim-low   .aurora-blob   { animation: aurora-drift 30s ease-in-out infinite; }
 .anim-low   .star          { animation: none; opacity: 0.4; }
-.anim-low   .shooting       { display: none; }
+.anim-low   .shooting       { animation: shooting-star 18s ease-in-out infinite; opacity: 0.35; }
 
 .anim-off   .aurora-blob   { animation: none; }
 .anim-off   .star          { animation: none; opacity: 0.4; }

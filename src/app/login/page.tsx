@@ -69,7 +69,6 @@ function AuroraBackground() {
 
 /* ── Yulduzlar ── */
 function Starfield() {
-  // 60 ta deterministik yulduz — oltin nisbat bilan teng taqsimlangan
   const stars = Array.from({ length: 60 }, (_, i) => ({
     left: `${((i * 61.803) % 100).toFixed(2)}%`,
     top:  `${((i * 137.508) % 100).toFixed(2)}%`,
@@ -77,14 +76,31 @@ function Starfield() {
     dur:  `${(2 + (i % 7) * 0.4).toFixed(1)}s`,
     delay:`${(i % 9 * 0.45).toFixed(2)}s`,
   }));
+  // 12 kometa: 3 ta guruhi birga, 3 ta ketma-ket, qolganlari yolg'iz
+  const shots = [
+    { top: "8%",  left: "5%",   w: 110, delay: "0s"    }, // Guruhi A (birga)
+    { top: "14%", left: "55%",  w: 85,  delay: "-0.6s" }, // Guruhi A
+    { top: "6%",  left: "40%",  w: 80,  delay: "-1.5s" }, //
+    { top: "5%",  left: "28%",  w: 95,  delay: "-2s"   }, //
+    { top: "22%", left: "8%",   w: 70,  delay: "-3.5s" }, // Guruhi B (ketma-ket)
+    { top: "10%", left: "44%",  w: 90,  delay: "-3.8s" }, // Guruhi B
+    { top: "32%", left: "68%",  w: 65,  delay: "-4.1s" }, // Guruhi B
+    { top: "4%",  left: "78%",  w: 80,  delay: "-5.5s" }, //
+    { top: "20%", left: "32%",  w: 100, delay: "-6s"   }, // Guruhi C (birga)
+    { top: "38%", left: "15%",  w: 70,  delay: "-6.3s" }, // Guruhi C
+    { top: "12%", left: "62%",  w: 85,  delay: "-1s"   }, //
+    { top: "28%", left: "82%",  w: 65,  delay: "-7.2s" }, //
+  ];
   return (
     <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
       {stars.map((s, i) => (
         <span key={i} className="star absolute rounded-full bg-white"
           style={{ left: s.left, top: s.top, width: s.size, height: s.size, ["--tw" as string]: s.dur, animationDelay: s.delay }} />
       ))}
-      <span className="shooting absolute top-[12%] left-[8%] h-px w-28 bg-gradient-to-r from-white to-transparent" />
-      <span className="shooting absolute top-[55%] left-[60%] h-px w-20 bg-gradient-to-r from-white/80 to-transparent" style={{ animationDelay: "-3.5s" }} />
+      {shots.map((sh, i) => (
+        <span key={`sh${i}`} className="shooting absolute h-px bg-gradient-to-r from-white to-transparent"
+          style={{ top: sh.top, left: sh.left, width: sh.w, animationDelay: sh.delay }} />
+      ))}
     </div>
   );
 }
