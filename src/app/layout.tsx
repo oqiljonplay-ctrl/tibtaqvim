@@ -3,8 +3,19 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ClinicBot — Klinika Boshqaruv Tizimi",
-  description: "Ko'p klinikali boshqaruv tizimi",
+  title: "TibTaqvim — Klinika Boshqaruv Tizimi",
+  description: "Ko'p klinikali shifokor qabuli va navbat boshqaruv tizimi",
+  openGraph: {
+    title: "TibTaqvim — Klinika Boshqaruv Tizimi",
+    description: "Ko'p klinikali shifokor qabuli va navbat boshqaruv tizimi",
+    type: "website",
+    locale: "uz_UZ",
+  },
+  twitter: {
+    card: "summary",
+    title: "TibTaqvim — Klinika Boshqaruv Tizimi",
+    description: "Ko'p klinikali shifokor qabuli va navbat boshqaruv tizimi",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
