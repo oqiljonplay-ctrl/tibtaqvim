@@ -93,9 +93,6 @@
 }
 
 /* Animatsiya darajalari — root klassiga qarab */
-.shooting {
-  filter: drop-shadow(0 0 4px rgba(255,255,255,0.95)) drop-shadow(0 0 8px rgba(255,255,255,0.5));
-}
 .anim-full  .aurora-blob   { animation: aurora-drift 18s ease-in-out infinite, aurora-hue 24s linear infinite; }
 .anim-full  .star          { animation: twinkle var(--tw, 3s) ease-in-out infinite; }
 .anim-full  .shooting       { animation: shooting-star 7s ease-in-out infinite; }

@@ -98,7 +98,7 @@ function Starfield() {
           style={{ left: s.left, top: s.top, width: s.size, height: s.size, ["--tw" as string]: s.dur, animationDelay: s.delay }} />
       ))}
       {shots.map((sh, i) => (
-        <span key={`sh${i}`} className="shooting absolute h-[2px] bg-gradient-to-r from-white via-white/80 to-transparent"
+        <span key={`sh${i}`} className="shooting absolute h-px bg-gradient-to-r from-white to-transparent"
           style={{ top: sh.top, left: sh.left, width: sh.w, animationDelay: sh.delay }} />
       ))}
     </div>
@@ -193,9 +193,9 @@ function LoginForm() {
   }
 
   const glass =
-    "relative z-10 w-full max-w-md rounded-3xl border border-white/30 bg-white/[0.06] " +
-    "backdrop-blur-xl " +
-    "shadow-[0_8px_48px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-1px_0_rgba(255,255,255,0.08)] " +
+    "relative z-10 w-full max-w-md rounded-3xl border border-white/25 bg-white/[0.04] " +
+    "backdrop-blur-md " +
+    "shadow-[0_8px_48px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.3)] " +
     "p-7 sm:p-9";
   const field =
     "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-base text-white " +
