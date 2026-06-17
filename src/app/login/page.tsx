@@ -193,8 +193,8 @@ function LoginForm() {
   }
 
   const glass =
-    "relative z-10 w-full max-w-md rounded-3xl border border-white/20 bg-white/[0.13] " +
-    "backdrop-blur-2xl shadow-[0_8px_48px_rgba(0,0,0,0.55)] p-7 sm:p-9";
+    "relative z-10 w-full max-w-md rounded-3xl border border-white/25 bg-white/[0.09] " +
+    "backdrop-blur-md shadow-[0_8px_48px_rgba(0,0,0,0.55)] p-7 sm:p-9";
   const field =
     "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-base text-white " +
     "placeholder-white/40 outline-none transition focus:border-white/50 focus:bg-white/15 " +
