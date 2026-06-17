@@ -89,6 +89,7 @@
   border-radius: 9999px;
   opacity: 0.55;
   mix-blend-mode: screen;
+  will-change: transform;
 }
 
 /* Animatsiya darajalari — root klassiga qarab */

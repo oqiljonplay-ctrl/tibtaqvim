@@ -3,11 +3,14 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://tibtaqvim.vercel.app"),
   title: "TibTaqvim — Klinika Boshqaruv Tizimi",
   description: "Ko'p klinikali shifokor qabuli va navbat boshqaruv tizimi",
   openGraph: {
     title: "TibTaqvim — Klinika Boshqaruv Tizimi",
     description: "Ko'p klinikali shifokor qabuli va navbat boshqaruv tizimi",
+    url: "https://tibtaqvim.vercel.app",
+    siteName: "TibTaqvim",
     type: "website",
     locale: "uz_UZ",
   },
