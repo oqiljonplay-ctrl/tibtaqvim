@@ -45,3 +45,67 @@
     @apply bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LOGIN AURORA FONI — animatsiyalar
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes aurora-drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(6%, -4%) scale(1.08); }
+  66%  { transform: translate(-5%, 5%) scale(0.96); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes aurora-hue {
+  0%, 100% { filter: hue-rotate(0deg); }
+  50%      { filter: hue-rotate(25deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.15; }
+  50%      { opacity: 0.9; }
+}
+
+@keyframes shooting-star {
+  0%   { transform: translate(0, 0) rotate(-35deg); opacity: 0; }
+  8%   { opacity: 1; }
+  20%  { opacity: 1; }
+  30%  { transform: translate(420px, 300px) rotate(-35deg); opacity: 0; }
+  100% { transform: translate(420px, 300px) rotate(-35deg); opacity: 0; }
+}
+
+/* Aurora qatlamlari */
+.aurora-layer {
+  position: fixed;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(60px);
+  will-change: transform, filter;
+}
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  opacity: 0.55;
+  mix-blend-mode: screen;
+}
+
+/* Animatsiya darajalari — root klassiga qarab */
+.anim-full  .aurora-blob   { animation: aurora-drift 18s ease-in-out infinite, aurora-hue 24s linear infinite; }
+.anim-full  .star          { animation: twinkle var(--tw, 3s) ease-in-out infinite; }
+.anim-full  .shooting       { animation: shooting-star 7s ease-in-out infinite; }
+
+.anim-low   .aurora-blob   { animation: aurora-drift 30s ease-in-out infinite; }
+.anim-low   .star          { animation: none; opacity: 0.4; }
+.anim-low   .shooting       { display: none; }
+
+.anim-off   .aurora-blob   { animation: none; }
+.anim-off   .star          { animation: none; opacity: 0.4; }
+.anim-off   .shooting       { display: none; }
+
+/* Foydalanuvchi tizimda harakatni kamaytirgan bo'lsa — hurmat qil */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob, .star, .shooting { animation: none !important; }
+  .shooting { display: none !important; }
+}
