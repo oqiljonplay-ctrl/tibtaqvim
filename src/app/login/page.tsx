@@ -60,35 +60,31 @@ function GoogleIcon({ className = "" }: { className?: string }) {
 function AuroraBackground() {
   return (
     <div className="aurora-layer" aria-hidden="true">
-      <div className="aurora-blob" style={{ width: "45vw", height: "45vw", top: "-5%", left: "-5%", background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
-      <div className="aurora-blob" style={{ width: "40vw", height: "40vw", top: "20%", right: "-8%", background: "radial-gradient(circle, #2563eb, transparent 70%)", animationDelay: "-6s" }} />
-      <div className="aurora-blob" style={{ width: "38vw", height: "38vw", bottom: "-10%", left: "25%", background: "radial-gradient(circle, #db2777, transparent 70%)", animationDelay: "-12s" }} />
+      <div className="aurora-blob" style={{ width: "55vmax", height: "55vmax", top: "-10%", left: "-10%", background: "radial-gradient(circle, #a855f7 10%, #7c3aed 40%, transparent 70%)" }} />
+      <div className="aurora-blob" style={{ width: "50vmax", height: "50vmax", top: "15%", right: "-12%", background: "radial-gradient(circle, #60a5fa 10%, #3b82f6 40%, transparent 70%)", animationDelay: "-6s" }} />
+      <div className="aurora-blob" style={{ width: "45vmax", height: "45vmax", bottom: "-12%", left: "20%", background: "radial-gradient(circle, #f472b6 10%, #db2777 40%, transparent 70%)", animationDelay: "-12s" }} />
     </div>
   );
 }
 
 /* ── Yulduzlar ── */
 function Starfield() {
-  // 40 ta deterministik yulduz (SSR/CSR mos kelishi uchun sobit massiv)
-  const stars = Array.from({ length: 40 }, (_, i) => {
-    const seed = (i * 9301 + 49297) % 233280;
-    const r = seed / 233280;
-    const r2 = ((i * 4096 + 150889) % 714025) / 714025;
-    return {
-      left: `${(r * 100).toFixed(2)}%`,
-      top: `${(r2 * 100).toFixed(2)}%`,
-      size: r > 0.85 ? 2.5 : 1.5,
-      dur: `${(2 + r * 3).toFixed(2)}s`,
-      delay: `${(r2 * 4).toFixed(2)}s`,
-    };
-  });
+  // 60 ta deterministik yulduz — oltin nisbat bilan teng taqsimlangan
+  const stars = Array.from({ length: 60 }, (_, i) => ({
+    left: `${((i * 61.803) % 100).toFixed(2)}%`,
+    top:  `${((i * 137.508) % 100).toFixed(2)}%`,
+    size: i % 7 === 0 ? 2.5 : i % 3 === 0 ? 2 : 1.5,
+    dur:  `${(2 + (i % 7) * 0.4).toFixed(1)}s`,
+    delay:`${(i % 9 * 0.45).toFixed(2)}s`,
+  }));
   return (
-    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
+    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
       {stars.map((s, i) => (
         <span key={i} className="star absolute rounded-full bg-white"
           style={{ left: s.left, top: s.top, width: s.size, height: s.size, ["--tw" as string]: s.dur, animationDelay: s.delay }} />
       ))}
-      <span className="shooting absolute top-[12%] left-[8%] h-px w-24 bg-gradient-to-r from-white to-transparent" />
+      <span className="shooting absolute top-[12%] left-[8%] h-px w-28 bg-gradient-to-r from-white to-transparent" />
+      <span className="shooting absolute top-[55%] left-[60%] h-px w-20 bg-gradient-to-r from-white/80 to-transparent" style={{ animationDelay: "-3.5s" }} />
     </div>
   );
 }
@@ -104,10 +100,13 @@ function LoginForm() {
   const [pendingUser, setPendingUser] = useState<PendingUser | null>(null);
   const [anim, setAnim] = useState<AnimLevel>("full");
 
-  // Animatsiya darajasini eslab qolish
   useEffect(() => {
     const saved = localStorage.getItem("login_anim") as AnimLevel | null;
-    if (saved && ANIM_ORDER.includes(saved)) setAnim(saved);
+    if (saved && ANIM_ORDER.includes(saved)) {
+      setAnim(saved);
+    } else if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setAnim("low");
+    }
   }, []);
   function cycleAnim() {
     const next = ANIM_ORDER[(ANIM_ORDER.indexOf(anim) + 1) % ANIM_ORDER.length];
@@ -178,8 +177,8 @@ function LoginForm() {
   }
 
   const glass =
-    "relative z-10 w-full max-w-md rounded-3xl border border-white/15 bg-white/10 " +
-    "backdrop-blur-2xl shadow-[0_8px_40px_rgba(0,0,0,0.45)] p-7 sm:p-9";
+    "relative z-10 w-full max-w-md rounded-3xl border border-white/20 bg-white/[0.13] " +
+    "backdrop-blur-2xl shadow-[0_8px_48px_rgba(0,0,0,0.55)] p-7 sm:p-9";
   const field =
     "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-base text-white " +
     "placeholder-white/40 outline-none transition focus:border-white/50 focus:bg-white/15 " +

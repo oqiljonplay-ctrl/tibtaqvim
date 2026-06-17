@@ -77,18 +77,18 @@
 
 /* Aurora qatlamlari */
 .aurora-layer {
-  position: fixed;
+  position: absolute;
   inset: -20%;
   z-index: 0;
   pointer-events: none;
-  filter: blur(60px);
+  filter: blur(90px);
+  mix-blend-mode: screen;
   will-change: transform, filter;
 }
 .aurora-blob {
   position: absolute;
   border-radius: 9999px;
-  opacity: 0.55;
-  mix-blend-mode: screen;
+  opacity: 0.9;
   will-change: transform;
 }
 
@@ -104,9 +104,3 @@
 .anim-off   .aurora-blob   { animation: none; }
 .anim-off   .star          { animation: none; opacity: 0.4; }
 .anim-off   .shooting       { display: none; }
-
-/* Foydalanuvchi tizimda harakatni kamaytirgan bo'lsa — hurmat qil */
-@media (prefers-reduced-motion: reduce) {
-  .aurora-blob, .star, .shooting { animation: none !important; }
-  .shooting { display: none !important; }
-}
