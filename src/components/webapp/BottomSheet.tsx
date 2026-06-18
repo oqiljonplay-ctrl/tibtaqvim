@@ -135,8 +135,8 @@ export function BottomSheet({
 
       {/* Kontent — mustaqil scroll */}
       <div
-        className="flex-1 overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))]"
-        style={{ touchAction: "pan-y" }}
+        className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(16px+env(safe-area-inset-bottom))]"
+        style={{ touchAction: "pan-y", overscrollBehavior: "contain" }}
       >
         {children}
       </div>
