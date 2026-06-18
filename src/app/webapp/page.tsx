@@ -12,6 +12,7 @@ import { BookingFlipCard } from "@/components/webapp/BookingFlipCard";
 import { ProfileFlipCard } from "@/components/webapp/ProfileFlipCard";
 import { ServicePicker } from "@/components/webapp/ServicePicker";
 import { DoctorPicker } from "@/components/webapp/DoctorPicker";
+import { ServiceDoctorPanel } from "@/components/webapp/ServiceDoctorPanel";
 
 declare global {
   interface Window { Telegram?: { WebApp?: any } }
@@ -1047,13 +1048,16 @@ export default function WebApp() {
         <div className="flex-1 -mt-3 pb-[calc(96px+env(safe-area-inset-bottom))] px-4">
           <Stack gap={4}>
 
+          {/* ── Shifokorlar/Xizmatlar panel (B joylashuv) ── */}
+          <ServiceDoctorPanel clinicId={contextClinicId} />
+
           {/* Clinic switcher yoki "tanlanmagan" holat */}
           {activeClinic ? (
-            <div className="mt-3">
+            <div>
               <ClinicSwitcher />
             </div>
           ) : (
-            <div className="mt-3 bg-white rounded-2xl border border-blue-100 px-4 py-3 flex items-center gap-3">
+            <div className="bg-white rounded-2xl border border-blue-100 px-4 py-3 flex items-center gap-3">
               <span className="text-2xl">🏥</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-700">Klinika tanlanmagan</p>
