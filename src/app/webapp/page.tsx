@@ -168,6 +168,7 @@ export default function WebApp() {
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [dashLoading, setDashLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [selfLimit, setSelfLimit] = useState<number | null>(null);
   const [selfActiveCountDB, setSelfActiveCountDB] = useState<number>(0);
 
@@ -1165,6 +1166,8 @@ export default function WebApp() {
                     onRebook={startRebook}
                     cancellingId={cancellingId}
                     telegramId={telegramId}
+                    compact={expandedHistoryId !== a.id}
+                    onToggle={() => setExpandedHistoryId(prev => prev === a.id ? null : a.id)}
                   />
                 ))}
               </div>
