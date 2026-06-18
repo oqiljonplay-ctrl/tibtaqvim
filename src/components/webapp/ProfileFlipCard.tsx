@@ -238,7 +238,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
 
   return (
     // perspective konteyner — balandlikni aktiv yuzga mos qil
-    <div style={{ perspective: "1200px" }}>
+    <div className="rounded-2xl overflow-hidden" style={{ perspective: "1200px" }}>
       <div
         style={{
           position: "relative",
@@ -370,7 +370,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
             left: 0,
             transform: "rotateY(180deg)",
           }}
-          className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white pt-5 pb-7 px-4"
+          className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl pt-5 pb-7 px-4"
         >
           {/* Header */}
           <div className="flex items-center gap-3 mb-4">
