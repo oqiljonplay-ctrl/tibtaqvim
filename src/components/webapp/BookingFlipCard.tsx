@@ -51,6 +51,8 @@ interface Props {
   onCancel: (appointmentId: string) => void;
   cancellingId?: string | null;
   telegramId?: string | null;
+  compact?: boolean;
+  onToggle?: () => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -136,7 +138,7 @@ function ChipList({ icon, label, items }: { icon: string; label: string; items: 
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancellingId, telegramId }: Props) {
+export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancellingId, telegramId, compact = false, onToggle }: Props) {
   const [flipped, setFlipped] = useState(false);
   const [paymentNotice, setPaymentNotice] = useState(false);
   const [fullDoc, setFullDoc] = useState<DocData | null>(null);
@@ -228,6 +230,10 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
     return () => clearTimeout(t);
   }, [paymentNotice]);
 
+  useEffect(() => {
+    if (compact) setFlipped(false);
+  }, [compact]);
+
   async function handleFlip() {
     setFlipped(true);
     if (!doc || fullDoc) return;
@@ -256,6 +262,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
   const frontStyle: React.CSSProperties = {
     backfaceVisibility: "hidden",
     WebkitBackfaceVisibility: "hidden",
+    transform: "translateZ(0)", // TEST: GPU layer — oqarish yo'qoladimi?
   };
 
   const backStyle: React.CSSProperties = {
@@ -269,7 +276,34 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
 
   return (
     <div style={{ perspective: "1200px" }} className="w-full">
-      {/* Flipper — transform-style: preserve-3d, front is relative (sets height) */}
+      {compact ? (
+        /* ───── IXCHAM QATOR ───── */
+        <div
+          onClick={() => onToggle?.()}
+          className="flex items-center gap-3 px-4 py-3 bg-white rounded-2xl shadow-sm border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform"
+        >
+          {doc ? (
+            <Avatar doc={doc} size={36} />
+          ) : (
+            <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+              <span className="text-lg">{TYPE_EMOJI[a.service.type] ?? "🏥"}</span>
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-800 truncate">
+              {doc ? `${doc.lastName} ${doc.firstName}` : a.service.name}
+            </p>
+            <p className="text-xs text-gray-400 truncate">{a.service.name} · {fmtDate(a.date)}</p>
+          </div>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${STATUS_CLS[a.status] ?? "bg-gray-100 text-gray-500"}`}>
+            {STATUS_LABEL[a.status] ?? a.status}
+          </span>
+          <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      ) : (
+      /* ───── FLIPPER — o'zgarmaydi ───── */
       <div
         style={{
           position: "relative",
@@ -282,7 +316,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
         {/* ── OLD TOMON: relative → container balandligini belgilaydi ── */}
         <div
           style={frontStyle}
-          onClick={doc ? () => handleFlip() : undefined}
+          onClick={doc ? () => handleFlip() : (onToggle ? () => onToggle() : undefined)}
           className={`relative bg-white rounded-2xl shadow-sm border border-gray-100 p-4 transition-transform${doc ? " cursor-pointer active:scale-[0.99]" : ""}`}
         >
           {/* Flip tugmasi — shifokor bo'lsa har doim ko'rsatiladi */}
@@ -470,7 +504,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
         {/* ── ORQA TOMON: absolute inset-0, overflow-y-auto ── */}
         <div
           style={backStyle}
-          onClick={() => setFlipped(false)}
+          onClick={onToggle ? () => onToggle() : () => setFlipped(false)}
           className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-sm p-4 cursor-pointer"
         >
           {/* Header: orqaga tugma + shifokor mini info */}
@@ -577,6 +611,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
