@@ -1020,35 +1020,35 @@ export default function WebApp() {
 
     return (
       <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col">
-        {/* Header — ProfileFlipCard */}
-        {tgUser && telegramId ? (
-          <ProfileFlipCard
-            profile={{
-              firstName: tgUser.firstName,
-              lastName: tgUser.lastName ?? null,
-              fatherName: tgUser.fatherName ?? null,
-              region: tgUser.region ?? null,
-              district: tgUser.district ?? null,
-              phone: tgUser.phone,
-              tibId: tgUser.tibId,
-            }}
-            telegramId={telegramId}
-            headerDate={headerDate}
-            onUpdated={(updated) =>
-              setTgUser((prev) => prev ? { ...prev, ...updated } : prev)
-            }
-          />
-        ) : (
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7 px-4">
-            <p className="text-blue-200 text-xs mb-0.5">{headerDate}</p>
-            <h1 className="font-bold text-xl">Salom! 👋</h1>
-          </div>
-        )}
+        <div className="flex-1 pb-[calc(96px+env(safe-area-inset-bottom))] px-4 pt-3">
+          <Stack gap={2}>
 
-        <div className="flex-1 -mt-3 pb-[calc(96px+env(safe-area-inset-bottom))] px-4">
-          <Stack gap={4}>
+          {/* ① Profil — Stack birinchi farzandi */}
+          {tgUser && telegramId ? (
+            <ProfileFlipCard
+              profile={{
+                firstName: tgUser.firstName,
+                lastName: tgUser.lastName ?? null,
+                fatherName: tgUser.fatherName ?? null,
+                region: tgUser.region ?? null,
+                district: tgUser.district ?? null,
+                phone: tgUser.phone,
+                tibId: tgUser.tibId,
+              }}
+              telegramId={telegramId}
+              headerDate={headerDate}
+              onUpdated={(updated) =>
+                setTgUser((prev) => prev ? { ...prev, ...updated } : prev)
+              }
+            />
+          ) : (
+            <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl px-4 py-3">
+              <p className="text-blue-200 text-xs mb-0.5">{headerDate}</p>
+              <h1 className="font-bold text-xl">Salom! 👋</h1>
+            </div>
+          )}
 
-          {/* ── Shifokorlar/Xizmatlar panel (B joylashuv) ── */}
+          {/* ② Shifokorlar/Xizmatlar panel */}
           <ServiceDoctorPanel clinicId={contextClinicId} />
 
           {/* Clinic switcher yoki "tanlanmagan" holat */}
