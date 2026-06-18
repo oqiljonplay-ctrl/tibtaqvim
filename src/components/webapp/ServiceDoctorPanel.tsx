@@ -25,7 +25,7 @@ export function ServiceDoctorPanel({ clinicId }: { clinicId: string | null }) {
   return (
     <>
       {/* Tab'lar — kartochkasiz, bare segment */}
-      <div ref={tabsRef} className="mt-3 flex gap-2">
+      <div ref={tabsRef} className="mt-7 flex gap-2">
         <button
           onClick={() => handleTab("doctors")}
           aria-pressed={tab === "doctors"}
