@@ -1,9 +1,34 @@
 "use client";
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
 import { normalizePhone } from "@/lib/utils/phone";
 
 const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME || "tibtaqvim_bot";
+
+/** Matnni konteynerga bir qatorga sig'dirish: maxPx dan minPx gacha kichraytiradi.
+ *  minPx da ham sig'masa — CSS ellipsis ("…") ishlaydi. */
+function useAutoFitText(text: string, maxPx = 18, minPx = 14, stepPx = 0.5) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      let s = maxPx;
+      el.style.fontSize = `${s}px`;
+      let guard = 0;
+      while (s > minPx && el.scrollWidth > el.clientWidth && guard < 40) {
+        s -= stepPx;
+        el.style.fontSize = `${s}px`;
+        guard++;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, maxPx, minPx, stepPx]);
+  return ref;
+}
 
 interface ProfileData {
   firstName: string;
@@ -61,6 +86,9 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
   const displayName = [profile.firstName, profile.lastName, profile.fatherName]
     .filter(Boolean)
     .join(" ");
+
+  const addressText = [profile.district, profile.region].filter(Boolean).join(", ");
+  const nameRef = useAutoFitText(displayName, 18, 14, 0.5);
 
   async function savePhone(phone: string, tgFirstName?: string) {
     setPhoneSaving(true);
@@ -130,9 +158,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
     if (typeof tg?.requestContact === "function") {
       try {
         tg.requestContact((result: any) => {
-          // result: boolean (true/false) yoki {status:"sent"|"cancelled", contact?:{...}}
           const isSent = result === true || result?.status === "sent";
-          // Phone callback'da yo'q bo'lsa tg.responseUnsafe'dan olamiz
           const phone =
             result?.contact?.phone_number ??
             tg.responseUnsafe?.contact?.phone_number ??
@@ -213,115 +239,125 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
   return (
     // perspective konteyner — balandlikni aktiv yuzga mos qil
     <div style={{ perspective: "1200px" }}>
-      {/*
-        Flipper: position:relative + aniq balandlik (containerHeight).
-        Ikkala yuz ham position:absolute → layout flow'dan chiqadi,
-        shuning uchun siz balandlikni qo'lda berishingiz kerak.
-        containerHeight state orqali aktiv yuzga moslanadi.
-      */}
       <div
         style={{
           position: "relative",
           transformStyle: "preserve-3d",
-          // Balandlik ham silliq o'zgaradi — flip + height bir vaqtda animatsiya
           transition: "transform 0.6s ease, height 0.45s ease",
           transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
           height: containerHeight || undefined,
         }}
       >
-        {/* ── OLDI: Header ── */}
+        {/* ── FRONT YUZ — compact profil (3 qator) ── */}
         <div
           ref={frontRef}
           style={{ ...faceBase, position: "absolute", top: 0, left: 0 }}
-          className="bg-gradient-to-br from-blue-600 to-blue-700 text-white pt-5 pb-7 px-4"
+          className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl px-4 py-3"
         >
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0 pr-2">
-              <p className="text-blue-200 text-xs mb-0.5">{headerDate}</p>
-              <h1 className="font-bold text-xl leading-tight break-words">
-                Salom, {displayName || "Foydalanuvchi"}! 👋
-              </h1>
-            </div>
-            <div className="flex items-start gap-2 shrink-0 mt-1">
-              {profile.tibId && (
-                <span className="text-xs bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-mono font-semibold">
-                  🆔 {profile.tibId}
-                </span>
-              )}
-              <button
-                onClick={(e) => { e.stopPropagation(); setFlipped(true); }}
-                className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-sm hover:bg-white/30 active:scale-95 transition-all"
-                title="Profilni tahrirlash"
-                aria-label="Profilni tahrirlash"
-              >
-                ✏️
-              </button>
-            </div>
-          </div>
-          {profile.phone ? (
-            <p className="text-blue-200 text-xs mt-2">📞 {profile.phone}</p>
-          ) : pollingForPhone ? (
-            <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <span className="text-xs text-blue-200 animate-pulse">⏳ Botda tasdiqlang...</span>
-              <button
-                onClick={cancelPolling}
-                className="text-xs text-blue-300 underline"
-              >
-                Qo&apos;lda kiritish
-              </button>
-            </div>
-          ) : showPhoneInput ? (
-            <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
-              <input
-                type="tel"
-                className="w-full bg-white/20 text-white placeholder-blue-300 rounded-xl px-3 py-2 text-sm
-                           border border-white/30 focus:outline-none focus:border-white/60"
-                placeholder="+998 90 123 45 67"
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                autoFocus
-              />
-              {phoneError && (
-                <p className="text-red-300 text-xs">{phoneError}</p>
-              )}
-              <div className="flex gap-2">
+          {/* TEPA QATOR: chap bo'sh (avatar joyi), o'ng — sana + (ID + qalam) */}
+          <div className="flex items-start justify-between gap-2">
+            {/* avatar joyi — keyinchalik qo'shiladi */}
+            <div aria-hidden className="min-w-0 flex-1" />
+
+            {/* o'ng: sana ID ustida, ostida ID badge + qalam */}
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span className="text-[11px] leading-none text-white/80">{headerDate}</span>
+              <div className="flex items-center gap-2">
+                {profile.tibId && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-white/20 rounded-full px-2 py-0.5 whitespace-nowrap">
+                    🆔 {profile.tibId}
+                  </span>
+                )}
                 <button
-                  onClick={() => {
-                    try {
-                      const normalized = normalizePhone(phoneInput);
-                      savePhone(normalized);
-                    } catch {
-                      setPhoneError("Telefon formati noto'g'ri (+998XXXXXXXXX)");
-                    }
-                  }}
-                  disabled={phoneSaving || phoneInput.trim().length < 9}
-                  className="flex-1 bg-white text-blue-700 font-semibold text-xs py-2 rounded-xl
-                             disabled:opacity-50 active:scale-95 transition-all"
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setFlipped(true); }}
+                  aria-label="Profilni tahrirlash"
+                  className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-sm leading-none"
                 >
-                  {phoneSaving ? "Saqlanmoqda..." : "Saqlash"}
-                </button>
-                <button
-                  onClick={() => { setShowPhoneInput(false); setPhoneError(null); setPhoneInput(""); }}
-                  className="px-3 py-2 text-blue-200 text-xs rounded-xl bg-white/10"
-                >
-                  Bekor
+                  ✏️
                 </button>
               </div>
             </div>
-          ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleRequestContact(); }}
-              className="mt-2 flex items-center gap-1.5 text-xs bg-white/20 hover:bg-white/30
-                         text-white px-3 py-1.5 rounded-full active:scale-95 transition-all"
+          </div>
+
+          {/* 1-QATOR: to'liq ism — bitta qator, auto-fit, ortib ketsa "…" */}
+          <div className="mt-1.5">
+            <span
+              ref={nameRef}
+              className="block w-full font-bold leading-tight whitespace-nowrap overflow-hidden text-ellipsis"
+              style={{ fontSize: 18 }}
             >
-              📞 Telefon ulash
-            </button>
-          )}
-          {(profile.region || profile.district) && (
-            <p className="text-blue-200 text-xs mt-1">
-              📍 {[profile.district, profile.region].filter(Boolean).join(", ")}
-            </p>
-          )}
+              {displayName || "Foydalanuvchi"}
+            </span>
+          </div>
+
+          {/* 2-QATOR: telefon va manzil (yoki telefon ulash UI) */}
+          <div className="mt-0.5">
+            {profile.phone ? (
+              <div className="flex items-center gap-2 text-xs text-white/90 min-w-0">
+                <span className="shrink-0">📞 {profile.phone}</span>
+                {addressText && (
+                  <>
+                    <span className="text-white/50">·</span>
+                    <span className="truncate">📍 {addressText}</span>
+                  </>
+                )}
+              </div>
+            ) : pollingForPhone ? (
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <span className="text-xs text-white/80 animate-pulse">⏳ Botda tasdiqlang...</span>
+                <button onClick={cancelPolling} className="text-xs text-white/60 underline">
+                  Qo&apos;lda kiritish
+                </button>
+              </div>
+            ) : showPhoneInput ? (
+              <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="tel"
+                  className="w-full bg-white/20 text-white placeholder-blue-300 rounded-xl px-3 py-2 text-sm
+                             border border-white/30 focus:outline-none focus:border-white/60"
+                  placeholder="+998 90 123 45 67"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  autoFocus
+                />
+                {phoneError && (
+                  <p className="text-red-300 text-xs">{phoneError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      try {
+                        const normalized = normalizePhone(phoneInput);
+                        savePhone(normalized);
+                      } catch {
+                        setPhoneError("Telefon formati noto'g'ri (+998XXXXXXXXX)");
+                      }
+                    }}
+                    disabled={phoneSaving || phoneInput.trim().length < 9}
+                    className="flex-1 bg-white text-blue-700 font-semibold text-xs py-2 rounded-xl
+                               disabled:opacity-50 active:scale-95 transition-all"
+                  >
+                    {phoneSaving ? "Saqlanmoqda..." : "Saqlash"}
+                  </button>
+                  <button
+                    onClick={() => { setShowPhoneInput(false); setPhoneError(null); setPhoneInput(""); }}
+                    className="px-3 py-2 text-white/70 text-xs rounded-xl bg-white/10"
+                  >
+                    Bekor
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleRequestContact(); }}
+                className="flex items-center gap-1.5 text-xs bg-white/20 hover:bg-white/30
+                           text-white px-3 py-1.5 rounded-full active:scale-95 transition-all"
+              >
+                📞 Telefon ulash
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── ORQA: Tahrirlash formasi ── */}
