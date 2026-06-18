@@ -84,24 +84,28 @@ function fmtDate(iso: string) {
 }
 
 function Avatar({ doc, size = 88 }: { doc: DocData; size?: number }) {
-  if (doc.photoUrl) {
-    return (
-      <img
-        src={doc.photoUrl}
-        alt=""
-        className="rounded-xl object-cover border border-gray-200 shrink-0"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
+  const initials = `${doc.firstName?.[0] ?? ""}${doc.lastName?.[0] ?? ""}`;
   return (
     <div
-      className="rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shrink-0"
+      className="relative rounded-xl overflow-hidden border border-gray-200 shrink-0 bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center"
       style={{ width: size, height: size }}
     >
-      <span className="text-white font-bold" style={{ fontSize: Math.round(size * 0.27) }}>
-        {doc.firstName[0]}{doc.lastName[0]}
+      <span
+        className="absolute text-white font-bold select-none"
+        style={{ fontSize: Math.round(size * 0.27) }}
+      >
+        {initials}
       </span>
+      {doc.photoUrl && (
+        <img
+          src={doc.photoUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="relative object-cover"
+          style={{ width: size, height: size }}
+        />
+      )}
     </div>
   );
 }
