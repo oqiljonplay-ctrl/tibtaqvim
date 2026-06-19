@@ -7,6 +7,7 @@ import { Container } from "@/components/layout";
 import { ServicePicker } from "@/components/webapp/ServicePicker";
 import type { Service, ServiceDoctor } from "@/components/webapp/ServicePicker";
 import { DoctorPicker } from "@/components/webapp/DoctorPicker";
+import { useTelegramBack } from "@/lib/use-telegram-back";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
 
@@ -233,6 +234,34 @@ export default function BranchServicesPage() {
     finally { setSubmitting(false); }
   }
 
+  const goBack = () => {
+    switch (step) {
+      case "services": {
+        if (sessionStorage.getItem("branch_shown") === "1") {
+          router.push(`/webapp/clinics/${clinicId}`);
+        } else {
+          const entry = sessionStorage.getItem("booking_entry");
+          window.location.href = entry === "dashboard"
+            ? `/webapp?mode=dashboard&clinicId=${clinicId}`
+            : `/webapp/clinics`;
+        }
+        break;
+      }
+      case "doctor":  setStep("services"); break;
+      case "date":    setStep((selSvc?.doctors.length ?? 0) > 1 ? "doctor" : "services"); break;
+      case "slots":   setStep("date"); break;
+      case "patient": setStep(selSvc?.requiresSlot ? "slots" : "date"); break;
+      case "form":    setStep(selSvc?.requiresSlot ? "slots" : "date"); break;
+      case "confirm": setStep(u?.hasPhone ? "patient" : "form"); break;
+    }
+  };
+  const goHome = () => {
+    sessionStorage.removeItem("booking_entry");
+    sessionStorage.removeItem("branch_shown");
+    window.location.href = `/webapp?mode=dashboard&clinicId=${clinicId}`;
+  };
+  const nativeBackOk = useTelegramBack(goBack, step !== "done");
+
   const displayTibId = tgUser?.tibId ?? tibId;
   const u = tgUser;
 
@@ -241,19 +270,29 @@ export default function BranchServicesPage() {
       {/* Header */}
       <div className="bg-blue-600 text-white pt-4 pb-6 px-4">
         <div className="flex items-center gap-2 mb-1">
-          {step !== "done" && (
-            <button onClick={() => step === "services" ? router.push(`/webapp/clinics`) : setStep("services")}
-              className="text-blue-200 hover:text-white text-sm">←</button>
+          {!nativeBackOk && step !== "done" && (
+            <button onClick={goBack} aria-label="Orqaga" className="text-blue-200 hover:text-white text-sm">←</button>
           )}
           <h1 className="font-bold text-lg">🏥 Qabulga yozilish</h1>
-          {displayTibId && (
-            <span className="ml-auto text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono">{displayTibId}</span>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {step !== "done" && (
+              <button onClick={goHome} aria-label="Bosh sahifa" className="text-blue-200 hover:text-white text-base leading-none">🏠</button>
+            )}
+            {displayTibId && (
+              <span className="text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono">{displayTibId}</span>
+            )}
+          </div>
         </div>
         {step !== "services" && step !== "done" && (
           <div className="mt-2 h-1.5 bg-blue-500 rounded-full overflow-hidden">
             <div className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${step === "confirm" ? 88 : step === "form" || step === "patient" ? 72 : step === "slots" ? 58 : step === "doctor" ? 42 : step === "date" ? 55 : 28}%` }} />
+              style={{ width: `${
+                step === "confirm" ? 88 :
+                step === "form" || step === "patient" ? 72 :
+                step === "slots" ? 58 :
+                step === "doctor" ? 42 :
+                step === "date" ? 55 : 28
+              }%` }} />
           </div>
         )}
       </div>
@@ -297,9 +336,6 @@ export default function BranchServicesPage() {
         {/* Doctor */}
         {step === "doctor" && selSvc && (
           <div>
-            <button onClick={() => setStep("services")} className="text-blue-600 text-sm mb-4">
-              ← Orqaga
-            </button>
             <div className="bg-blue-50 rounded-xl p-3 mb-4 flex items-center gap-3">
               <span className="text-xl">{typeEmojis[selSvc.type]}</span>
               <div>
@@ -325,12 +361,6 @@ export default function BranchServicesPage() {
         {/* Date */}
         {step === "date" && selSvc && (
           <div>
-            <button
-              onClick={() => setStep(selSvc.doctors.length > 1 ? "doctor" : "services")}
-              className="text-blue-600 text-sm mb-4"
-            >
-              ← Orqaga
-            </button>
             <div className="bg-blue-50 rounded-xl p-3 mb-4 flex items-center gap-3">
               <span className="text-xl">{typeEmojis[selSvc.type]}</span>
               <div>
@@ -369,7 +399,6 @@ export default function BranchServicesPage() {
         {/* Slots */}
         {step === "slots" && (
           <div>
-            <button onClick={() => setStep("date")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
             <h2 className="font-semibold text-gray-900 mb-4">Vaqtni tanlang</h2>
             {slots.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">Bu kunda bo&apos;sh vaqt yo&apos;q</div>
@@ -390,7 +419,6 @@ export default function BranchServicesPage() {
         {/* Patient selection */}
         {step === "patient" && u && (
           <div>
-            <button onClick={() => setStep(selSvc?.requiresSlot ? "slots" : "date")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
             <h2 className="font-semibold text-gray-900 mb-4">👤 Bron kim uchun?</h2>
             <div className="space-y-2 mb-4">
               {/* O'zim */}
@@ -478,7 +506,6 @@ export default function BranchServicesPage() {
         {/* Form (guest / no-phone user) */}
         {step === "form" && (
           <form onSubmit={(e) => { e.preventDefault(); setPatient({ type: "guest", dependentId: null, patientName: form.name, patientPhone: form.phone }); setStep("confirm"); }}>
-            <button type="button" onClick={() => setStep(selSvc?.requiresSlot ? "slots" : "date")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
             <h2 className="font-semibold text-gray-900 mb-4">Ma&apos;lumotlaringizni kiriting</h2>
             <div className="space-y-4">
               <div>
@@ -506,7 +533,6 @@ export default function BranchServicesPage() {
         {/* Confirm */}
         {step === "confirm" && selSvc && (
           <div>
-            <button onClick={() => setStep(u?.hasPhone ? "patient" : "form")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
             <h2 className="font-semibold text-gray-900 mb-4">Tasdiqlash</h2>
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 mb-5">
               <SummaryRow label="Xizmat" value={`${typeEmojis[selSvc.type]} ${selSvc.name}`} />
