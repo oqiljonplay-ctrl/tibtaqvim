@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/layout";
+import { useTelegramBack } from "@/lib/use-telegram-back";
 
 interface BranchItem {
   id: string;
@@ -39,6 +40,21 @@ export default function ClinicDetailPage() {
   const [loading, setLoading] = useState(true);
   const [autoRedirected, setAutoRedirected] = useState(false);
 
+  const goBack = () => {
+    const entry = sessionStorage.getItem("booking_entry");
+    if (entry === "dashboard") {
+      window.location.href = `/webapp?mode=dashboard&clinicId=${id}`;
+    } else {
+      router.push("/webapp/clinics");
+    }
+  };
+  const goHome = () => {
+    sessionStorage.removeItem("booking_entry");
+    sessionStorage.removeItem("branch_shown");
+    window.location.href = `/webapp?mode=dashboard&clinicId=${id}`;
+  };
+  const nativeBackOk = useTelegramBack(goBack, true);
+
   useEffect(() => {
     fetch(`/api/clinics/${id}`, { cache: "no-store" })
       .then((r) => r.json())
@@ -54,6 +70,7 @@ export default function ClinicDetailPage() {
       setAutoRedirected(true);
       sessionStorage.setItem("selectedClinicId", id);
       sessionStorage.setItem("selectedBranchId", clinic.branches[0].id);
+      sessionStorage.setItem("branch_shown", "0");
       router.replace(`/webapp/clinics/${id}/branches/${clinic.branches[0].id}`);
     }
   }, [clinic, id, router, autoRedirected]);
@@ -61,6 +78,7 @@ export default function ClinicDetailPage() {
   function selectBranch(branchId: string) {
     sessionStorage.setItem("selectedClinicId", id);
     sessionStorage.setItem("selectedBranchId", branchId);
+    sessionStorage.setItem("branch_shown", "1");
     router.push(`/webapp/clinics/${id}/branches/${branchId}`);
   }
 
@@ -93,7 +111,12 @@ export default function ClinicDetailPage() {
   return (
     <Container size="sm" className="min-h-[100dvh] bg-gray-50">
       <div className="bg-blue-600 text-white pt-5 pb-6 px-4">
-        <Link href="/webapp/clinics" className="text-blue-200 text-sm mb-2 block">← Klinikalar</Link>
+        <div className="flex items-center justify-between mb-2">
+          {!nativeBackOk ? (
+            <button onClick={goBack} aria-label="Orqaga" className="text-blue-200 hover:text-white text-sm">←</button>
+          ) : <span />}
+          <button onClick={goHome} aria-label="Bosh sahifa" className="text-blue-200 hover:text-white text-base leading-none">🏠</button>
+        </div>
         <h1 className="font-bold text-xl">{clinic.name}</h1>
         {clinic.workingHours && (
           <p className="text-blue-200 text-xs mt-0.5">🕐 {clinic.workingHours}</p>
