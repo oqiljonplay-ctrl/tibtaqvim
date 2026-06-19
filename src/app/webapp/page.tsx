@@ -13,6 +13,7 @@ import { ProfileFlipCard } from "@/components/webapp/ProfileFlipCard";
 import { ServicePicker } from "@/components/webapp/ServicePicker";
 import { DoctorPicker } from "@/components/webapp/DoctorPicker";
 import { ServiceDoctorPanel } from "@/components/webapp/ServiceDoctorPanel";
+import { useTelegramBack } from "@/lib/use-telegram-back";
 
 declare global {
   interface Window { Telegram?: { WebApp?: any } }
@@ -507,6 +508,19 @@ export default function WebApp() {
     const qs = new URLSearchParams({ clinic: clinicIdRef.current, mode: "dashboard" });
     window.location.href = `/webapp?${qs}`;
   }
+
+  const goBack = () => {
+    switch (step) {
+      case "services": goToDashboard(); break;
+      case "doctor":   setStep("services"); break;
+      case "date":     setStep((selectedService?.doctors.length ?? 0) > 1 ? "doctor" : "services"); break;
+      case "slots":    setStep("date"); break;
+      case "form":     setStep(selectedService?.requiresSlot ? "slots" : "date"); break;
+      case "confirm":  setStep(tgUserRef.current?.hasPhone ? (selectedService?.requiresSlot ? "slots" : "date") : "form"); break;
+    }
+  };
+  const goHome = () => goToDashboard();
+  const nativeBackOk = useTelegramBack(goBack, !!telegramId && step !== "done");
 
   // ─── Onboarding functions ──────────────────────────────────────────────────
 
@@ -1202,10 +1216,10 @@ export default function WebApp() {
                   }
                   const cId = clinicIdRef.current;
                   if (cId) {
-                    // Tanlangan klinikaning bron sahifasiga
+                    sessionStorage.setItem("booking_entry", "dashboard");
                     window.location.href = `/webapp/clinics/${cId}`;
                   } else {
-                    // Klinika tanlanmagan — avval klinika tanlash
+                    sessionStorage.setItem("booking_entry", "clinics");
                     const qs = new URLSearchParams();
                     if (telegramId) qs.set("tgid", telegramId);
                     window.location.href = `/webapp/clinics?${qs}`;
@@ -1327,30 +1341,24 @@ export default function WebApp() {
       <div className="bg-blue-600 text-white pt-4 pb-6 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Back to dashboard for any Telegram user */}
-            {telegramId && step !== "done" && (
-              <button
-                onClick={goToDashboard}
-                className="text-blue-200 hover:text-white text-sm mr-1"
-              >
-                ←
-              </button>
+            {!nativeBackOk && telegramId && step !== "done" && (
+              <button onClick={goBack} aria-label="Orqaga" className="text-blue-200 hover:text-white text-sm mr-1">←</button>
             )}
             <h1 className="font-bold text-lg">🏥 Qabulga yozilish</h1>
           </div>
-          {displayTibId && (
-            <span className="text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono font-semibold">
-              🆔 {displayTibId}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {step !== "done" && (
+              <button onClick={goHome} aria-label="Bosh sahifa" className="text-blue-200 hover:text-white text-base leading-none">🏠</button>
+            )}
+            {displayTibId && (
+              <span className="text-xs bg-blue-500 px-2.5 py-1 rounded-full font-mono font-semibold">🆔 {displayTibId}</span>
+            )}
+          </div>
         </div>
         {headerDate && <p className="text-blue-200 text-xs mt-0.5">{headerDate}</p>}
         {step !== "services" && (
           <div className="mt-3 h-1.5 bg-blue-500 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${bookingProgress}%` }}
-            />
+            <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${bookingProgress}%` }} />
           </div>
         )}
       </div>
@@ -1384,9 +1392,6 @@ export default function WebApp() {
         {/* ── Doctor ── */}
         {step === "doctor" && selectedService && (
           <div>
-            <button onClick={() => setStep("services")} className="text-blue-600 text-sm mb-4 flex items-center gap-1">
-              ← Orqaga
-            </button>
             <div className="bg-blue-50 rounded-xl p-3 mb-4 flex items-center gap-3">
               <span className="text-xl">{typeEmojis[selectedService.type]}</span>
               <div>
@@ -1404,14 +1409,6 @@ export default function WebApp() {
         {/* ── Date ── */}
         {step === "date" && (
           <div>
-            <button
-              onClick={() => setStep(
-                selectedService && selectedService.doctors.length > 1 ? "doctor" : "services"
-              )}
-              className="text-blue-600 text-sm mb-4 flex items-center gap-1"
-            >
-              ← Orqaga
-            </button>
             {selectedService && (
               <div className="bg-blue-50 rounded-xl p-3 mb-3 flex items-center gap-3">
                 <span className="text-xl">{typeEmojis[selectedService.type]}</span>
@@ -1465,7 +1462,6 @@ export default function WebApp() {
         {/* ── Slots ── */}
         {step === "slots" && (
           <div>
-            <button onClick={() => setStep("date")} className="text-blue-600 text-sm mb-4">← Orqaga</button>
             <h2 className="font-semibold text-gray-900 mb-4">Vaqtni tanlang</h2>
             {slots.length === 0 ? (
               <div className="text-center py-8">
@@ -1493,14 +1489,6 @@ export default function WebApp() {
         {/* ── Form ── */}
         {step === "form" && (
           <form onSubmit={handleFormNext}>
-            <button
-              type="button"
-              onClick={() => setStep(selectedService?.requiresSlot ? "slots" : "date")}
-              className="text-blue-600 text-sm mb-4"
-            >
-              ← Orqaga
-            </button>
-
             {nameIsKnown && (
               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 mb-4 text-sm text-blue-700">
                 👤 {form.name}
@@ -1562,12 +1550,6 @@ export default function WebApp() {
         {/* ── Confirm ── */}
         {step === "confirm" && (
           <div>
-            <button
-              onClick={() => setStep(tgUserRef.current?.hasPhone ? (selectedService?.requiresSlot ? "slots" : "date") : "form")}
-              className="text-blue-600 text-sm mb-4"
-            >
-              ← Orqaga
-            </button>
             <h2 className="font-semibold text-gray-900 mb-4">Tasdiqlash</h2>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 mb-5">
