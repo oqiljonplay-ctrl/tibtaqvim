@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useClinic } from "@/lib/clinic-context";
 import { ClinicLogo } from "@/components/ClinicLogo";
 import { ResponsiveGrid } from "@/components/layout";
+import { useTelegramBack } from "@/lib/use-telegram-back";
 
 interface ClinicItem {
   id: string;
@@ -32,6 +33,9 @@ export default function ClinicsPage() {
   const [selecting, setSelecting] = useState<string | null>(null);
 
   const nextPath = searchParams.get("next");
+
+  const goHome = () => { window.location.href = `/webapp?mode=dashboard`; };
+  const nativeBackOk = useTelegramBack(goHome, true);
 
   const fetchClinics = useCallback(async () => {
     setLoading(true);
@@ -74,10 +78,13 @@ export default function ClinicsPage() {
   return (
     <div className="w-full min-h-[100dvh] bg-gray-50">
       <div className="bg-blue-600 text-white pt-5 pb-6 px-4">
-        <h1 className="font-bold text-xl">🏥 Klinikani tanlang</h1>
-        <p className="text-blue-200 text-sm mt-0.5">
-          Davolanmoqchi bo&apos;lgan klinikani tanlang
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="font-bold text-xl">🏥 Klinikani tanlang</h1>
+            <p className="text-blue-200 text-sm mt-0.5">Davolanmoqchi bo&apos;lgan klinikani tanlang</p>
+          </div>
+          <button onClick={goHome} aria-label="Bosh sahifa" className="text-blue-200 hover:text-white text-base leading-none shrink-0">🏠</button>
+        </div>
       </div>
 
       <div className="py-4 space-y-3 px-4">
