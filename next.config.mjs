@@ -3,6 +3,13 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "lxqimithjjabhnldcugc.supabase.co" },
+      { protocol: "https", hostname: "i.ytimg.com" },
+      { protocol: "https", hostname: "img.youtube.com" },
+    ],
+  },
   experimental: {
     serverComponentsExternalPackages: ["@prisma/client", "node-telegram-bot-api"],
     serverActions: {
