@@ -155,6 +155,8 @@ model Clinic {
   stints        EmploymentStint[]
   doctorRatings DoctorRating[]
   jobRequests   JobRequest[]
+  showcaseBlocks ShowcaseBlock[]
+  showcaseLimits ClinicShowcaseLimits?
 
   @@index([isActive, city])
   @@index([subscriptionStatus])
@@ -215,7 +217,8 @@ model Service {
   branch       Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
   appointments Appointment[]
   slots        Slot[]
-  doctors      ServiceDoctor[]
+  doctors        ServiceDoctor[]
+  showcaseBlocks ShowcaseBlock[]
 
   @@index([clinicId])
   @@index([clinicId, type])
@@ -424,7 +427,8 @@ model Employee {
   directions  DoctorDirection[]
   experiences DoctorExperience[]
   workplaces  DoctorWorkplace[]
-  jobRequests JobRequest[]
+  jobRequests    JobRequest[]
+  showcaseBlocks ShowcaseBlock[]
 
   @@map("employees")
 }
@@ -982,4 +986,124 @@ model GlobalSetting {
   updatedAt DateTime @default(now()) @updatedAt
 
   @@map("global_settings")
+}
+
+// ─── SHOWCASE (REKLAMA VITRINA) MODELLARI ────────────────────────────────────
+
+enum ShowcaseTab {
+  doctors
+  services
+}
+
+enum ShowcaseSource {
+  em
+  service
+  manual
+}
+
+enum ShowcaseCta {
+  auto
+  generic
+}
+
+enum ShowcaseMediaKind {
+  image
+  gif
+  video
+  audio
+  youtube
+  telegram
+  pdf
+}
+
+enum ShowcaseMediaSource {
+  upload
+  url
+}
+
+enum ShowcaseShape {
+  original
+  circle
+}
+
+model ShowcaseBlock {
+  id         String         @id @default(cuid())
+  clinicId   String
+  tab        ShowcaseTab
+  sortOrder  Int            @default(0)
+  source     ShowcaseSource @default(manual)
+  employeeId String?
+  serviceId  String?
+  title      String
+  subtitle   String?
+  showRating Boolean        @default(true)
+  cta        ShowcaseCta    @default(auto)
+  isActive   Boolean        @default(true)
+  createdBy  String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  deletedAt  DateTime?
+
+  clinic   Clinic          @relation(fields: [clinicId],   references: [id], onDelete: Cascade)
+  employee Employee?       @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  service  Service?        @relation(fields: [serviceId],  references: [id], onDelete: SetNull)
+  media    ShowcaseMedia[]
+
+  @@index([clinicId, tab, sortOrder])
+  @@index([employeeId])
+  @@index([serviceId])
+  @@map("showcase_blocks")
+}
+
+model ShowcaseMedia {
+  id                String              @id @default(cuid())
+  blockId           String
+  sortOrder         Int                 @default(0)
+  kind              ShowcaseMediaKind
+  mediaSource       ShowcaseMediaSource
+  storagePath       String?
+  url               String?
+  embedRef          String?
+  posterStoragePath String?
+  posterUrl         String?
+  shape             ShowcaseShape       @default(original)
+  aspectW           Int?
+  aspectH           Int?
+  title             String?
+  caption           String?
+  mimeType          String?
+  fileSizeBytes     Int?
+  durationSec       Int?
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  deletedAt         DateTime?
+
+  block ShowcaseBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@index([blockId, sortOrder])
+  @@map("showcase_media")
+}
+
+model ClinicShowcaseLimits {
+  id                String   @id @default(cuid())
+  clinicId          String   @unique
+  maxBlocksDoctors  Int      @default(0)
+  maxBlocksServices Int      @default(0)
+  maxMediaPerBlock  Int      @default(0)
+  maxImageKb        Int      @default(0)
+  maxGifKb          Int      @default(0)
+  maxVideoKb        Int      @default(0)
+  maxAudioKb        Int      @default(0)
+  maxPdfKb          Int      @default(0)
+  storageTotalMb    Int      @default(0)
+  videoMaxSec       Int      @default(0)
+  allowVideoUpload  Boolean  @default(false)
+  allowedFormats    Json     @default("[\"image\",\"gif\",\"youtube\",\"telegram\",\"pdf\",\"audio\",\"url\"]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@map("clinic_showcase_limits")
 }
