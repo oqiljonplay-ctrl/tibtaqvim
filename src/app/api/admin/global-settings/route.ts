@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, serverError } from "@/lib/api-response";
 
-const ALLOWED_KEYS = ["ratingEditWindow"] as const;
+const ALLOWED_KEYS = ["ratingEditWindow", "showcaseMediaPolicy"] as const;
 
 // GET /api/admin/global-settings — ratingEditWindow, ratingPrior (super_admin only)
 export async function GET(req: NextRequest) {
