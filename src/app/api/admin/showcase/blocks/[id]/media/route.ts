@@ -145,6 +145,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return created(media);
   } catch (e: unknown) {
     if (e instanceof ApiError) return error(e.message, e.statusCode);
+    const msg = String((e as any)?.message ?? "");
+    if (msg.includes("Supabase storage sozlanmagan")) {
+      return error(
+        "Server sozlamasi to'liq emas: storage kalitlari yo'q (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY). Adminga murojaat qiling.",
+        503
+      );
+    }
+    if (msg.toLowerCase().includes("upload") || msg.toLowerCase().includes("storage")) {
+      return error(`Fayl yuklashda xato: ${msg}`, 502);
+    }
     console.error("showcase media POST", e);
     return serverError();
   }
