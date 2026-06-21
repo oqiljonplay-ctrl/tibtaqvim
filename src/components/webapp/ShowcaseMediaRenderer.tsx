@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TelegramPostEmbed } from "@/components/webapp/TelegramPostEmbed";
+import { useImageAlpha } from "@/lib/webapp/use-image-alpha";
 import type { ShowcaseMedia } from "@/lib/showcase/types";
 
 function openExternal(url: string) {
   const tg =
     typeof window !== "undefined"
-      ? (window as unknown as { Telegram?: { WebApp?: { openLink?: (u: string) => void } } })
-          .Telegram?.WebApp
+      ? (window as unknown as {
+          Telegram?: { WebApp?: { openLink?: (u: string) => void } };
+        }).Telegram?.WebApp
       : undefined;
   if (tg?.openLink) tg.openLink(url);
   else window.open(url, "_blank", "noopener,noreferrer");
@@ -18,72 +20,102 @@ function parseTelegramEmbedId(embedRef: string): string {
   return embedRef.replace(/^https?:\/\/t\.me\//i, "").replace(/^\//, "");
 }
 
-function aspectStyle(m: ShowcaseMedia): React.CSSProperties {
-  if (m.aspectW && m.aspectH) return { aspectRatio: `${m.aspectW} / ${m.aspectH}` };
-  if (m.kind === "youtube") return { aspectRatio: "16 / 9" };
-  if (m.shape === "circle") return { aspectRatio: "1 / 1" };
-  return {};
-}
+type Props = {
+  media: ShowcaseMedia;
+  /** Coverflow markazidami — video autoplay shu bilan boshqariladi. */
+  active?: boolean;
+  /** Coverflow box ichini to'ldirsinmi (h-full w-full). */
+  fill?: boolean;
+};
 
-function NeutralFallback({ label }: { label: string }) {
-  return (
-    <div className="w-full h-full min-h-[120px] flex items-center justify-center bg-gray-50 border border-gray-100 rounded-xl">
-      <span className="text-xs text-gray-400">{label}</span>
-    </div>
-  );
-}
-
-export function ShowcaseMediaRenderer({ media }: { media: ShowcaseMedia }) {
+export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Props) {
   const [imgBroken, setImgBroken] = useState(false);
-  const rounded = media.shape === "circle" ? "rounded-full" : "rounded-xl";
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Video: faqat markazda o'ynaydi
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (active) {
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, [active]);
+
+  // Shaffoflik — faqat upload rasm (CORS-safe)
+  const alphaEnabled =
+    (media.kind === "image" || media.kind === "gif") &&
+    media.mediaSource === "upload";
+  const alpha = useImageAlpha(alphaEnabled ? media.url : null, alphaEnabled);
+  const transparent = alpha === "transparent";
+
+  const fillCls = fill ? "h-full w-full" : "w-full";
 
   switch (media.kind) {
     case "image":
     case "gif": {
-      if (!media.url || imgBroken) return <NeutralFallback label="Rasm yuklanmadi" />;
-
-      if (media.shape === "circle") {
+      if (!media.url || imgBroken) {
         return (
-          <div className="flex flex-col items-center">
-            <img
-              src={media.url}
-              alt={media.title ?? ""}
-              onError={() => setImgBroken(true)}
-              className={`${rounded} object-cover w-28 h-28 border border-gray-100`}
-              loading="lazy"
-            />
-            {media.title && (
-              <span className="mt-1 text-xs text-gray-500">{media.title}</span>
-            )}
+          <div className="h-full w-full min-h-[100px] flex items-center justify-center bg-gray-50 border border-gray-100 rounded-xl">
+            <span className="text-xs text-gray-400">Rasm yuklanmadi</span>
           </div>
         );
       }
-
+      if (media.shape === "circle") {
+        return (
+          <img
+            src={media.url}
+            alt={media.title ?? ""}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgBroken(true)}
+            className={`${fill ? "h-full w-full" : "w-28 h-28"} rounded-full object-cover border border-gray-100`}
+          />
+        );
+      }
+      // Shaffof → frameless (object-contain, ramkasiz, suzib turadi)
+      if (transparent) {
+        return (
+          <img
+            src={media.url}
+            alt={media.title ?? ""}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgBroken(true)}
+            className={`${fillCls} object-contain bg-transparent`}
+            style={fill ? undefined : { maxHeight: 320 }}
+          />
+        );
+      }
       return (
         <img
           src={media.url}
           alt={media.title ?? ""}
-          onError={() => setImgBroken(true)}
-          className={`${rounded} object-cover w-full`}
-          style={{
-            ...aspectStyle(media),
-            ...(media.aspectW && media.aspectH ? {} : { maxHeight: 320 }),
-          }}
           loading="lazy"
+          decoding="async"
+          onError={() => setImgBroken(true)}
+          className={`${fillCls} object-cover rounded-xl`}
+          style={fill ? undefined : { maxHeight: 320 }}
         />
       );
     }
 
     case "youtube": {
       const id = (media.embedRef ?? "").trim();
-      if (!id) return <NeutralFallback label="Video manzili yo'q" />;
+      if (!id)
+        return (
+          <div className="h-full w-full flex items-center justify-center bg-gray-50 rounded-xl text-xs text-gray-400">
+            Video manzili yo&apos;q
+          </div>
+        );
       const thumb = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
       return (
         <button
           type="button"
           onClick={() => openExternal(`https://youtu.be/${id}`)}
-          className="relative w-full rounded-xl overflow-hidden border border-gray-100"
-          style={{ aspectRatio: "16 / 9" }}
+          className={`relative ${fill ? "h-full w-full" : "w-full"} rounded-xl overflow-hidden border border-gray-100`}
+          style={fill ? undefined : { aspectRatio: "16 / 9" }}
           aria-label={media.title ? `${media.title} — videoni ochish` : "Videoni ochish"}
         >
           <img
@@ -91,6 +123,7 @@ export function ShowcaseMediaRenderer({ media }: { media: ShowcaseMedia }) {
             alt={media.title ?? "YouTube"}
             className="w-full h-full object-cover"
             loading="lazy"
+            decoding="async"
           />
           <span className="absolute inset-0 flex items-center justify-center">
             <span className="flex items-center justify-center w-14 h-14 rounded-full bg-black/60">
@@ -108,32 +141,42 @@ export function ShowcaseMediaRenderer({ media }: { media: ShowcaseMedia }) {
       );
     }
 
-    case "telegram": {
-      const ref = media.embedRef ?? "";
-      const embedId = parseTelegramEmbedId(ref);
-      if (!embedId) return <NeutralFallback label="Telegram post yo'q" />;
-      return <TelegramPostEmbed embedId={embedId} />;
-    }
-
     case "video": {
-      if (!media.url) return <NeutralFallback label="Video yo'q" />;
+      if (!media.url)
+        return (
+          <div className="h-full w-full flex items-center justify-center bg-gray-50 rounded-xl text-xs text-gray-400">
+            Video yo&apos;q
+          </div>
+        );
       return (
         <video
+          ref={videoRef}
           src={media.url}
-          autoPlay
           muted
           playsInline
           loop
           controls
           poster={media.posterUrl ?? undefined}
-          className={`${rounded} w-full object-cover`}
-          style={media.aspectW && media.aspectH ? aspectStyle(media) : { maxHeight: 360 }}
+          className={`${fillCls} object-cover rounded-xl`}
+          style={fill ? undefined : { maxHeight: 360 }}
         />
       );
     }
 
+    case "telegram": {
+      const ref = media.embedRef ?? "";
+      const embedId = parseTelegramEmbedId(ref);
+      if (!embedId)
+        return (
+          <div className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs text-gray-400">
+            Telegram post yo&apos;q
+          </div>
+        );
+      return <TelegramPostEmbed embedId={embedId} />;
+    }
+
     case "audio": {
-      if (!media.url) return <NeutralFallback label="Audio yo'q" />;
+      if (!media.url) return null;
       return (
         <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
           {media.posterUrl && (
@@ -142,6 +185,7 @@ export function ShowcaseMediaRenderer({ media }: { media: ShowcaseMedia }) {
               alt={media.title ?? "cover"}
               className="w-16 h-16 rounded-lg object-cover mb-2"
               loading="lazy"
+              decoding="async"
             />
           )}
           <audio controls src={media.url} className="w-full" />
@@ -151,7 +195,7 @@ export function ShowcaseMediaRenderer({ media }: { media: ShowcaseMedia }) {
     }
 
     case "pdf": {
-      if (!media.url) return <NeutralFallback label="PDF yo'q" />;
+      if (!media.url) return null;
       return (
         <a
           href={media.url}
