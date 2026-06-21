@@ -30,8 +30,24 @@ interface Limits {
   maxGifKb: number;
   maxAudioKb: number;
   maxPdfKb: number;
+  maxVideoKb: number;
+  videoMaxSec: number;
+  allowVideoUpload: boolean;
   allowedFormats: string[];
   maxMediaPerBlock: number;
+}
+
+function readVideoMeta(file: File): Promise<{ durationSec: number; w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => {
+      resolve({ durationSec: Math.round(v.duration), w: v.videoWidth, h: v.videoHeight });
+      URL.revokeObjectURL(v.src);
+    };
+    v.onerror = () => reject(new Error("Video metadata o'qib bo'lmadi"));
+    v.src = URL.createObjectURL(file);
+  });
 }
 
 interface Props {
@@ -67,10 +83,12 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
   const [confirmDelId, setConfirmDelId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const baseKinds: MediaKind[] = ["image", "gif", "audio", "pdf"];
+  if (limits?.allowVideoUpload && limits.allowedFormats.includes("video")) {
+    baseKinds.push("video");
+  }
   const allowedKinds = limits
-    ? (["image", "gif", "audio", "pdf"] as MediaKind[]).filter((k) =>
-        limits.allowedFormats.includes(k)
-      )
+    ? baseKinds.filter((k) => k === "video" ? true : limits.allowedFormats.includes(k))
     : (["image", "gif", "audio", "pdf"] as MediaKind[]);
 
   const linkKinds = limits
@@ -86,7 +104,8 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
       kind === "image" ? limits?.maxImageKb :
       kind === "gif"   ? limits?.maxGifKb :
       kind === "audio" ? limits?.maxAudioKb :
-      kind === "pdf"   ? limits?.maxPdfKb : 0;
+      kind === "pdf"   ? limits?.maxPdfKb :
+      kind === "video" ? limits?.maxVideoKb : 0;
     if (kbLimit && file.size > kbLimit * 1024) {
       setErr(`Fayl katta: ${Math.round(file.size / 1024)}KB > ${kbLimit}KB`);
       return;
@@ -109,6 +128,23 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
         img.onerror = () => res();
         img.src = URL.createObjectURL(file);
       });
+    }
+    if (kind === "video") {
+      try {
+        const meta = await readVideoMeta(file);
+        if (limits?.videoMaxSec && limits.videoMaxSec > 0 && meta.durationSec > limits.videoMaxSec) {
+          setSaving(false);
+          setErr(`Video juda uzun: ${meta.durationSec}s > ${limits.videoMaxSec}s`);
+          return;
+        }
+        fd.append("durationSec", String(meta.durationSec));
+        fd.append("aspectW", String(meta.w));
+        fd.append("aspectH", String(meta.h));
+      } catch {
+        setSaving(false);
+        setErr("Video metadata o'qib bo'lmadi");
+        return;
+      }
     }
     const r = await fetch(`/api/admin/showcase/blocks/${block.id}/media`, {
       method: "POST",
@@ -267,7 +303,7 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
                 {/* Fayl */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Fayl{kind === "image" ? " (jpg/png/webp)" : kind === "gif" ? " (.gif)" : kind === "audio" ? " (.mp3)" : " (.pdf)"}
+                    Fayl{kind === "image" ? " (jpg/png/webp)" : kind === "gif" ? " (.gif)" : kind === "audio" ? " (.mp3)" : kind === "video" ? " (mp4/webm)" : " (.pdf)"}
                   </label>
                   <input
                     ref={fileRef}
@@ -276,12 +312,18 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
                       kind === "image" ? "image/jpeg,image/png,image/webp" :
                       kind === "gif"   ? "image/gif" :
                       kind === "audio" ? "audio/mpeg" :
+                      kind === "video" ? "video/mp4,video/webm,video/quicktime" :
                       "application/pdf"
                     }
                     className="text-xs text-gray-600 file:mr-2 file:px-2 file:py-1 file:text-xs file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700"
                   />
                   {kind === "image" && limits?.maxImageKb && (
                     <p className="text-xs text-gray-400 mt-0.5">Maks: {limits.maxImageKb}KB</p>
+                  )}
+                  {kind === "video" && limits?.maxVideoKb && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Maks: {limits.maxVideoKb}KB{limits.videoMaxSec ? ` · ${limits.videoMaxSec}s` : ""}
+                    </p>
                   )}
                 </div>
               </>

@@ -15,6 +15,8 @@ interface ShowcaseLimits {
   maxGifKb: number;
   maxAudioKb: number;
   maxPdfKb: number;
+  maxVideoKb: number;
+  videoMaxSec: number;
   storageTotalMb: number;
   allowedFormats: string[];
   allowVideoUpload: boolean;
