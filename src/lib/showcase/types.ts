@@ -42,3 +42,36 @@ export type ShowcaseResponse = {
   data?: { tab: ShowcaseTab; blocks: ShowcaseBlock[] };
   error?: { code: string; message: string };
 };
+
+// ── 4-bosqich: vitrina o'lchami ──────────────────────────────
+export type ShowcaseSize = "S" | "M" | "L" | "XL";
+
+/** Coverflow element BALANDLIGI (px). Kenglik = balandlik × aspect. */
+export const SHOWCASE_SIZE_PX: Record<ShowcaseSize, number> = {
+  S: 140,
+  M: 190,
+  L: 250,
+  XL: 320,
+};
+
+export const SHOWCASE_SIZE_DEFAULT: ShowcaseSize = "M";
+export const SHOWCASE_SIZE_KEY = "tibtaqvim_showcase_size";
+
+/** Coverflow elementining width/height nisbati. */
+export function showcaseAspectRatio(m: {
+  shape: "original" | "circle";
+  aspectW: number | null;
+  aspectH: number | null;
+  kind: string;
+}): number {
+  if (m.shape === "circle") return 1;
+  if (m.aspectW && m.aspectH) return m.aspectW / m.aspectH;
+  if (m.kind === "youtube" || m.kind === "video") return 16 / 9;
+  return 4 / 3;
+}
+
+/** Coverflow'da ko'rsatiladigan "ramkali vizual" kindlar. Qolganlari pastda stack. */
+export const GALLERY_KINDS = ["image", "gif", "youtube", "video"] as const;
+export function isGalleryKind(k: string): boolean {
+  return (GALLERY_KINDS as readonly string[]).includes(k);
+}
