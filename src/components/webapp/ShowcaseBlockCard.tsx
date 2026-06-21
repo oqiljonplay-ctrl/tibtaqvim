@@ -1,7 +1,8 @@
 "use client";
 
+import { ShowcaseCoverflow } from "@/components/webapp/ShowcaseCoverflow";
 import { ShowcaseMediaRenderer } from "@/components/webapp/ShowcaseMediaRenderer";
-import type { ShowcaseBlock } from "@/lib/showcase/types";
+import { type ShowcaseBlock, type ShowcaseSize, isGalleryKind } from "@/lib/showcase/types";
 
 function ShowcaseRatingStars({ value }: { value: number }) {
   const v = Math.max(0, Math.min(5, value));
@@ -34,10 +35,15 @@ function getTgid(): string | null {
 export function ShowcaseBlockCard({
   block,
   clinicId,
+  size,
 }: {
   block: ShowcaseBlock;
   clinicId: string;
+  size: ShowcaseSize;
 }) {
+  const gallery = block.media.filter((m) => isGalleryKind(m.kind));
+  const rest = block.media.filter((m) => !isGalleryKind(m.kind));
+
   const onBook = () => {
     const tgid = getTgid();
     if (block.cta === "auto" && block.serviceId) {
@@ -78,9 +84,17 @@ export function ShowcaseBlockCard({
         )}
       </div>
 
-      {block.media.length > 0 && (
+      {/* Gallereya — coverflow (image/gif/youtube/video) */}
+      {gallery.length > 0 && (
+        <div className="mb-3">
+          <ShowcaseCoverflow media={gallery} size={size} />
+        </div>
+      )}
+
+      {/* Qolgan media (telegram/pdf/audio) — vertikal stack */}
+      {rest.length > 0 && (
         <div className="flex flex-col gap-3 mb-3">
-          {block.media.map((m) => (
+          {rest.map((m) => (
             <ShowcaseMediaRenderer key={m.id} media={m} />
           ))}
         </div>

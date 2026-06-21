@@ -3,6 +3,8 @@
 import { useRef, useState, useCallback } from "react";
 import { BottomSheet } from "@/components/webapp/BottomSheet";
 import { ShowcaseBlockCard } from "@/components/webapp/ShowcaseBlockCard";
+import { ShowcaseSizePicker } from "@/components/webapp/ShowcaseSizePicker";
+import { useShowcaseSize } from "@/lib/webapp/use-showcase-size";
 import type { ShowcaseBlock } from "@/lib/showcase/types";
 
 type Tab = "doctors" | "services";
@@ -23,6 +25,8 @@ export function ServiceDoctorPanel({ clinicId }: { clinicId: string | null }) {
 
   const abortRef = useRef<AbortController | null>(null);
   const tokenRef = useRef(0);
+
+  const [size, setSize] = useShowcaseSize();
 
   const open = tab !== null;
   const close = () => setTab(null);
@@ -157,8 +161,12 @@ export function ServiceDoctorPanel({ clinicId }: { clinicId: string | null }) {
 
         {clinicId && !loading && !errored && blocks && blocks.length > 0 && (
           <div className="py-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-400">O&apos;lcham</span>
+              <ShowcaseSizePicker value={size} onChange={setSize} />
+            </div>
             {blocks.map((b) => (
-              <ShowcaseBlockCard key={b.id} block={b} clinicId={clinicId} />
+              <ShowcaseBlockCard key={b.id} block={b} clinicId={clinicId} size={size} />
             ))}
           </div>
         )}
