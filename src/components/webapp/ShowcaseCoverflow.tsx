@@ -14,7 +14,7 @@ const ROTATE = 28;       // prototip
 const SCALE_DROP = 0.18;
 const TRANSLATE_Z = 110;
 const OPACITY_DROP = 0.36;
-const WIDTH_CAP_RATIO = 0.92;
+const WIDTH_CAP_RATIO = 0.98;
 
 export function ShowcaseCoverflow({
   media,
@@ -136,8 +136,8 @@ export function ShowcaseCoverflow({
           touchAction: "pan-x pan-y",
           overflowY: "hidden",
           overscrollBehaviorX: "contain",
-          paddingLeft: single ? 0 : `calc(50% - ${firstW / 2}px)`,
-          paddingRight: single ? 0 : `calc(50% - ${lastW / 2}px)`,
+          paddingLeft: `calc(50% - ${firstW / 2}px)`,
+          paddingRight: `calc(50% - ${lastW / 2}px)`,
           height: H + 8,
           WebkitOverflowScrolling: "touch",
         }}
