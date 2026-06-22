@@ -10,16 +10,16 @@ import {
   showcaseAspectRatio,
 } from "@/lib/showcase/types";
 
-const BASE_SCALE_DROP = 0.18;
-const BASE_ROTATE = 14;
-const BASE_OPACITY_DROP = 0.35;
-const INTENSITY_GAIN = 1.8; // intensity=1 → kuchli 3D (default 0.55 ≈ hozirgi)
+const ROTATE = 28;       // prototip
+const SCALE_DROP = 0.18;
+const TRANSLATE_Z = 110;
+const OPACITY_DROP = 0.36;
 const WIDTH_CAP_RATIO = 0.92;
 
 export function ShowcaseCoverflow({
   media,
   size,
-  intensity = 0.55,
+  intensity = 0.5,
 }: {
   media: ShowcaseMedia[];
   size: ShowcaseSize;
@@ -32,7 +32,6 @@ export function ShowcaseCoverflow({
   const [activeIdx, setActiveIdx] = useState(0);
   const [maxW, setMaxW] = useState(0);
 
-  // intensity ni ref orqali — applyTransforms identifikatori barqaror, drag'da re-center yo'q
   const intensityRef = useRef(intensity);
   intensityRef.current = intensity;
 
@@ -66,7 +65,7 @@ export function ShowcaseCoverflow({
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const center = scroller.scrollLeft + scroller.clientWidth / 2;
-    const k = Math.max(0, Math.min(1, intensityRef.current)) * INTENSITY_GAIN;
+    const k = Math.max(0, Math.min(1, intensityRef.current));
     let nearest = 0;
     let nearestDist = Infinity;
 
@@ -75,24 +74,23 @@ export function ShowcaseCoverflow({
       const itemCenter = el.offsetLeft + el.offsetWidth / 2;
       const w = el.offsetWidth || 1;
       const dist = (itemCenter - center) / w;
-      const adist = Math.min(Math.abs(dist), 1.5);
+      const ad = Math.min(Math.abs(dist), 2);
       if (Math.abs(dist) < nearestDist) { nearestDist = Math.abs(dist); nearest = i; }
 
-      const inner = el.firstElementChild as HTMLElement | null;
-      if (!inner) return;
       if (reduced || k === 0) {
-        inner.style.transform = "";
-        inner.style.opacity = "1";
-        inner.style.willChange = "";
+        el.style.transform = "";
+        el.style.opacity = "1";
+        el.style.zIndex = "0";
         return;
       }
-      const clamped = Math.max(-1, Math.min(1, dist));
-      const scale = 1 - Math.min(adist, 1) * BASE_SCALE_DROP * k;
-      const rotateY = -clamped * BASE_ROTATE * k;
-      const opacity = 1 - Math.min(adist, 1) * BASE_OPACITY_DROP * k;
-      inner.style.transform = `scale(${scale.toFixed(3)}) rotateY(${rotateY.toFixed(1)}deg)`;
-      inner.style.opacity = opacity.toFixed(3);
-      inner.style.willChange = adist < 1.2 ? "transform" : "";
+      const clamped = Math.max(-2, Math.min(2, dist));
+      const rot = -clamped * ROTATE * k;
+      const scale = 1 - Math.min(ad, 1) * SCALE_DROP * k;
+      const tz = -ad * TRANSLATE_Z * k;
+      const opacity = 1 - Math.min(ad, 1) * OPACITY_DROP;
+      el.style.transform = `perspective(1150px) rotateY(${rot.toFixed(1)}deg) translateZ(${tz.toFixed(1)}px) scale(${scale.toFixed(3)})`;
+      el.style.opacity = opacity.toFixed(3);
+      el.style.zIndex = String(100 - Math.round(ad * 20));
     });
 
     setActiveIdx((p) => (p !== nearest ? nearest : p));
@@ -112,71 +110,93 @@ export function ShowcaseCoverflow({
     else sc.scrollLeft = target;
   }, []);
 
-  // Re-center: faqat o'lcham/media/kenglik o'zgarsa (intensity'ga BOG'LIQ EMAS)
+  // Re-center: o'lcham/media/kenglik o'zgarsa (intensity'ga BOG'LIQ EMAS)
   useLayoutEffect(() => {
     if (!single) centerOn(0, false);
     applyTransforms();
   }, [applyTransforms, centerOn, size, media.length, maxW, single]);
 
-  // Slider o'zgarsa: faqat transformlarni qayta qo'llash (re-center YO'Q → scroll sakramaydi)
+  // Slider o'zgarsa: faqat transformlarni qayta qo'llash (re-center YO'Q)
   useEffect(() => { applyTransforms(); }, [intensity, applyTransforms]);
 
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
+
+  // Aniq markazlash uchun chet elementlar kengligi (FIX 1)
+  const firstW = media.length ? dims(media[0]).w : 0;
+  const lastW = media.length ? dims(media[media.length - 1]).w : 0;
 
   return (
     <div className="relative">
       <div
         ref={scrollerRef}
         onScroll={onScroll}
-        className="flex items-center gap-3 overflow-x-auto scrollbar-hide"
+        className="flex items-center gap-2 overflow-x-auto scrollbar-hide"
         style={{
           scrollSnapType: single ? "none" : "x mandatory",
           touchAction: "pan-x pan-y",
           overflowY: "hidden",
           overscrollBehaviorX: "contain",
-          perspective: "1000px",
-          paddingLeft: single ? 0 : "50%",
-          paddingRight: single ? 0 : "50%",
-          height: H,
+          paddingLeft: single ? 0 : `calc(50% - ${firstW / 2}px)`,
+          paddingRight: single ? 0 : `calc(50% - ${lastW / 2}px)`,
+          height: H + 8,
           WebkitOverflowScrolling: "touch",
         }}
       >
         {media.map((m, i) => {
           const { w, h } = dims(m);
+          const circle = m.shape === "circle";
           return (
             <div
               key={m.id}
               ref={(el) => { itemRefs.current[i] = el; }}
               className="flex-shrink-0 flex items-center justify-center"
-              style={{ width: w, height: H, scrollSnapAlign: "center" }}
+              style={{
+                width: w,
+                height: H,
+                scrollSnapAlign: "center",
+                transition: reduced ? undefined : "transform 0.25s ease, opacity 0.25s ease",
+                willChange: "transform, opacity",
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+              }}
             >
-              <div
-                className="w-full"
-                style={{
-                  height: h,
-                  transition: reduced ? undefined : "transform 0.25s ease, opacity 0.25s ease",
-                  backfaceVisibility: "hidden",
-                  WebkitBackfaceVisibility: "hidden",
-                  contain: "layout style paint",
-                }}
-              >
-                <ShowcaseMediaRenderer media={m} fill active={i === activeIdx} />
+              <div className="relative w-full" style={{ height: h }}>
+                {/* media — box'ni to'ldiradi */}
+                <div className={`relative w-full h-full ${circle ? "" : "rounded-xl overflow-hidden"}`}>
+                  <ShowcaseMediaRenderer media={m} fill active={i === activeIdx} />
+
+                  {/* MEDIA ICHIDA MATN — doira'dan tashqari (prototipdan) */}
+                  {!circle && m.title && (
+                    <div className="absolute inset-x-0 top-0 px-2 pt-1.5 pb-4 bg-gradient-to-b from-black/55 to-transparent pointer-events-none">
+                      <span className="block text-white text-xs font-semibold leading-tight line-clamp-2" style={{ textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>
+                        {m.title}
+                      </span>
+                    </div>
+                  )}
+                  {!circle && m.caption && (
+                    <div className="absolute inset-x-0 bottom-0 px-2 pb-1.5 pt-5 bg-gradient-to-t from-black/65 to-transparent pointer-events-none">
+                      <span className="block text-white text-[11px] leading-snug line-clamp-2" style={{ textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>
+                        {m.caption}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* DOIRA: matn shakldan tashqarida (kichik, pastda) */}
+                {circle && m.title && (
+                  <div className="mt-1 text-center text-[11px] text-gray-500 leading-tight line-clamp-1">
+                    {m.title}
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-1.5 text-center min-h-[18px]" aria-live="polite">
-        {(() => {
-          const m = media[activeIdx];
-          const label = m?.title || m?.caption;
-          return label ? <span className="text-sm text-gray-600">{label}</span> : null;
-        })()}
-      </div>
-
+      {/* Pozitsiya indikatori (nuqtalar) */}
       {!single && media.length > 1 && (
-        <div className="mt-1 flex items-center justify-center gap-1.5" role="tablist" aria-label="Media pozitsiyasi">
+        <div className="mt-1.5 flex items-center justify-center gap-1.5" role="tablist" aria-label="Media pozitsiyasi">
           {media.map((m, i) => (
             <button
               key={m.id}
