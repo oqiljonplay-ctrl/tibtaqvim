@@ -22,31 +22,30 @@ function parseTelegramEmbedId(embedRef: string): string {
 
 type Props = {
   media: ShowcaseMedia;
-  /** Coverflow markazidami — video autoplay shu bilan boshqariladi. */
   active?: boolean;
-  /** Coverflow box ichini to'ldirsinmi (h-full w-full). */
   fill?: boolean;
 };
 
 export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Props) {
   const [imgBroken, setImgBroken] = useState(false);
+  const [ytPlaying, setYtPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Video: faqat markazda o'ynaydi
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (active) {
-      v.play().catch(() => {});
-    } else {
-      v.pause();
-    }
+    if (active) v.play().catch(() => {});
+    else v.pause();
   }, [active]);
 
-  // Shaffoflik — faqat upload rasm (CORS-safe)
+  // YouTube: markazdan chiqsa to'xtaydi (iframe unmount)
+  useEffect(() => {
+    if (!active) setYtPlaying(false);
+  }, [active]);
+
   const alphaEnabled =
-    (media.kind === "image" || media.kind === "gif") &&
-    media.mediaSource === "upload";
+    (media.kind === "image" || media.kind === "gif") && media.mediaSource === "upload";
   const alpha = useImageAlpha(alphaEnabled ? media.url : null, alphaEnabled);
   const transparent = alpha === "transparent";
 
@@ -74,7 +73,6 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
           />
         );
       }
-      // Shaffof → frameless (object-contain, ramkasiz, suzib turadi)
       if (transparent) {
         return (
           <img
@@ -101,6 +99,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
       );
     }
 
+    // ── YouTube: tap → ICHKI iframe ijro (5a) ──
     case "youtube": {
       const id = (media.embedRef ?? "").trim();
       if (!id)
@@ -109,34 +108,35 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
             Video manzili yo&apos;q
           </div>
         );
+
+      if (ytPlaying) {
+        return (
+          <iframe
+            src={`https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1`}
+            title={media.title ?? "YouTube"}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            className={`${fill ? "h-full w-full" : "w-full"} rounded-xl`}
+            style={{ border: 0, ...(fill ? {} : { aspectRatio: "16 / 9" }) }}
+          />
+        );
+      }
+
       const thumb = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
       return (
         <button
           type="button"
-          onClick={() => openExternal(`https://youtu.be/${id}`)}
-          className={`relative ${fill ? "h-full w-full" : "w-full"} rounded-xl overflow-hidden border border-gray-100`}
+          onClick={() => setYtPlaying(true)}
+          className={`relative ${fill ? "h-full w-full" : "w-full"} rounded-xl overflow-hidden`}
           style={fill ? undefined : { aspectRatio: "16 / 9" }}
-          aria-label={media.title ? `${media.title} — videoni ochish` : "Videoni ochish"}
+          aria-label={media.title ? `${media.title} — ijro` : "Videoni ijro qilish"}
         >
-          <img
-            src={thumb}
-            alt={media.title ?? "YouTube"}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            decoding="async"
-          />
+          <img src={thumb} alt={media.title ?? "YouTube"} className="w-full h-full object-cover" loading="lazy" decoding="async" />
           <span className="absolute inset-0 flex items-center justify-center">
             <span className="flex items-center justify-center w-14 h-14 rounded-full bg-black/60">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
             </span>
           </span>
-          {media.title && (
-            <span className="absolute bottom-0 inset-x-0 px-2 py-1 text-left text-xs text-white bg-gradient-to-t from-black/70 to-transparent">
-              {media.title}
-            </span>
-          )}
         </button>
       );
     }
@@ -180,13 +180,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
       return (
         <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
           {media.posterUrl && (
-            <img
-              src={media.posterUrl}
-              alt={media.title ?? "cover"}
-              className="w-16 h-16 rounded-lg object-cover mb-2"
-              loading="lazy"
-              decoding="async"
-            />
+            <img src={media.posterUrl} alt={media.title ?? "cover"} className="w-16 h-16 rounded-lg object-cover mb-2" loading="lazy" decoding="async" />
           )}
           <audio controls src={media.url} className="w-full" />
           {media.title && <p className="text-xs text-gray-500 mt-1">{media.title}</p>}
@@ -197,16 +191,9 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
     case "pdf": {
       if (!media.url) return null;
       return (
-        <a
-          href={media.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl"
-        >
+        <a href={media.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl">
           <span className="text-xl" aria-hidden="true">📄</span>
-          <span className="text-sm text-blue-600 truncate">
-            {media.title ?? "PDF faylni ochish"}
-          </span>
+          <span className="text-sm text-blue-600 truncate">{media.title ?? "PDF faylni ochish"}</span>
         </a>
       );
     }
