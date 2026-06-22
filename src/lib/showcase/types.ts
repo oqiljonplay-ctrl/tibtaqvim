@@ -51,7 +51,7 @@ export const SHOWCASE_SIZE_PX: Record<ShowcaseSize, number> = {
   S: 120,
   M: 150,
   L: 180,
-  XL: 220,
+  XL: 230,
 };
 
 export const SHOWCASE_SIZE_DEFAULT: ShowcaseSize = "M";
