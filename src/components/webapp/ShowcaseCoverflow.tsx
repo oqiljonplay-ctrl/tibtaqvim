@@ -10,17 +10,20 @@ import {
   showcaseAspectRatio,
 } from "@/lib/showcase/types";
 
-const MAX_SCALE_DROP = 0.18;    // markaz 1.0 → chet 0.82
-const MAX_ROTATE = 14;          // deg
-const MAX_OPACITY_DROP = 0.35;  // markaz 1.0 → chet 0.65
-const WIDTH_CAP_RATIO = 0.92;   // element kengligi konteynerning 92%idan oshmaydi
+const BASE_SCALE_DROP = 0.18;
+const BASE_ROTATE = 14;
+const BASE_OPACITY_DROP = 0.35;
+const INTENSITY_GAIN = 1.8; // intensity=1 → kuchli 3D (default 0.55 ≈ hozirgi)
+const WIDTH_CAP_RATIO = 0.92;
 
 export function ShowcaseCoverflow({
   media,
   size,
+  intensity = 0.55,
 }: {
   media: ShowcaseMedia[];
   size: ShowcaseSize;
+  intensity?: number; // 0..1
 }) {
   const reduced = useReducedMotion();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -29,36 +32,31 @@ export function ShowcaseCoverflow({
   const [activeIdx, setActiveIdx] = useState(0);
   const [maxW, setMaxW] = useState(0);
 
+  // intensity ni ref orqali — applyTransforms identifikatori barqaror, drag'da re-center yo'q
+  const intensityRef = useRef(intensity);
+  intensityRef.current = intensity;
+
   const H = SHOWCASE_SIZE_PX[size];
   const single = media.length === 1;
 
-  // Konteyner kengligini o'lchash (overflow cheki uchun)
   useLayoutEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
     const measure = () => setMaxW(el.clientWidth);
     measure();
-    const ro =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
     ro?.observe(el);
     window.addEventListener("resize", measure);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener("resize", measure);
-    };
+    return () => { ro?.disconnect(); window.removeEventListener("resize", measure); };
   }, []);
 
-  // Element o'lchami: balandlik H, kenglik = H*aspect, lekin konteyner 92%idan oshmaydi
   const dims = useCallback(
     (m: ShowcaseMedia): { w: number; h: number } => {
       const ratio = showcaseAspectRatio(m);
       let w = Math.round(H * ratio);
       let h = H;
       const cap = maxW ? Math.round(maxW * WIDTH_CAP_RATIO) : Infinity;
-      if (w > cap) {
-        w = cap;
-        h = Math.round(cap / ratio);
-      }
+      if (w > cap) { w = cap; h = Math.round(cap / ratio); }
       return { w, h };
     },
     [H, maxW]
@@ -68,6 +66,7 @@ export function ShowcaseCoverflow({
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const center = scroller.scrollLeft + scroller.clientWidth / 2;
+    const k = Math.max(0, Math.min(1, intensityRef.current)) * INTENSITY_GAIN;
     let nearest = 0;
     let nearestDist = Infinity;
 
@@ -77,22 +76,20 @@ export function ShowcaseCoverflow({
       const w = el.offsetWidth || 1;
       const dist = (itemCenter - center) / w;
       const adist = Math.min(Math.abs(dist), 1.5);
-      if (Math.abs(dist) < nearestDist) {
-        nearestDist = Math.abs(dist);
-        nearest = i;
-      }
+      if (Math.abs(dist) < nearestDist) { nearestDist = Math.abs(dist); nearest = i; }
+
       const inner = el.firstElementChild as HTMLElement | null;
       if (!inner) return;
-      if (reduced) {
+      if (reduced || k === 0) {
         inner.style.transform = "";
         inner.style.opacity = "1";
         inner.style.willChange = "";
         return;
       }
       const clamped = Math.max(-1, Math.min(1, dist));
-      const scale = 1 - Math.min(adist, 1) * MAX_SCALE_DROP;
-      const rotateY = -clamped * MAX_ROTATE;
-      const opacity = 1 - Math.min(adist, 1) * MAX_OPACITY_DROP;
+      const scale = 1 - Math.min(adist, 1) * BASE_SCALE_DROP * k;
+      const rotateY = -clamped * BASE_ROTATE * k;
+      const opacity = 1 - Math.min(adist, 1) * BASE_OPACITY_DROP * k;
       inner.style.transform = `scale(${scale.toFixed(3)}) rotateY(${rotateY.toFixed(1)}deg)`;
       inner.style.opacity = opacity.toFixed(3);
       inner.style.willChange = adist < 1.2 ? "transform" : "";
@@ -103,10 +100,7 @@ export function ShowcaseCoverflow({
 
   const onScroll = useCallback(() => {
     if (rafRef.current != null) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      applyTransforms();
-    });
+    rafRef.current = requestAnimationFrame(() => { rafRef.current = null; applyTransforms(); });
   }, [applyTransforms]);
 
   const centerOn = useCallback((i: number, smooth: boolean) => {
@@ -118,18 +112,16 @@ export function ShowcaseCoverflow({
     else sc.scrollLeft = target;
   }, []);
 
-  // Mount / o'lcham / media o'zgarsa: item[0] ni markazga (instant) + transformlar
+  // Re-center: faqat o'lcham/media/kenglik o'zgarsa (intensity'ga BOG'LIQ EMAS)
   useLayoutEffect(() => {
     if (!single) centerOn(0, false);
     applyTransforms();
   }, [applyTransforms, centerOn, size, media.length, maxW, single]);
 
-  useEffect(
-    () => () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    },
-    []
-  );
+  // Slider o'zgarsa: faqat transformlarni qayta qo'llash (re-center YO'Q → scroll sakramaydi)
+  useEffect(() => { applyTransforms(); }, [intensity, applyTransforms]);
+
+  useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
 
   return (
     <div className="relative">
@@ -139,8 +131,8 @@ export function ShowcaseCoverflow({
         className="flex items-center gap-3 overflow-x-auto scrollbar-hide"
         style={{
           scrollSnapType: single ? "none" : "x mandatory",
-          touchAction: "pan-x pan-y",        // FIX 1: vertikal scroll parentga o'tadi
-          overflowY: "hidden",               // FIX 1: vertikal o'qni egallamaydi → chain
+          touchAction: "pan-x pan-y",
+          overflowY: "hidden",
           overscrollBehaviorX: "contain",
           perspective: "1000px",
           paddingLeft: single ? 0 : "50%",
@@ -154,9 +146,7 @@ export function ShowcaseCoverflow({
           return (
             <div
               key={m.id}
-              ref={(el) => {
-                itemRefs.current[i] = el;
-              }}
+              ref={(el) => { itemRefs.current[i] = el; }}
               className="flex-shrink-0 flex items-center justify-center"
               style={{ width: w, height: H, scrollSnapAlign: "center" }}
             >
@@ -177,8 +167,7 @@ export function ShowcaseCoverflow({
         })}
       </div>
 
-      {/* Markazdagi element sarlavha/izohi */}
-      <div className="mt-2 text-center min-h-[20px]" aria-live="polite">
+      <div className="mt-1.5 text-center min-h-[18px]" aria-live="polite">
         {(() => {
           const m = media[activeIdx];
           const label = m?.title || m?.caption;
@@ -186,7 +175,6 @@ export function ShowcaseCoverflow({
         })()}
       </div>
 
-      {/* FIX 3: pozitsiya indikatori (nuqtalar) */}
       {!single && media.length > 1 && (
         <div className="mt-1 flex items-center justify-center gap-1.5" role="tablist" aria-label="Media pozitsiyasi">
           {media.map((m, i) => (
@@ -197,9 +185,7 @@ export function ShowcaseCoverflow({
               aria-selected={i === activeIdx}
               aria-label={`${i + 1}-media`}
               onClick={() => centerOn(i, true)}
-              className={`h-1.5 rounded-full transition-all ${
-                i === activeIdx ? "w-4 bg-blue-600" : "w-1.5 bg-gray-300"
-              }`}
+              className={`h-1.5 rounded-full transition-all ${i === activeIdx ? "w-4 bg-blue-600" : "w-1.5 bg-gray-300"}`}
             />
           ))}
         </div>

@@ -5,6 +5,8 @@ import { BottomSheet } from "@/components/webapp/BottomSheet";
 import { ShowcaseBlockCard } from "@/components/webapp/ShowcaseBlockCard";
 import { ShowcaseSizePicker } from "@/components/webapp/ShowcaseSizePicker";
 import { useShowcaseSize } from "@/lib/webapp/use-showcase-size";
+import { useShowcase3d } from "@/lib/webapp/use-showcase-3d";
+import { Showcase3dSlider } from "@/components/webapp/Showcase3dSlider";
 import type { ShowcaseBlock } from "@/lib/showcase/types";
 
 type Tab = "doctors" | "services";
@@ -27,6 +29,7 @@ export function ServiceDoctorPanel({ clinicId }: { clinicId: string | null }) {
   const tokenRef = useRef(0);
 
   const [size, setSize] = useShowcaseSize();
+  const [threeD, setThreeD] = useShowcase3d();
 
   const open = tab !== null;
   const close = () => setTab(null);
@@ -161,12 +164,12 @@ export function ServiceDoctorPanel({ clinicId }: { clinicId: string | null }) {
 
         {clinicId && !loading && !errored && blocks && blocks.length > 0 && (
           <div className="py-1">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-400">O&apos;lcham</span>
+            <div className="flex items-center justify-between gap-3 mb-2">
               <ShowcaseSizePicker value={size} onChange={setSize} />
+              <Showcase3dSlider value={threeD} onChange={setThreeD} />
             </div>
             {blocks.map((b) => (
-              <ShowcaseBlockCard key={b.id} block={b} clinicId={clinicId} size={size} />
+              <ShowcaseBlockCard key={b.id} block={b} clinicId={clinicId} size={size} intensity={threeD} />
             ))}
           </div>
         )}
