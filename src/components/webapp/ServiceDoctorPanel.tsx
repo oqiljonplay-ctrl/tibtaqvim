@@ -29,7 +29,7 @@ export function ServiceDoctorPanel({ clinicId }: { clinicId: string | null }) {
   const tokenRef = useRef(0);
 
   const [size, setSize] = useShowcaseSize();
-  const [threeD, setThreeD] = useShowcase3d();
+  const [threeD, setThreeD, threeDExplicit] = useShowcase3d();
 
   const open = tab !== null;
   const close = () => setTab(null);
@@ -169,7 +169,7 @@ export function ServiceDoctorPanel({ clinicId }: { clinicId: string | null }) {
               <Showcase3dSlider value={threeD} onChange={setThreeD} />
             </div>
             {blocks.map((b) => (
-              <ShowcaseBlockCard key={b.id} block={b} clinicId={clinicId} size={size} intensity={threeD} />
+              <ShowcaseBlockCard key={b.id} block={b} clinicId={clinicId} size={size} intensity={threeD} intensityExplicit={threeDExplicit} />
             ))}
           </div>
         )}

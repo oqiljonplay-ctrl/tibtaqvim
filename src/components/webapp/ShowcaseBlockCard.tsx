@@ -37,11 +37,13 @@ export function ShowcaseBlockCard({
   clinicId,
   size,
   intensity,
+  intensityExplicit,
 }: {
   block: ShowcaseBlock;
   clinicId: string;
   size: ShowcaseSize;
   intensity: number;
+  intensityExplicit: boolean;
 }) {
   const gallery = block.media.filter((m) => isGalleryKind(m.kind));
   const rest = block.media.filter((m) => !isGalleryKind(m.kind));
@@ -52,10 +54,13 @@ export function ShowcaseBlockCard({
   const onBook = () => {
     const tgid = getTgid();
     if (block.cta === "auto" && block.serviceId) {
+      // Xizmat oldindan tanlangan — to'g'ridan booking
       const qs = new URLSearchParams({ clinic: clinicId, mode: "booking", serviceId: block.serviceId });
       if (tgid) qs.set("tgid", tgid);
       window.location.href = `/webapp?${qs.toString()}`;
     } else {
+      // "Yangi bron" bilan aynan bir xil: booking_entry o'rnatiladi → orqaga = dashboard
+      sessionStorage.setItem("booking_entry", "dashboard");
       window.location.href = `/webapp/clinics/${clinicId}`;
     }
   };
@@ -92,7 +97,7 @@ export function ShowcaseBlockCard({
       {/* Gallereya — coverflow (matn media ichida) */}
       {gallery.length > 0 && (
         <div className="mb-1">
-          <ShowcaseCoverflow media={gallery} size={size} intensity={intensity} />
+          <ShowcaseCoverflow media={gallery} size={size} intensity={intensity} intensityExplicit={intensityExplicit} />
         </div>
       )}
 
