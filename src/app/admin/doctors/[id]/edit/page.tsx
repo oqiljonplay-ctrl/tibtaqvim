@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { DoctorProfileFields, DoctorProfileData, emptyProfileData, profileFromServer } from "@/components/DoctorProfileFields";
 import { DoctorBlockedDatesManager } from "@/components/DoctorBlockedDatesManager";
+import { PhoneInput, isValidPhone } from "@/components/forms/PhoneInput";
 
 interface ServiceItem { id: string; name: string; price: number; type: string }
 interface Branch      { id: string; name: string }
@@ -183,9 +184,12 @@ export default function EditDoctorPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-              <input className="input" value={form.phone} placeholder="+998 90 000 00 00"
-                onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
+              <PhoneInput
+                label="Telefon"
+                value={form.phone}
+                onChange={(v) => setForm((p) => ({ ...p, phone: v }))}
+                error={form.phone && !isValidPhone(form.phone) ? "Raqamni to'liq kiriting" : undefined}
+              />
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Foto URL (ixtiyoriy)</label>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PhoneInput, isValidPhone } from "@/components/forms/PhoneInput";
 
 type Props = {
   clinicId: string;
@@ -101,8 +102,12 @@ export function CreateAdminModal({ clinicId, onClose, onCreated }: Props) {
           <input value={lastName} onChange={(e) => setLastName(e.target.value)} className="input" />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Telefon</label>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998901234567" className="input" />
+          <PhoneInput
+            label="Telefon"
+            value={phone}
+            onChange={setPhone}
+            error={phone && !isValidPhone(phone) ? "Raqamni to'liq kiriting" : undefined}
+          />
         </div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={autoPassword} onChange={(e) => setAutoPassword(e.target.checked)} />

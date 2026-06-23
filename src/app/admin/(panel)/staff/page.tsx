@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StaffCard } from "@/components/StaffCard";
+import { PhoneInput, isValidPhone } from "@/components/forms/PhoneInput";
 
 interface Branch {
   id: string;
@@ -242,13 +243,12 @@ export default function AdminStaffPage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon (login) *</label>
-              <input
-                className="input"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+998 90 000 00 00"
+              <PhoneInput
+                label="Telefon (login)"
                 required
+                value={form.phone}
+                onChange={(v) => setForm({ ...form, phone: v })}
+                error={form.phone && !isValidPhone(form.phone) ? "Raqamni to'liq kiriting" : undefined}
               />
             </div>
 

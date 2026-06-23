@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PhoneInput, isValidPhone } from "@/components/forms/PhoneInput";
 
 type Props = {
   clinicId: string;
@@ -58,8 +59,12 @@ export function CreateBranchAdminModal({ clinicId, branchId, onClose, onCreated 
             <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="input" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+998 XX XXX XX XX" className="input" />
+            <PhoneInput
+              label="Telefon"
+              value={form.phone}
+              onChange={(v) => setForm({ ...form, phone: v })}
+              error={form.phone && !isValidPhone(form.phone) ? "Raqamni to'liq kiriting" : undefined}
+            />
           </div>
 
           <div>

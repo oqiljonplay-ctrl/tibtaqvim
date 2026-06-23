@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { PhoneInput, isValidPhone } from "@/components/forms/PhoneInput";
 
 interface Branch {
   id: string;
@@ -138,12 +139,11 @@ export default function EditStaffPage() {
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-            <input
-              className="input"
+            <PhoneInput
+              label="Telefon"
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder="+998 90 000 00 00"
+              onChange={(v) => setForm({ ...form, phone: v })}
+              error={form.phone && !isValidPhone(form.phone) ? "Raqamni to'liq kiriting" : undefined}
             />
           </div>
 
