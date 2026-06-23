@@ -20,10 +20,12 @@ export function ShowcaseCoverflow({
   media,
   size,
   intensity = 0.5,
+  intensityExplicit = false,
 }: {
   media: ShowcaseMedia[];
   size: ShowcaseSize;
-  intensity?: number; // 0..1
+  intensity?: number;
+  intensityExplicit?: boolean;
 }) {
   const reduced = useReducedMotion();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -34,6 +36,8 @@ export function ShowcaseCoverflow({
 
   const intensityRef = useRef(intensity);
   intensityRef.current = intensity;
+  const explicitRef = useRef(intensityExplicit);
+  explicitRef.current = intensityExplicit;
 
   const H = SHOWCASE_SIZE_PX[size];
   const single = media.length === 1;
@@ -77,7 +81,9 @@ export function ShowcaseCoverflow({
       const ad = Math.min(Math.abs(dist), 2);
       if (Math.abs(dist) < nearestDist) { nearestDist = Math.abs(dist); nearest = i; }
 
-      if (reduced || k === 0) {
+      // tizim reduced + user TANLAMAGAN bo'lsagina bostir; user surgan bo'lsa uning tanlovi ustun
+      const flat = k === 0 || (reduced && !explicitRef.current);
+      if (flat) {
         el.style.transform = "";
         el.style.opacity = "1";
         el.style.zIndex = "0";
@@ -117,9 +123,12 @@ export function ShowcaseCoverflow({
   }, [applyTransforms, centerOn, size, media.length, maxW, single]);
 
   // Slider o'zgarsa: faqat transformlarni qayta qo'llash (re-center YO'Q)
-  useEffect(() => { applyTransforms(); }, [intensity, applyTransforms]);
+  useEffect(() => { applyTransforms(); }, [intensity, intensityExplicit, applyTransforms]);
 
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
+
+  // reduced-motion + user tanlamagan → transition ham o'chadi; user surgan bo'lsa yonadi
+  const suppress = reduced && !intensityExplicit;
 
   // Aniq markazlash uchun chet elementlar kengligi (FIX 1)
   const firstW = media.length ? dims(media[0]).w : 0;
@@ -154,7 +163,7 @@ export function ShowcaseCoverflow({
                 width: w,
                 height: H,
                 scrollSnapAlign: "center",
-                transition: reduced ? undefined : "transform 0.25s ease, opacity 0.25s ease",
+                transition: suppress ? undefined : "transform 0.25s ease, opacity 0.25s ease",
                 willChange: "transform, opacity",
                 backfaceVisibility: "hidden",
                 WebkitBackfaceVisibility: "hidden",
