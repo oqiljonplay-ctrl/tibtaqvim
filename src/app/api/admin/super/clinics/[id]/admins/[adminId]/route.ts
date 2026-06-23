@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, hashPassword, validatePasswordStrength, generateRandomPassword } from "@/lib/auth";
 import { ok, forbidden, notFound, error, serverError } from "@/lib/api-response";
+import { normalizePhone } from "@/lib/utils/phone";
 import { Prisma } from "@prisma/client";
 
 export async function PATCH(
@@ -20,7 +21,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { firstName, lastName, phone, isActive, resetPassword, newPassword } = body;
+    const { firstName, lastName, phone, isActive, resetPassword, newPassword, username } = body;
 
     const data: Prisma.UserUpdateInput = {};
 
@@ -35,15 +36,29 @@ export async function PATCH(
 
     if (phone !== undefined) {
       if (phone) {
+        const np = normalizePhone(phone);
+        if (!np) return error("Telefon raqam formati noto'g'ri", 400);
         const existing = await prisma.user.findFirst({
-          where: { phone, id: { not: adminId } },
+          where: { phone: np, id: { not: adminId } },
         });
         if (existing) return error("Telefon raqami band", 409);
+        data.phone = np;
+      } else {
+        data.phone = null;
       }
-      data.phone = phone || null;
     }
 
     if (isActive !== undefined) data.isActive = Boolean(isActive);
+
+    if (username !== undefined) {
+      const u = String(username).trim();
+      if (!/^tib_(b?admin)_[a-z0-9]+$/.test(u)) {
+        return error("Login formati noto'g'ri (tib_admin_… yoki tib_badmin_…)", 400);
+      }
+      const clash = await prisma.user.findFirst({ where: { username: u, id: { not: adminId } } });
+      if (clash) return error("Bu login band", 409);
+      data.username = u;
+    }
 
     let returnedPassword: string | null = null;
     if (resetPassword) {
@@ -70,14 +85,21 @@ export async function PATCH(
       },
     });
 
+    const action = resetPassword
+      ? "admin.reset_password"
+      : username !== undefined
+      ? "admin.username_rename"
+      : "admin.update";
+
     await prisma.auditLog.create({
       data: {
         actorId: session.userId,
         clinicId,
-        action: resetPassword ? "admin.reset_password" : "admin.update",
+        action,
         payload: {
           adminId,
           changes: Object.keys(data).filter((k) => k !== "passwordHash"),
+          ...(username !== undefined ? { oldUsername: admin.username, newUsername: data.username } : {}),
         },
       },
     });
