@@ -562,9 +562,8 @@ export default function WebApp() {
     setObSaving(true);
     setObPhoneError(null);
     try {
-      let normalized: string;
-      try { normalized = normalizePhone(rawPhone); }
-      catch { setObPhoneError("Telefon formati noto'g'ri (+998XXXXXXXXX)"); return; }
+      const normalized = normalizePhone(rawPhone);
+      if (!normalized) { setObPhoneError("Telefon formati noto'g'ri (+998XXXXXXXXX)"); return; }
       const body: Record<string, string> = { telegramId, phone: normalized, onboardingStep: "profile" };
       if (tgName && tgName.length >= 2) body.firstName = tgName;
       const res = await fetch("/api/webapp/profile", {
@@ -897,30 +896,12 @@ export default function WebApp() {
           </div>
 
           <div className="flex-1 px-5 pt-7 pb-12">
-            {!obShowManual ? (
-              <button
-                onClick={obRequestContact}
-                disabled={obSaving}
-                className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-60"
-              >
-                {obSaving ? "⏳ Tekshirilmoqda..." : "📱 Telegram orqali ulash"}
-              </button>
-            ) : (
-              <div className="space-y-3 text-center">
-                <div className="text-4xl mb-2">📲</div>
-                <p className="text-gray-700 font-medium">Telegram ilovasidan foydalaning</p>
-                <p className="text-gray-400 text-sm">Raqamni ulash uchun sahifani Telegram ichidan oching</p>
-                <button
-                  onClick={() => { setObShowManual(false); obRequestContact(); }}
-                  className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all mt-4"
-                >
-                  🔄 Qayta urinish
-                </button>
-              </div>
-            )}
-
-            <button onClick={obSkip} className="w-full mt-6 py-3 text-gray-400 text-sm">
-              Keyinroq to&apos;ldiraman
+            <button
+              onClick={obRequestContact}
+              disabled={obSaving}
+              className="w-full py-4 rounded-2xl bg-blue-600 text-white font-semibold text-base shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-60"
+            >
+              {obSaving ? "⏳ Tekshirilmoqda..." : "📱 Telegram orqali ulash"}
             </button>
           </div>
         </div>
