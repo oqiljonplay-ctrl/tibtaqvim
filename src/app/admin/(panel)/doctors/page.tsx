@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DoctorCard } from "@/components/DoctorCard";
+import { PhoneInput, isValidPhone } from "@/components/forms/PhoneInput";
 
 type QueueMode = "live" | "online" | "slot";
 type StaffRole = "doctor" | "receptionist";
@@ -521,13 +522,11 @@ export default function AdminDoctorsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon (login) *</label>
-              <input
-                className="input"
+              <PhoneInput
+                label="Telefon (login) *"
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+998 90 000 00 00"
-                required
+                onChange={(v) => setForm({ ...form, phone: v })}
+                error={form.phone && !isValidPhone(form.phone) ? "Raqamni to'liq kiriting" : undefined}
               />
             </div>
 
