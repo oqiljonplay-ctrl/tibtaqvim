@@ -49,6 +49,7 @@ export async function assignTibId(userId: string): Promise<string | null> {
 
 export async function getTibIdByPhone(phone: string): Promise<string | null> {
   const normalized = normalizePhone(phone);
+  if (!normalized) return null;
   const cacheKey = `phone:${normalized}`;
 
   const cached = getCache(cacheKey);

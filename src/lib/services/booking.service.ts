@@ -54,7 +54,7 @@ async function bookDoctorQueue(
       const duplicate = await tx.appointment.findFirst({
         where: {
           serviceId: input.serviceId,
-          patientPhone: normalizePhone(input.patientPhone),
+          patientPhone: normalizePhone(input.patientPhone) ?? input.patientPhone,
           date: bookingDate,
           status: { not: "cancelled" },
         },
@@ -67,7 +67,7 @@ async function bookDoctorQueue(
       if (input.doctorId) {
         const doctorDuplicate = await tx.appointment.findFirst({
           where: {
-            patientPhone: normalizePhone(input.patientPhone),
+            patientPhone: normalizePhone(input.patientPhone) ?? input.patientPhone,
             doctorId: input.doctorId,
             date: bookingDate,
             status: { in: ["booked", "arrived"] },
@@ -109,7 +109,7 @@ async function bookDoctorQueue(
           slotId: null,
           date: bookingDate,
           patientName: input.patientName.trim(),
-          patientPhone: normalizePhone(input.patientPhone),
+          patientPhone: normalizePhone(input.patientPhone) ?? input.patientPhone,
           address: null,
           queueNumber,
           queueMode,
@@ -160,7 +160,7 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
       const diagDuplicate = await tx.appointment.findFirst({
         where: {
           serviceId: input.serviceId,
-          patientPhone: normalizePhone(input.patientPhone),
+          patientPhone: normalizePhone(input.patientPhone) ?? input.patientPhone,
           date: bookingDate,
           status: { not: "cancelled" },
         },
@@ -193,7 +193,7 @@ async function bookDiagnostic(input: BookingInput, service: { dailyLimit: number
           slotId: input.slotId ?? null,
           date: bookingDate,
           patientName: input.patientName.trim(),
-          patientPhone: normalizePhone(input.patientPhone),
+          patientPhone: normalizePhone(input.patientPhone) ?? input.patientPhone,
           address: null,
           queueNumber: null,
           status: "booked",
@@ -240,7 +240,7 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
       const homeDuplicate = await tx.appointment.findFirst({
         where: {
           serviceId: input.serviceId,
-          patientPhone: normalizePhone(input.patientPhone),
+          patientPhone: normalizePhone(input.patientPhone) ?? input.patientPhone,
           date: bookingDate,
           status: { not: "cancelled" },
         },
@@ -259,7 +259,7 @@ async function bookHomeService(input: BookingInput, service: { dailyLimit: numbe
           slotId: null,
           date: bookingDate,
           patientName: input.patientName.trim(),
-          patientPhone: normalizePhone(input.patientPhone),
+          patientPhone: normalizePhone(input.patientPhone) ?? input.patientPhone,
           address: input.address!.trim(),
           queueNumber: null,
           status: "booked",
@@ -449,7 +449,7 @@ async function resolveTibId(input: BookingInput): Promise<string | null> {
       const u = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true, tibId: true } });
       if (u) return u.tibId ?? await assignTibId(u.id);
     }
-    const phone = normalizePhone(input.patientPhone);
+    const phone = normalizePhone(input.patientPhone) ?? input.patientPhone;
     const u = await prisma.user.findFirst({ where: { phone }, select: { id: true, tibId: true } });
     if (!u) return null;
     return u.tibId ?? await assignTibId(u.id);
@@ -513,7 +513,7 @@ async function notifyPatientAsync(
 ): Promise<void> {
   try {
     const user = await prisma.user.findFirst({
-      where: { phone: normalizePhone(patientPhone) },
+      where: { phone: normalizePhone(patientPhone) ?? patientPhone },
       select: { telegramId: true, tibId: true },
     });
     if (!user?.telegramId) return;

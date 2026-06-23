@@ -32,7 +32,7 @@ export function validateBookingInput(data: Partial<BookingInput>): string | null
 
   if (!data.patientPhone) return "patientPhone majburiy";
   const phone = normalizePhone(data.patientPhone);
-  if (!/^\+998\d{9}$/.test(phone)) return "patientPhone format noto'g'ri (+998XXXXXXXXX)";
+  if (!phone || !/^\+998\d{9}$/.test(phone)) return "patientPhone format noto'g'ri (+998XXXXXXXXX)";
 
   if (data.address !== undefined && data.address !== null) {
     const addr = sanitizeText(data.address);

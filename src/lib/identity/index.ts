@@ -21,10 +21,8 @@ export async function linkPhoneToTelegramUser(
   rawPhone: string,
 ): Promise<LinkPhoneResult> {
   try {
-    let phone: string;
-    try {
-      phone = normalizePhone(rawPhone);
-    } catch {
+    const phone = normalizePhone(rawPhone);
+    if (!phone) {
       return { status: "error", message: "Telefon formati noto'g'ri (+998XXXXXXXXX)" };
     }
 

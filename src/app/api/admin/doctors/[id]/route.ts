@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, notFound, serverError } from "@/lib/api-response";
+import { normalizePhone } from "@/lib/utils/phone";
 import { canManageResources } from "@/lib/branch-scope";
 import { createAuditLog } from "@/lib/services/config.service";
 import { closeStint } from "@/lib/services/employment.service";
@@ -127,7 +128,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           firstName,
           lastName,
           specialty,
-          phone: phone || null,
+          phone: phone ? (normalizePhone(phone) ?? null) : null,
           ...(branchId !== undefined && { branchId: branchId || null }),
           ...(Array.isArray(serviceIds)
             ? {

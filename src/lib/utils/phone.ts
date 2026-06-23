@@ -1,28 +1,44 @@
+export const CIS_RULES: { code: string; len: number; label: string }[] = [
+  { code: "+998", len: 9,  label: "O'zbekiston" },
+  { code: "+7",   len: 10, label: "Rossiya/Qozog'iston" },
+  { code: "+996", len: 9,  label: "Qirg'iziston" },
+  { code: "+992", len: 9,  label: "Tojikiston" },
+  { code: "+993", len: 8,  label: "Turkmaniston" },
+  { code: "+994", len: 9,  label: "Ozarbayjon" },
+  { code: "+374", len: 8,  label: "Armaniston" },
+  { code: "+375", len: 9,  label: "Belarus" },
+  { code: "+373", len: 8,  label: "Moldova" },
+  { code: "+380", len: 9,  label: "Ukraina" },
+];
+
 /**
- * Barcha telefon raqamlarni yagona formatga keltiradi: +998XXXXXXXXX
- *
- * Qoidalar:
- *  +998901234567  → +998901234567  (to'g'ri)
- *   998901234567  → +998901234567  ('+' qo'shish)
- *    901234567    → +998901234567  (mahalliy 9 raqam)
- *   0901234567    → +998901234567  (boshidagi 0 o'rniga +998)
+ * Kanonik <kod><raqam> qaytaradi yoki noto'g'ri bo'lsa null.
+ * Kirish: +998 90 111-11-11, 998901234567, 901234567, 0901234567
+ * Harf yoki axlat (masalan "TIBBIYOT") → null qaytaradi.
  */
-export function normalizePhone(raw: string): string {
-  // Faqat raqamlar va boshidagi '+' ni qoldirish
-  const digits = raw.replace(/[\s\-\(\)]/g, "");
+export function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let s = String(raw).trim().replace(/[\s\-()]/g, "");
+  if (!s) return null;
+  // Harf bor bo'lsa — axlat → null
+  if (/[a-zA-Z]/.test(s)) return null;
+  // 00xxx → +xxx
+  if (s.startsWith("00")) s = "+" + s.slice(2);
+  // O'zbekiston qisqartmalari (orqaga moslik):
+  if (/^998\d{9}$/.test(s)) return "+" + s;
+  if (/^0\d{9}$/.test(s)) return "+998" + s.slice(1);
+  if (/^9\d{8}$/.test(s)) return "+998" + s;
+  // Umumiy MDH tekshiruvi:
+  if (s.startsWith("+")) {
+    for (const r of CIS_RULES) {
+      const re = new RegExp(`^\\${r.code}\\d{${r.len}}$`);
+      if (re.test(s)) return s;
+    }
+  }
+  return null;
+}
 
-  // +998XXXXXXXXX (13 ta belgi) — to'g'ri format
-  if (/^\+998\d{9}$/.test(digits)) return digits;
-
-  // 998XXXXXXXXX (12 ta raqam) — '+' qo'shish
-  if (/^998\d{9}$/.test(digits)) return "+" + digits;
-
-  // 0XXXXXXXXX (10 ta raqam, 0 bilan boshlanadi) — 0 → +998
-  if (/^0\d{9}$/.test(digits)) return "+998" + digits.slice(1);
-
-  // 9XXXXXXXX (9 ta raqam, 9 bilan boshlanadi) — +998 qo'shish
-  if (/^9\d{8}$/.test(digits)) return "+998" + digits;
-
-  // Noma'lum format — trimlab qaytarish (validator xatoni ko'rsatadi)
-  return digits;
+/** Telefon to'liq va kanonik formatdami. */
+export function isValidPhone(v: string | null | undefined): boolean {
+  return normalizePhone(v) !== null;
 }

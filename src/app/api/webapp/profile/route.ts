@@ -40,14 +40,12 @@ export async function PATCH(req: NextRequest) {
     if (typeof phone !== "string" || phone.trim().length === 0) {
       return error("Telefon format noto'g'ri", 400);
     }
-    try {
-      normalizedPhone = normalizePhone(phone.trim());
-    } catch {
-      return error("Telefon formati noto'g'ri (+998XXXXXXXXX)", 400);
-    }
-    if (!/^\+998\d{9}$/.test(normalizedPhone)) {
+    const np = normalizePhone(phone.trim());
+    if (!np) return error("Telefon formati noto'g'ri (+998XXXXXXXXX)", 400);
+    if (!/^\+998\d{9}$/.test(np)) {
       return error("Telefon +998XXXXXXXXX formatida bo'lishi kerak", 400);
     }
+    normalizedPhone = np;
   }
 
   const user = await prisma.user.findUnique({

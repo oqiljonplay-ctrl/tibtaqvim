@@ -169,7 +169,8 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
             "";
 
           if (isSent && phone) {
-            try { savePhone(normalizePhone(phone), firstName); } catch { setShowPhoneInput(true); }
+            const norm = normalizePhone(phone);
+            if (norm) { savePhone(norm, firstName); } else { setShowPhoneInput(true); }
           } else if (isSent) {
             // Bot webhook orqali oladi → polling
             pollForPhone();
@@ -327,10 +328,10 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      try {
-                        const normalized = normalizePhone(phoneInput);
+                      const normalized = normalizePhone(phoneInput);
+                      if (normalized) {
                         savePhone(normalized);
-                      } catch {
+                      } else {
                         setPhoneError("Telefon formati noto'g'ri (+998XXXXXXXXX)");
                       }
                     }}

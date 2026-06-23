@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden, notFound, serverError } from "@/lib/api-response";
+import { normalizePhone } from "@/lib/utils/phone";
 import { canManageResources } from "@/lib/branch-scope";
 import { createAuditLog } from "@/lib/services/config.service";
 import { closeStint } from "@/lib/services/employment.service";
@@ -45,6 +46,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     if (!firstName) return error("firstName majburiy");
 
+    // Telefon normalizatsiya — probel/harf bo'lsa 400
+    let normalizedPhone: string | null | undefined = undefined;
+    if (phone !== undefined) {
+      if (phone) {
+        const np = normalizePhone(phone);
+        if (!np) return error("Telefon raqam formati noto'g'ri", 400);
+        normalizedPhone = np;
+      } else {
+        normalizedPhone = null;
+      }
+    }
+
     // clinic_admin faqat o'z klinikasining filialini belgilashi mumkin
     if (branchId !== undefined && branchId !== null && auth.role === "clinic_admin") {
       const branch = await prisma.branch.findFirst({
@@ -60,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         data: {
           firstName: firstName.trim(),
           lastName: lastName?.trim() ?? staff.lastName,
-          phone: phone || null,
+          ...(normalizedPhone !== undefined && { phone: normalizedPhone }),
           photoUrl: photoUrl || null,
           ...(branchId !== undefined && { branchId: branchId || null }),
         },
@@ -74,7 +87,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           data: {
             firstName: firstName.trim(),
             lastName: lastName?.trim() ?? undefined,
-            phone: phone || undefined,
+            ...(normalizedPhone !== undefined && { phone: normalizedPhone }),
             ...(branchId !== undefined && { branchId: branchId || null }),
           },
         });
