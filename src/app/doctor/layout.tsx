@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "@/components/ui/Navbar";
 import { Container } from "@/components/layout";
+import ActingClinicBanner from "@/components/auth/ActingClinicBanner";
 
 export default function DoctorLayout({ children }: { children: React.ReactNode }) {
   const [invitationCount, setInvitationCount] = useState(0);
@@ -37,6 +38,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
           { href: "/doctor/invitations", label: "📬 Takliflar", badge: invitationCount },
         ]}
       />
+      <ActingClinicBanner />
       <Container size="xl" className="py-6">{children}</Container>
     </div>
   );

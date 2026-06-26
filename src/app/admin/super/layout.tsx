@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 const navItems = [
   { href: "/admin/super", label: "Dashboard", icon: "⬡" },
@@ -11,6 +11,96 @@ const navItems = [
   { href: "/admin/super/promotions", label: "Telegram postlar", icon: "📣" },
   { href: "/admin/super/audit", label: "Audit Log", icon: "📋" },
 ];
+
+interface ClinicItem { id: string; name: string; isActive: boolean }
+
+function ClinicSelector() {
+  const [clinics, setClinics] = useState<ClinicItem[]>([]);
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const refreshActing = useCallback(() => {
+    const stored = document.cookie.split("; ").find(c => c.startsWith("acting_clinic="));
+    setActingId(stored ? stored.split("=")[1] : null);
+  }, []);
+
+  useEffect(() => {
+    refreshActing();
+    fetch("/api/admin/super/clinics", { credentials: "include" })
+      .then(r => r.json())
+      .then(j => { if (j.success) setClinics(j.data || []); })
+      .catch(() => {});
+  }, [refreshActing]);
+
+  async function selectClinic(id: string | null, name: string | null) {
+    setLoading(true);
+    try {
+      if (id) {
+        await fetch("/api/admin/super/acting-clinic", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clinicId: id }),
+        });
+        localStorage.setItem("clinicId", id);
+        localStorage.setItem("acting_clinic_name", name || "");
+        setActingId(id);
+      } else {
+        await fetch("/api/admin/super/acting-clinic", { method: "DELETE", credentials: "include" });
+        localStorage.removeItem("clinicId");
+        localStorage.removeItem("acting_clinic_name");
+        setActingId(null);
+      }
+    } catch {}
+    setLoading(false);
+    setOpen(false);
+  }
+
+  const current = clinics.find(c => c.id === actingId);
+  const label = current ? current.name : "🌐 Barcha klinikalar";
+
+  return (
+    <div className="relative px-3 py-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        disabled={loading}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-white transition-colors disabled:opacity-50"
+      >
+        <span className="truncate font-medium">{label}</span>
+        <svg className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-3 right-3 top-full mt-1 z-50 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden shadow-xl">
+          <button
+            onClick={() => selectClinic(null, null)}
+            className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-slate-700 transition-colors ${!actingId ? "text-indigo-300 font-medium" : "text-slate-300"}`}
+          >
+            <span>🌐</span>
+            <span>Barcha klinikalar</span>
+            {!actingId && <span className="ml-auto text-xs text-slate-500">faqat ko'rish</span>}
+          </button>
+          <div className="border-t border-slate-700" />
+          {clinics.map(c => (
+            <button
+              key={c.id}
+              onClick={() => selectClinic(c.id, c.name)}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-slate-700 transition-colors ${actingId === c.id ? "text-indigo-300 font-medium" : "text-slate-300"}`}
+            >
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.isActive ? "bg-green-400" : "bg-slate-500"}`} />
+              <span className="truncate">{c.name}</span>
+              {actingId === c.id && <span className="ml-auto text-xs text-emerald-400">aktiv</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const path = usePathname();
@@ -25,7 +115,8 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     localStorage.clear();
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     await fetch("/api/admin/super/auth", { method: "DELETE" });
-    router.push("/admin/super/auth");
+    await fetch("/api/admin/super/acting-clinic", { method: "DELETE" });
+    router.push("/superadminjon");
   }
 
   return (
@@ -42,6 +133,14 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               <div className="text-slate-400 text-xs">Clinic OS</div>
             </div>
           </div>
+        </div>
+
+        {/* Klinika-tanlagich */}
+        <div className="border-b border-slate-700">
+          <p className="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Aktiv klinika
+          </p>
+          <ClinicSelector />
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -119,6 +218,11 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
           >
             ⏻
           </button>
+        </div>
+
+        {/* Mobile clinic selector */}
+        <div className="lg:hidden bg-slate-800 px-3 py-1.5 border-b border-slate-700">
+          <ClinicSelector />
         </div>
 
         {/* Content */}

@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { requireAuth, requireEmVerified } from "@/lib/auth";
 import { ok, error } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
-import { getBranchScope } from "@/lib/branch-scope";
+import { getScope, getBranchScope } from "@/lib/branch-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       ? new Date(dateParam + "T00:00:00.000Z")
       : new Date(new Date().toLocaleDateString("sv-SE") + "T00:00:00.000Z");
 
-    const scope = getBranchScope(auth);
+    const scope = getScope(req, auth);
     const where: Prisma.AppointmentWhereInput = {
       date,
       paymentStatus: { in: ["paid", "not_required"] },

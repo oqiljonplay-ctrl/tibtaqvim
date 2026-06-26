@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, error, unauthorized, forbidden } from "@/lib/api-response";
 import { getTodayInTZ, getTodayRange } from "@/lib/utils/date";
-import { getBranchScope } from "@/lib/branch-scope";
+import { getScope } from "@/lib/branch-scope";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,8 +11,7 @@ export async function GET(req: NextRequest) {
     if (!auth) return unauthorized();
     if (!["super_admin", "clinic_admin", "branch_admin"].includes(auth.role)) return forbidden();
 
-    const explicitClinicId = new URL(req.url).searchParams.get("clinicId");
-    const scope = getBranchScope(auth, explicitClinicId);
+    const scope = getScope(req, auth);
 
     const todayStr = getTodayInTZ();
     const { gte: todayStart, lte: todayEnd } = getTodayRange();

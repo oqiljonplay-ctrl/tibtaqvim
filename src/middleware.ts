@@ -3,6 +3,7 @@ import { verifyTokenEdge } from "@/lib/auth-edge";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/superadminjon",
   "/webapp",
   "/api/services",
   "/api/book",
@@ -68,14 +69,14 @@ export async function middleware(req: NextRequest) {
 
   const token = req.cookies.get("auth_token")?.value;
   if (!token) {
-    const loginUrl = new URL("/login", req.url);
+    const loginUrl = new URL("/", req.url);
     loginUrl.searchParams.set("returnUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   const payload = await verifyTokenEdge(token);
   if (!payload) {
-    const res = NextResponse.redirect(new URL("/login", req.url));
+    const res = NextResponse.redirect(new URL("/", req.url));
     res.cookies.delete("auth_token");
     return res;
   }

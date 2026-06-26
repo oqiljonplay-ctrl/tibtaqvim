@@ -2,6 +2,55 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
+function PanelSwitcher() {
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [actingName, setActingName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = document.cookie.split("; ").find(c => c.startsWith("acting_clinic="));
+    setActingId(stored ? stored.split("=")[1] : null);
+    setActingName(localStorage.getItem("acting_clinic_name"));
+  }, []);
+
+  const panels = [
+    { href: "/admin",     label: "Admin",     icon: "🏥", desc: "Klinika boshqaruvi" },
+    { href: "/doctor",    label: "Shifokor",  icon: "👨‍⚕️", desc: "Navbat ko'rish" },
+    { href: "/reception", label: "Qabulxona", icon: "📋", desc: "To'lov nazorati" },
+  ];
+
+  const modeLabel = actingId && actingName
+    ? `${actingName} — tahrirlash yoniq`
+    : "Barcha klinikalar — faqat ko'rish";
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-gray-900">Panel ko'rish</h2>
+        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+          actingId ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+        }`}>
+          {actingId ? "✏️" : "👁"} {modeLabel}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {panels.map(p => (
+          <Link
+            key={p.href}
+            href={p.href}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all group text-center"
+          >
+            <span className="text-2xl group-hover:scale-110 transition-transform">{p.icon}</span>
+            <div>
+              <div className="text-sm font-medium text-gray-800">{p.label}</div>
+              <div className="text-xs text-gray-400">{p.desc}</div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface Stats {
   totalClinics: number;
   activeClinics: number;
@@ -289,6 +338,9 @@ export default function SuperDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Clinic OS — barcha klinikalar nazorati</p>
       </div>
+
+      {/* Panel almashtirgich */}
+      <PanelSwitcher />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

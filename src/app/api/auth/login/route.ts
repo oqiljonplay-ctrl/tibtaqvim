@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { phone: rawPhone, identifier: rawIdentifier, password, clinicId } = await req.json();
+    const { phone: rawPhone, identifier: rawIdentifier, password, clinicId, mode = "staff" } = await req.json();
 
     const rawLogin = rawIdentifier || rawPhone;
     if (!rawLogin || !password) {
@@ -64,6 +64,19 @@ export async function POST(req: NextRequest) {
         });
       } catch {}
       return unauthorized("Invalid credentials");
+    }
+
+    // mode=staff: super_admin bu eshikdan kira olmaydi
+    if (mode === "staff" && user.role === "super_admin") {
+      return NextResponse.json({ success: true, data: { redirectToSuper: true } });
+    }
+
+    // mode=super: faqat super_admin qabul qilinadi
+    if (mode === "super" && user.role !== "super_admin") {
+      return NextResponse.json(
+        { success: false, error: "Bu sahifa faqat superadmin uchun" },
+        { status: 403 }
+      );
     }
 
     try {

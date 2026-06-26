@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
-import { getBranchScope, resolveBranchIdForCreate, canManageResources } from "@/lib/branch-scope";
+import { getScope, getBranchScope, resolveBranchIdForCreate, canManageResources } from "@/lib/branch-scope";
 import { resolveOrCreateEmployee, openStint, assertClinicCapacity, ApiError } from "@/lib/services/employment.service";
 import { createAuditLog } from "@/lib/services/config.service";
 
@@ -11,8 +11,7 @@ export async function GET(req: NextRequest) {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
 
-    const explicitClinicId = new URL(req.url).searchParams.get("clinicId");
-    const scope = getBranchScope(auth, explicitClinicId);
+    const scope = getScope(req, auth);
 
     const doctors = await prisma.doctor.findMany({
       where: { ...scope, isActive: true },

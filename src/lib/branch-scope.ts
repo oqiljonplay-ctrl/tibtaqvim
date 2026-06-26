@@ -1,3 +1,4 @@
+import { NextRequest } from "next/server";
 import { JwtPayload } from "@/lib/auth";
 
 /**
@@ -40,6 +41,34 @@ export function resolveBranchIdForCreate(
   if (auth.role === "clinic_admin") return null;
   if (auth.role === "branch_admin") return auth.branchId ?? null;
   return null;
+}
+
+/**
+ * Super_admin uchun: ?clinicId= → acting_clinic cookie → null (hamma).
+ * Boshqa rollar: null (getBranchScope o'zi ishlaydi).
+ */
+export function getActingClinicId(req: NextRequest, auth: JwtPayload): string | null {
+  if (auth.role !== "super_admin") return null;
+  const explicit = new URL(req.url).searchParams.get("clinicId");
+  if (explicit) return explicit;
+  return req.cookies.get("acting_clinic")?.value || null;
+}
+
+/**
+ * getBranchScope uchun wrapper: super_admin → acting_clinic cookie fallback.
+ * Mavjud getBranchScope funksiyasini almashtirmaydi.
+ */
+export function getScope(
+  req: NextRequest,
+  auth: JwtPayload
+): { clinicId?: string; branchId?: string | null } {
+  const actingId = getActingClinicId(req, auth);
+  // Non-super: getBranchScope o'z URL ?clinicId= ni ham qaytaradi
+  if (auth.role !== "super_admin") {
+    const explicit = new URL(req.url).searchParams.get("clinicId");
+    return getBranchScope(auth, explicit);
+  }
+  return getBranchScope(auth, actingId);
 }
 
 /** Admin yaratishga ruxsat — faqat super_admin */

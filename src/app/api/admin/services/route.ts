@@ -2,15 +2,14 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
-import { getBranchScope, canManageResources } from "@/lib/branch-scope";
+import { getScope, getBranchScope, canManageResources } from "@/lib/branch-scope";
 
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if (!auth) return unauthorized();
 
-    const explicitClinicId = new URL(req.url).searchParams.get("clinicId");
-    const scope = getBranchScope(auth, explicitClinicId);
+    const scope = getScope(req, auth);
 
     const services = await prisma.service.findMany({
       where: { ...scope, isActive: true },

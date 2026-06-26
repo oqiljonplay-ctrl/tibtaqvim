@@ -4,7 +4,7 @@ import { requireAuth, hashPassword, generateRandomPassword } from "@/lib/auth";
 import type { Prisma } from "@prisma/client";
 import { ok, created, error, unauthorized, forbidden } from "@/lib/api-response";
 import { normalizePhone } from "@/lib/utils/phone";
-import { getBranchScope, canCreateAdmin } from "@/lib/branch-scope";
+import { getScope, getBranchScope, canCreateAdmin } from "@/lib/branch-scope";
 import { resolveOrCreateEmployee, openStint, assertClinicCapacity, ApiError } from "@/lib/services/employment.service";
 
 // POST /api/admin/staff — xodim akkaunt yaratish (receptionist, clinic_admin, doctor)
@@ -252,8 +252,7 @@ export async function GET(req: NextRequest) {
     if (!auth) return unauthorized();
     if (!["super_admin", "clinic_admin", "branch_admin"].includes(auth.role)) return forbidden();
 
-    const explicitClinicId = new URL(req.url).searchParams.get("clinicId");
-    const scope = getBranchScope(auth, explicitClinicId);
+    const scope = getScope(req, auth);
 
     const staff = await prisma.staff.findMany({
       where: { ...scope, isActive: true },
