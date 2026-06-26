@@ -46,12 +46,12 @@ export type ShowcaseResponse = {
 // ── 4-bosqich: vitrina o'lchami ──────────────────────────────
 export type ShowcaseSize = "S" | "M" | "L" | "XL";
 
-/** Coverflow element BALANDLIGI (px). Kenglik = balandlik × aspect. */
+/** Coverflow element BALANDLIGI (px). Kenglik = balandlik × aspect (lekin konteyner 92% cheki bilan). */
 export const SHOWCASE_SIZE_PX: Record<ShowcaseSize, number> = {
-  S: 140,
-  M: 190,
-  L: 250,
-  XL: 320,
+  S: 120,
+  M: 150,
+  L: 180,
+  XL: 230,
 };
 
 export const SHOWCASE_SIZE_DEFAULT: ShowcaseSize = "M";

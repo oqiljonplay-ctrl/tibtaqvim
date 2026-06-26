@@ -5,6 +5,13 @@ import { Stack } from "@/components/layout";
 type MediaKind = "image" | "gif" | "video" | "audio" | "youtube" | "telegram" | "pdf";
 type MediaSource = "upload" | "url";
 type Shape = "original" | "circle";
+type Orientation = "landscape" | "portrait" | "square";
+
+const ORIENTATIONS: { key: Orientation; label: string; w: number; h: number }[] = [
+  { key: "landscape", label: "Gorizontal 16:9", w: 16, h: 9 },
+  { key: "portrait",  label: "Vertikal 9:16",   w: 9,  h: 16 },
+  { key: "square",    label: "Kvadrat 1:1",      w: 1,  h: 1 },
+];
 
 interface Media {
   id: string;
@@ -76,6 +83,7 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
   const [addMode, setAddMode] = useState<"upload" | "link">("upload");
   const [kind, setKind] = useState<MediaKind>("image");
   const [shape, setShape] = useState<Shape>("original");
+  const [orientation, setOrientation] = useState<Orientation>("landscape");
   const [linkUrl, setLinkUrl] = useState("");
   const [mediaTitle, setMediaTitle] = useState("");
   const [saving, setSaving] = useState(false);
@@ -176,11 +184,21 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
       url = linkUrl.trim();
     }
     setSaving(true);
+    const orient = ORIENTATIONS.find((o) => o.key === orientation)!;
+    const needsOrient = kind === "youtube" || (kind === "image" && !embedRef);
     const r = await fetch(`/api/admin/showcase/blocks/${block.id}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ kind, mediaSource: "url", url, embedRef, title: mediaTitle || null, shape }),
+      body: JSON.stringify({
+        kind,
+        mediaSource: "url",
+        url,
+        embedRef,
+        title: mediaTitle || null,
+        shape,
+        ...(needsOrient ? { aspectW: orient.w, aspectH: orient.h } : {}),
+      }),
     });
     const j = await r.json();
     setSaving(false);
@@ -276,7 +294,7 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
             {(["upload", "link"] as const).map((m) => (
               <button
                 key={m}
-                onClick={() => { setAddMode(m); setErr(null); setLinkUrl(""); setMediaTitle(""); }}
+                onClick={() => { setAddMode(m); setErr(null); setLinkUrl(""); setMediaTitle(""); setOrientation("landscape"); }}
                 className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${addMode === m ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600"}`}
               >
                 {m === "upload" ? "📎 Yuklash" : "🔗 Havola"}
@@ -334,7 +352,7 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
                   <label className="block text-xs font-medium text-gray-600 mb-1">Havola turi</label>
                   <select
                     value={kind}
-                    onChange={(e) => { setKind(e.target.value as MediaKind); setLinkUrl(""); }}
+                    onChange={(e) => { setKind(e.target.value as MediaKind); setLinkUrl(""); setOrientation("landscape"); }}
                     className={inputCls + " bg-white text-xs"}
                   >
                     {linkKinds.includes("youtube") && <option value="youtube">YouTube</option>}
@@ -368,6 +386,25 @@ export function ShowcaseMediaManager({ block, limits, onChange }: Props) {
                     className={inputCls + " text-xs"}
                   />
                 </div>
+
+                {/* Orientatsiya — faqat YouTube va rasm-URL uchun */}
+                {(kind === "youtube" || kind === "image") && (
+                  <div className="flex flex-col gap-1">
+                    <label className="block text-xs font-medium text-gray-600">Video/rasm shakli</label>
+                    <div className="inline-flex rounded-xl border border-gray-200 overflow-hidden">
+                      {ORIENTATIONS.map((o) => (
+                        <button
+                          key={o.key}
+                          type="button"
+                          onClick={() => setOrientation(o.key)}
+                          className={`px-3 py-2 text-xs transition ${orientation === o.key ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
