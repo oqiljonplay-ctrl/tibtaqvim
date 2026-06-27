@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("title" in b) data.title = String(b.title).trim();
   if ("subtitle" in b) data.subtitle = b.subtitle ? String(b.subtitle).trim() : null;
   if ("showRating" in b) data.showRating = Boolean(b.showRating);
-  if ("cta" in b) data.cta = b.cta === "generic" ? "generic" : "auto";
+  if ("cta" in b) data.cta = b.cta === "none" ? "none" : b.cta === "generic" ? "generic" : "auto";
   if ("isActive" in b) data.isActive = Boolean(b.isActive);
   if ("source" in b && ["em", "service", "manual"].includes(b.source)) data.source = b.source;
   if ("employeeId" in b) data.employeeId = b.employeeId ?? null;

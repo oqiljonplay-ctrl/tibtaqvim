@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
           title: String(body.title).trim(),
           subtitle: body.subtitle ? String(body.subtitle).trim() : null,
           showRating: body.showRating !== false,
-          cta: body.cta === "generic" ? "generic" : "auto",
+          cta: body.cta === "none" ? "none" : body.cta === "generic" ? "generic" : "auto",
           createdBy: auth.userId,
         },
       });

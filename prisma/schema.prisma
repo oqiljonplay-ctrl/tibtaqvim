@@ -1004,6 +1004,7 @@ enum ShowcaseSource {
 enum ShowcaseCta {
   auto
   generic
+  none
 }
 
 enum ShowcaseMediaKind {
