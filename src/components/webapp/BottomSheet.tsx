@@ -108,7 +108,7 @@ export function BottomSheet({
   return (
     <div
       ref={sheetRef}
-      className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md bg-white rounded-t-2xl shadow-2xl flex flex-col"
+      className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md bg-white rounded-t-[28px] shadow-2xl flex flex-col"
       style={{
         height: `${pct}%`,
         transform: open ? "translateY(0)" : "translateY(100%)",
