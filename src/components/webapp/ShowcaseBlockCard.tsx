@@ -84,13 +84,15 @@ export function ShowcaseBlockCard({
               )}
             </span>
           )}
-          <button
-            type="button"
-            onClick={onBook}
-            className="shrink-0 inline-flex items-center justify-center bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full active:bg-blue-700 transition-colors"
-          >
-            Band qilish
-          </button>
+          {block.cta !== "none" && (
+            <button
+              type="button"
+              onClick={onBook}
+              className="shrink-0 inline-flex items-center justify-center bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full active:bg-blue-700 transition-colors"
+            >
+              Band qilish
+            </button>
+          )}
         </div>
       </div>
 

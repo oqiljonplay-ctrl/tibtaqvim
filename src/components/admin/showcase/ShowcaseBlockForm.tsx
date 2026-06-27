@@ -58,7 +58,7 @@ export function ShowcaseBlockForm({ tab, block, onClose, onSaved }: Props) {
   const [title, setTitle] = useState(block?.title ?? "");
   const [subtitle, setSubtitle] = useState(block?.subtitle ?? "");
   const [showRating, setShowRating] = useState(block?.showRating !== false);
-  const [cta, setCta] = useState<"auto" | "generic">((block?.cta as "auto" | "generic") ?? "auto");
+  const [cta, setCta] = useState<"auto" | "generic" | "none">((block?.cta as "auto" | "generic" | "none") ?? "auto");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -271,11 +271,12 @@ export function ShowcaseBlockForm({ tab, block, onClose, onSaved }: Props) {
             <span className="text-gray-700">Tugma:</span>
             <select
               value={cta}
-              onChange={(e) => setCta(e.target.value as "auto" | "generic")}
+              onChange={(e) => setCta(e.target.value as "auto" | "generic" | "none")}
               className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-white"
             >
               <option value="auto">Avtomatik</option>
               <option value="generic">Umumiy</option>
+              <option value="none">Yashirin</option>
             </select>
           </div>
         </div>

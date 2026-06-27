@@ -3,7 +3,7 @@ export type ShowcaseMediaKind =
 export type ShowcaseMediaSource = "upload" | "url";
 export type ShowcaseShape = "original" | "circle";
 export type ShowcaseSource = "em" | "service" | "manual";
-export type ShowcaseCta = "auto" | "generic";
+export type ShowcaseCta = "auto" | "generic" | "none";
 export type ShowcaseTab = "doctors" | "services";
 
 export type ShowcaseMedia = {
