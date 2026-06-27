@@ -21,6 +21,22 @@ function applyAttr(eff: Effective) {
   if (typeof document !== "undefined") {
     document.documentElement.setAttribute("data-webapp-theme", eff);
   }
+  try {
+    const tg = (window as unknown as { Telegram?: { WebApp?: {
+      isVersionAtLeast?: (v: string) => boolean;
+      setHeaderColor?: (c: string) => void;
+      setBackgroundColor?: (c: string) => void;
+    } } }).Telegram?.WebApp;
+    if (tg) {
+      const c = eff === "dark" ? "#141311" : "#FBFCFC";
+      if (tg.isVersionAtLeast?.("6.9")) {
+        tg.setHeaderColor?.(c);
+        tg.setBackgroundColor?.(c);
+      } else {
+        tg.setHeaderColor?.("bg_color");
+      }
+    }
+  } catch { /* eski versiya yoki SSR */ }
 }
 
 export function useWebAppTheme() {

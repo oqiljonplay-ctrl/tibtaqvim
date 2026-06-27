@@ -20,7 +20,15 @@ const themeBootstrap = `(function(){try{
     if(tg&&(tg.colorScheme==="dark"||tg.colorScheme==="light")){eff=tg.colorScheme;}
     else{eff=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}
   }
-  document.documentElement.setAttribute("data-webapp-theme", eff==="dark"?"dark":"light");
+  document.documentElement.setAttribute("data-webapp-theme",eff==="dark"?"dark":"light");
+  try{
+    var wtg=window.Telegram&&window.Telegram.WebApp;
+    if(wtg){
+      var hc=eff==="dark"?"#141311":"#FBFCFC";
+      if(wtg.isVersionAtLeast&&wtg.isVersionAtLeast("6.9")){wtg.setHeaderColor&&wtg.setHeaderColor(hc);wtg.setBackgroundColor&&wtg.setBackgroundColor(hc);}
+      else{wtg.setHeaderColor&&wtg.setHeaderColor("bg_color");}
+    }
+  }catch(e){}
 }catch(e){document.documentElement.setAttribute("data-webapp-theme","light");}})();`;
 
 export default function WebAppLayout({ children }: { children: React.ReactNode }) {
@@ -29,10 +37,10 @@ export default function WebAppLayout({ children }: { children: React.ReactNode }
       <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       <Suspense
         fallback={
-          <div className="min-h-[100dvh] flex items-center justify-center bg-gray-50">
+          <div className="min-h-[100dvh] flex items-center justify-center bg-[var(--bg)]">
             <div className="text-center">
               <div className="text-4xl mb-3">🏥</div>
-              <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
+              <p className="text-sm animate-pulse" style={{ color: "var(--text-muted)" }}>Yuklanmoqda...</p>
             </div>
           </div>
         }

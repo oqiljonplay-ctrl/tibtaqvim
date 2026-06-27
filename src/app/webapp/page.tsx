@@ -238,7 +238,7 @@ export default function WebApp() {
       if (tg) {
         tg.ready();
         tg.expand();
-        tg.setHeaderColor?.("#2563eb");
+        tg.setHeaderColor?.(document.documentElement.getAttribute("data-webapp-theme") === "dark" ? "#141311" : "#FBFCFC");
       }
 
       // tgId: SDK → URL tgid param fallback (bot har doim yuboradi)
