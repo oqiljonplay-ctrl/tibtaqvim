@@ -114,3 +114,75 @@
 .anim-off   .aurora-blob   { animation: none; }
 .anim-off   .star          { animation: none; opacity: 0.4; }
 .anim-off   .shooting       { display: none; }
+
+/* ============================================================
+   WEBAPP MAVZU TIZIMI (tun/kun) — ADDITIVE
+   Scope: html[data-webapp-theme]  → faqat webapp sahifalarida faol.
+   Admin/doctor/reception'ga TEGMAYDI (ularda atribut yo'q).
+   ============================================================ */
+
+/* 1) Fallback (atribut yo'q paytda = kunduzgi qiymatlar) */
+:root{
+  --bg:#FCFCFD; --surface:#E3E7EB; --elevated:#CFD6DD; --media:#CED5DC;
+  --border:rgba(126,139,154,.23); --text:#191D22; --text-muted:#5C6772;
+  --star:#E0A92E; --on-tint:#FFFFFF;
+}
+/* 2) KUN (titan 50%) */
+html[data-webapp-theme="light"]{
+  --bg:#FCFCFD; --surface:#E3E7EB; --elevated:#CFD6DD; --media:#CED5DC;
+  --border:rgba(126,139,154,.23); --text:#191D22; --text-muted:#5C6772;
+  --star:#E0A92E; --on-tint:#FFFFFF;
+}
+/* 3) TUN (oltin 50%) */
+html[data-webapp-theme="dark"]{
+  --bg:#131211; --surface:#2E2A20; --elevated:#463F2C; --media:#2D2612;
+  --border:rgba(212,175,55,.17); --text:#F4EFE3; --text-muted:#A79E89;
+  --star:#E8C24A; --on-tint:#1A1505;
+}
+
+/* 4) Root fon — webapp faol paytda body ham tokеnga tushadi */
+html[data-webapp-theme] body{ background-color:var(--bg)!important; color:var(--text)!important; }
+
+/* 5) REMAP — mavjud Tailwind klasslarini tokеnga bog'laydi.
+      Specificity (html[attr] .class) + !important → utility'lardan ustun. */
+
+/* neytral sirtlar */
+html[data-webapp-theme] .bg-white{ background-color:var(--surface)!important; }
+html[data-webapp-theme] .bg-gray-50{ background-color:var(--bg)!important; }
+html[data-webapp-theme] .bg-gray-100,
+html[data-webapp-theme] .bg-gray-200{ background-color:var(--elevated)!important; }
+html[data-webapp-theme] .bg-gray-300{ background-color:var(--text-muted)!important; }
+
+/* matn (to'liq) */
+html[data-webapp-theme] .text-gray-900,
+html[data-webapp-theme] .text-gray-800,
+html[data-webapp-theme] .text-black,
+html[data-webapp-theme] .text-white{ color:var(--text)!important; }
+/* matn (muted) */
+html[data-webapp-theme] .text-gray-700,
+html[data-webapp-theme] .text-gray-600,
+html[data-webapp-theme] .text-gray-500,
+html[data-webapp-theme] .text-gray-400,
+html[data-webapp-theme] .text-white\/90,
+html[data-webapp-theme] .text-white\/80,
+html[data-webapp-theme] .text-white\/70,
+html[data-webapp-theme] .text-white\/60{ color:var(--text-muted)!important; }
+
+/* chegaralar */
+html[data-webapp-theme] .border-gray-100,
+html[data-webapp-theme] .border-gray-200,
+html[data-webapp-theme] .border-gray-300{ border-color:var(--border)!important; }
+
+/* brend ko'k (SOLID) → tatuv sirt (ko'k olib tashlanadi) */
+html[data-webapp-theme] .bg-blue-500,
+html[data-webapp-theme] .bg-blue-600,
+html[data-webapp-theme] .bg-blue-700{ background-color:var(--elevated)!important; }
+html[data-webapp-theme] .text-blue-600,
+html[data-webapp-theme] .text-blue-700{ color:var(--text)!important; }
+html[data-webapp-theme] .border-blue-500,
+html[data-webapp-theme] .border-blue-600{ border-color:var(--border)!important; }
+html[data-webapp-theme] .ring-blue-500{ --tw-ring-color:var(--border)!important; }
+
+/* DIQQAT: bg-blue-100 / bg-green-100 / bg-red-100 (pastel status badge),
+   yashil/qizil solid action (bg-green-600 / bg-red-600) va ularning matni
+   ATAYLAB remap QILINMAYDI — appointment statusi ma'nosi saqlanadi. */
