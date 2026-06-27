@@ -56,7 +56,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
     case "gif": {
       if (!media.url || imgBroken) {
         return (
-          <div className="h-full w-full min-h-[100px] flex items-center justify-center bg-gray-50 border border-gray-100 rounded-xl">
+          <div className="h-full w-full min-h-[100px] flex items-center justify-center bg-[var(--media)] border border-gray-100 rounded-xl">
             <span className="text-xs text-gray-400">Rasm yuklanmadi</span>
           </div>
         );
@@ -81,7 +81,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
             loading="lazy"
             decoding="async"
             onError={() => setImgBroken(true)}
-            className={`${fillCls} object-contain bg-transparent`}
+            className={`${fillCls} object-contain bg-[var(--media)]`}
             style={fill ? undefined : { maxHeight: 320 }}
           />
         );
@@ -104,7 +104,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
       const id = (media.embedRef ?? "").trim();
       if (!id)
         return (
-          <div className="h-full w-full flex items-center justify-center bg-gray-50 rounded-xl text-xs text-gray-400">
+          <div className="h-full w-full flex items-center justify-center bg-[var(--media)] rounded-xl text-xs text-gray-400">
             Video manzili yo&apos;q
           </div>
         );
@@ -144,7 +144,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
     case "video": {
       if (!media.url)
         return (
-          <div className="h-full w-full flex items-center justify-center bg-gray-50 rounded-xl text-xs text-gray-400">
+          <div className="h-full w-full flex items-center justify-center bg-[var(--media)] rounded-xl text-xs text-gray-400">
             Video yo&apos;q
           </div>
         );
@@ -168,7 +168,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
       const embedId = parseTelegramEmbedId(ref);
       if (!embedId)
         return (
-          <div className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs text-gray-400">
+          <div className="w-full p-3 bg-[var(--media)] border border-gray-100 rounded-xl text-xs text-gray-400">
             Telegram post yo&apos;q
           </div>
         );
@@ -178,7 +178,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
     case "audio": {
       if (!media.url) return null;
       return (
-        <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+        <div className="p-3 bg-[var(--media)] border border-gray-100 rounded-xl">
           {media.posterUrl && (
             <img src={media.posterUrl} alt={media.title ?? "cover"} className="w-16 h-16 rounded-lg object-cover mb-2" loading="lazy" decoding="async" />
           )}
@@ -191,7 +191,7 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
     case "pdf": {
       if (!media.url) return null;
       return (
-        <a href={media.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+        <a href={media.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-[var(--media)] border border-gray-200 rounded-xl">
           <span className="text-xl" aria-hidden="true">📄</span>
           <span className="text-sm text-blue-600 truncate">{media.title ?? "PDF faylni ochish"}</span>
         </a>

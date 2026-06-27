@@ -91,7 +91,7 @@ export function ClinicPromotionsDropdown({ clinicId, tgid }: Props) {
     <div
       className="overflow-hidden"
       style={{
-        background: "linear-gradient(to bottom, #ffffff, rgba(239,246,255,0.4))",
+        background: "var(--surface)",
       }}
     >
       {/* Liquid top accent */}
@@ -183,7 +183,7 @@ function PromotionCard({ promotion: p }: { promotion: Promotion }) {
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98]"
             style={{
-              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+              background: "var(--elevated)",
               boxShadow: "0 2px 8px rgba(37,99,235,0.25)",
             }}
           >

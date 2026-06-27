@@ -12,11 +12,11 @@ function ShowcaseRatingStars({ value }: { value: number }) {
         const fill = Math.max(0, Math.min(1, v - i));
         return (
           <span key={i} className="relative inline-block w-3.5 h-3.5">
-            <svg viewBox="0 0 24 24" className="absolute inset-0 w-3.5 h-3.5" fill="#E5E7EB" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="absolute inset-0 w-3.5 h-3.5" style={{ fill: "var(--border)" }} aria-hidden="true">
               <path d="M12 17.27l5.18 3.04-1.37-5.88 4.55-3.94-6-.51L12 4l-2.36 5.97-6 .51 4.55 3.94-1.37 5.88z" />
             </svg>
             <span className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}>
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="#F59E0B" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" style={{ fill: "var(--star)" }} aria-hidden="true">
                 <path d="M12 17.27l5.18 3.04-1.37-5.88 4.55-3.94-6-.51L12 4l-2.36 5.97-6 .51 4.55 3.94-1.37 5.88z" />
               </svg>
             </span>

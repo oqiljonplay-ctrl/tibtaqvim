@@ -50,11 +50,11 @@ export function StarRating({
                   </clipPath>
                 )}
               </defs>
-              <path d={STAR_PATH} fill="#d1d5db" />
+              <path d={STAR_PATH} style={{ fill: "var(--border)" }} />
               {fraction > 0 && (
                 <path
                   d={STAR_PATH}
-                  fill="#f5b50a"
+                  style={{ fill: "var(--star)" }}
                   clipPath={fraction === 1 ? undefined : `url(#${clipId})`}
                 />
               )}
