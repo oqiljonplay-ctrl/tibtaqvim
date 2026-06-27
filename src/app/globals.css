@@ -121,23 +121,26 @@
    Admin/doctor/reception'ga TEGMAYDI (ularda atribut yo'q).
    ============================================================ */
 
-/* 1) Fallback (atribut yo'q paytda = kunduzgi qiymatlar) */
+/* Fallback = kunduzgi */
 :root{
-  --bg:#FCFCFD; --surface:#E3E7EB; --elevated:#CFD6DD; --media:#CED5DC;
-  --border:rgba(126,139,154,.23); --text:#191D22; --text-muted:#5C6772;
+  --bg:#FBFCFC; --surface:#E1E5E9; --elevated:#CCD4DB; --media:#E1E5E9;
+  --border:rgba(126,139,154,.24); --text:#191D22; --text-muted:#3E4A57;
   --star:#E0A92E; --on-tint:#FFFFFF;
+  --shadow-sm:0 1px 3px rgba(40,55,70,.10); --shadow-lg:0 12px 40px -8px rgba(40,55,70,.20);
 }
-/* 2) KUN (titan 50%) */
+/* KUN (titan 58%) */
 html[data-webapp-theme="light"]{
-  --bg:#FCFCFD; --surface:#E3E7EB; --elevated:#CFD6DD; --media:#CED5DC;
-  --border:rgba(126,139,154,.23); --text:#191D22; --text-muted:#5C6772;
+  --bg:#FBFCFC; --surface:#E1E5E9; --elevated:#CCD4DB; --media:#E1E5E9;
+  --border:rgba(126,139,154,.24); --text:#191D22; --text-muted:#3E4A57;
   --star:#E0A92E; --on-tint:#FFFFFF;
+  --shadow-sm:0 1px 3px rgba(40,55,70,.10); --shadow-lg:0 12px 40px -8px rgba(40,55,70,.20);
 }
-/* 3) TUN (oltin 50%) */
+/* TUN (oltin 62%) */
 html[data-webapp-theme="dark"]{
-  --bg:#131211; --surface:#2E2A20; --elevated:#463F2C; --media:#2D2612;
-  --border:rgba(212,175,55,.17); --text:#F4EFE3; --text-muted:#A79E89;
+  --bg:#141311; --surface:#332E21; --elevated:#4D452C; --media:#332E21;
+  --border:rgba(212,175,55,.19); --text:#F4EFE3; --text-muted:#CDBF9E;
   --star:#E8C24A; --on-tint:#1A1505;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.45); --shadow-lg:0 14px 44px -8px rgba(0,0,0,.62);
 }
 
 /* 4) Root fon — webapp faol paytda body ham tokеnga tushadi */
@@ -183,6 +186,59 @@ html[data-webapp-theme] .border-blue-500,
 html[data-webapp-theme] .border-blue-600{ border-color:var(--border)!important; }
 html[data-webapp-theme] .ring-blue-500{ --tw-ring-color:var(--border)!important; }
 
-/* DIQQAT: bg-blue-100 / bg-green-100 / bg-red-100 (pastel status badge),
-   yashil/qizil solid action (bg-green-600 / bg-red-600) va ularning matni
-   ATAYLAB remap QILINMAYDI — appointment statusi ma'nosi saqlanadi. */
+/* DIQQAT: bg-green-600/bg-red-600 action tugmalar — O'ZGARMAYDI.
+   Pastel pill fonlar TUN rejimida tokenga tushadi (quyida). */
+
+/* ====== YAGONA IMPLEMENTATSIYA qo'shimchalari ====== */
+
+/* (#2) GRADIENT FLATTEN — from-blue-* / from-gray-* gradientlarni tekis tatuvga */
+html[data-webapp-theme] .from-blue-600,
+html[data-webapp-theme] .from-blue-500,
+html[data-webapp-theme] .from-blue-700{
+  background-image:none!important; background-color:var(--elevated)!important;
+}
+html[data-webapp-theme] .from-gray-100,
+html[data-webapp-theme] .from-gray-50{
+  background-image:none!important; background-color:var(--elevated)!important;
+}
+
+/* (#3) QOPLANMAGAN PAST MATN */
+html[data-webapp-theme] .text-white\/50,
+html[data-webapp-theme] .text-blue-200,
+html[data-webapp-theme] .text-blue-300{ color:var(--text-muted)!important; }
+html[data-webapp-theme] .placeholder-blue-300::placeholder,
+html[data-webapp-theme] .placeholder-gray-400::placeholder,
+html[data-webapp-theme] .placeholder-gray-500::placeholder{ color:var(--text-muted)!important; opacity:1; }
+
+/* (#5) KARTA AJRALISHI — surface'ga yengil soya; modal/sheet katta soyasi saqlanadi */
+html[data-webapp-theme] .bg-white{ box-shadow:var(--shadow-sm); }
+html[data-webapp-theme] .shadow-xl,
+html[data-webapp-theme] .shadow-2xl{ box-shadow:var(--shadow-lg)!important; }
+
+/* STATUS PILL remap — TUN rejimida pastel fon → tiniq; rang ma'nosi saqlanadi */
+html[data-webapp-theme="dark"] .bg-green-50,
+html[data-webapp-theme="dark"] .bg-green-100{ background-color:rgba(52,211,153,.14)!important; }
+html[data-webapp-theme="dark"] .bg-blue-50,
+html[data-webapp-theme="dark"] .bg-blue-100{ background-color:rgba(96,165,250,.14)!important; }
+html[data-webapp-theme="dark"] .bg-red-50,
+html[data-webapp-theme="dark"] .bg-red-100{ background-color:rgba(248,113,113,.14)!important; }
+html[data-webapp-theme="dark"] .bg-yellow-50{ background-color:rgba(250,204,21,.14)!important; }
+html[data-webapp-theme="dark"] .bg-amber-50{ background-color:rgba(251,191,36,.14)!important; }
+
+/* Status matni — TUN: yorug' variant */
+html[data-webapp-theme="dark"] .text-green-700,
+html[data-webapp-theme="dark"] .text-green-800{ color:#6EE7B7!important; }
+html[data-webapp-theme="dark"] .text-red-600,
+html[data-webapp-theme="dark"] .text-red-700{ color:#FCA5A5!important; }
+html[data-webapp-theme="dark"] .text-yellow-700{ color:#FDE047!important; }
+html[data-webapp-theme="dark"] .text-amber-600,
+html[data-webapp-theme="dark"] .text-amber-700,
+html[data-webapp-theme="dark"] .text-amber-800{ color:#FCD34D!important; }
+html[data-webapp-theme="dark"] .text-blue-500{ color:#93C5FD!important; }
+
+/* Status chegaralari — TUN: token */
+html[data-webapp-theme="dark"] .border-green-200,
+html[data-webapp-theme="dark"] .border-blue-200,
+html[data-webapp-theme="dark"] .border-red-200,
+html[data-webapp-theme="dark"] .border-yellow-200,
+html[data-webapp-theme="dark"] .border-amber-200{ border-color:var(--border)!important; }
