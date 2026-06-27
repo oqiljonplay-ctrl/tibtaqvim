@@ -54,6 +54,29 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
   switch (media.kind) {
     case "image":
     case "gif": {
+      if (media.shape === "circle") {
+        if (imgBroken || !media.url) {
+          return (
+            <div
+              className={`${fill ? "h-full w-full" : "w-28 h-28"} rounded-full flex items-center justify-center bg-[var(--media)]`}
+              style={{ border: "1px solid var(--border)" }}
+            >
+              <span className="text-2xl" style={{ color: "var(--text-muted)" }}>👤</span>
+            </div>
+          );
+        }
+        return (
+          <img
+            src={media.url}
+            alt={media.title ?? ""}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgBroken(true)}
+            className={`${fill ? "h-full w-full" : "w-28 h-28"} rounded-full object-cover`}
+            style={{ border: "1px solid var(--border)" }}
+          />
+        );
+      }
       if (!media.url || imgBroken) {
         return (
           <div className="h-full w-full min-h-[100px] flex items-center justify-center bg-[var(--media)] border border-gray-100 rounded-xl">
@@ -61,29 +84,18 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
           </div>
         );
       }
-      if (media.shape === "circle") {
-        return (
-          <img
-            src={media.url}
-            alt={media.title ?? ""}
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgBroken(true)}
-            className={`${fill ? "h-full w-full" : "w-28 h-28"} rounded-full object-cover border border-gray-100`}
-          />
-        );
-      }
       if (transparent) {
         return (
-          <img
-            src={media.url}
-            alt={media.title ?? ""}
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgBroken(true)}
-            className={`${fillCls} object-contain bg-[var(--media)]`}
-            style={fill ? undefined : { maxHeight: 320 }}
-          />
+          <div className={`${fillCls} flex items-center justify-center bg-[var(--media)] rounded-xl overflow-hidden`}>
+            <img
+              src={media.url}
+              alt={media.title ?? ""}
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgBroken(true)}
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
         );
       }
       return (
