@@ -2,6 +2,7 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
 import { normalizePhone } from "@/lib/utils/phone";
+import { ThemeToggle } from "@/components/webapp/ThemeToggle";
 
 const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME || "tibtaqvim_bot";
 
@@ -253,7 +254,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
         <div
           ref={frontRef}
           style={{ ...faceBase, position: "absolute", top: 0, left: 0 }}
-          className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl px-4 py-3"
+          className="bg-[var(--elevated)] text-[var(--text)] rounded-2xl px-4 py-3"
         >
           {/* TEPA QATOR: chap bo'sh (avatar joyi), o'ng — sana + (ID + qalam) */}
           <div className="flex items-start justify-between gap-2">
@@ -264,6 +265,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
             <div className="flex flex-col items-end gap-1 shrink-0">
               <span className="text-[11px] leading-none text-white/80">{headerDate}</span>
               <div className="flex items-center gap-2">
+                <ThemeToggle />
                 {profile.tibId && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-white/20 rounded-full px-2 py-0.5 whitespace-nowrap">
                     🆔 {profile.tibId}
@@ -436,9 +438,9 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
                 className="w-full border border-white/30 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/60 appearance-none"
                 style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
               >
-                <option value="" style={{ color: "#1e3a5f" }}>— Tanlang —</option>
+                <option value="" style={{ color: "var(--text)" }}>— Tanlang —</option>
                 {UZ_REGIONS.map((r) => (
-                  <option key={r.name} value={r.name} style={{ color: "#1e3a5f" }}>
+                  <option key={r.name} value={r.name} style={{ color: "var(--text)" }}>
                     {r.name}
                   </option>
                 ))}
@@ -456,9 +458,9 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
                   className="w-full border border-white/30 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/60 appearance-none"
                   style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
                 >
-                  <option value="" style={{ color: "#1e3a5f" }}>— Tanlang —</option>
+                  <option value="" style={{ color: "var(--text)" }}>— Tanlang —</option>
                   {districts.map((d) => (
-                    <option key={d} value={d} style={{ color: "#1e3a5f" }}>
+                    <option key={d} value={d} style={{ color: "var(--text)" }}>
                       {d}
                     </option>
                   ))}
