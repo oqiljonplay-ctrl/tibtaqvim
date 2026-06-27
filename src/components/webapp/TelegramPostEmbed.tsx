@@ -41,7 +41,7 @@ export function TelegramPostEmbed({ embedId }: Props) {
           <div className="w-full h-full bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 animate-pulse" style={{ minHeight: 120 }} />
         </div>
       )}
-      <div ref={containerRef} className="w-full min-h-[120px]" />
+      <div ref={containerRef} style={{ marginTop: -54 }} className="w-full min-h-[120px]" />
     </div>
   );
 }
