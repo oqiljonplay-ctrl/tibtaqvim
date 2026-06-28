@@ -33,6 +33,7 @@ export function ShowcaseCoverflow({
   const rafRef = useRef<number | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [maxW, setMaxW] = useState(0);
+  const activeIdxRef = useRef(0);
 
   const intensityRef = useRef(intensity);
   intensityRef.current = intensity;
@@ -99,7 +100,10 @@ export function ShowcaseCoverflow({
       el.style.zIndex = String(100 - Math.round(ad * 20));
     });
 
-    setActiveIdx((p) => (p !== nearest ? nearest : p));
+    setActiveIdx((p) => {
+      if (p !== nearest) activeIdxRef.current = nearest;
+      return p !== nearest ? nearest : p;
+    });
   }, [reduced]);
 
   const onScroll = useCallback(() => {
@@ -126,6 +130,48 @@ export function ShowcaseCoverflow({
   useEffect(() => { applyTransforms(); }, [intensity, intensityExplicit, applyTransforms]);
 
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
+
+  // Bir silkinish = bitta item: touchmove/end orqali gorizontal chegaralash
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    let startX = 0, startY = 0, startScroll = 0;
+    let isHoriz: boolean | null = null;
+
+    const onStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startScroll = el.scrollLeft;
+      isHoriz = null;
+    };
+    const onMove = (e: TouchEvent) => {
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
+      if (!isHoriz) return; // vertikal — sahifa scrolliga ruxsat
+      e.preventDefault();
+      el.scrollLeft = startScroll - dx;
+      applyTransforms();
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!isHoriz) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      const dir = dx < 0 ? 1 : -1;
+      const next = Math.abs(dx) >= 25
+        ? Math.max(0, Math.min(media.length - 1, activeIdxRef.current + dir))
+        : activeIdxRef.current;
+      centerOn(next, true);
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+    };
+  }, [centerOn, applyTransforms, media.length]);
 
   // reduced-motion + user tanlamagan → transition ham o'chadi; user surgan bo'lsa yonadi
   const suppress = reduced && !intensityExplicit;
@@ -163,7 +209,8 @@ export function ShowcaseCoverflow({
                 width: w,
                 height: H,
                 scrollSnapAlign: "center",
-                transition: suppress ? undefined : "transform 0.25s ease, opacity 0.25s ease",
+                scrollSnapStop: "always",
+                transition: suppress ? undefined : "transform 0.5s ease, opacity 0.5s ease",
                 willChange: "transform, opacity",
                 backfaceVisibility: "hidden",
                 WebkitBackfaceVisibility: "hidden",
