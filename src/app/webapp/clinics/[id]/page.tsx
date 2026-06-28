@@ -39,10 +39,13 @@ export default function ClinicDetailPage() {
   const [clinic, setClinic] = useState<ClinicDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [autoRedirected, setAutoRedirected] = useState(false);
+  const [entryFromDashboard] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return sessionStorage.getItem("booking_entry") === "dashboard"; } catch { return false; }
+  });
 
   const goBack = () => {
-    const entry = sessionStorage.getItem("booking_entry");
-    if (entry === "dashboard") {
+    if (entryFromDashboard) {
       window.location.href = `/webapp?mode=dashboard&clinicId=${id}`;
     } else {
       router.push("/webapp/clinics");
@@ -64,16 +67,29 @@ export default function ClinicDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // 1 ta filial bo'lsa — avtomatik xizmatlar sahifasiga o'tish
+  // booking_entry tokenini bir marta o'qib darhol tozalaymiz (stale qiymat qolmasin):
   useEffect(() => {
-    if (clinic && clinic.branches.length === 1 && !autoRedirected) {
+    try { sessionStorage.removeItem("booking_entry"); } catch {}
+  }, []);
+
+  // Avtomatik redirect: "Tanlash" orqali → my-clinics; "Yangi bron" + 1 filial → booking:
+  useEffect(() => {
+    if (!clinic || autoRedirected) return;
+
+    if (!entryFromDashboard) {
+      setAutoRedirected(true);
+      router.replace("/webapp/my-clinics");
+      return;
+    }
+
+    if (clinic.branches.length === 1) {
       setAutoRedirected(true);
       sessionStorage.setItem("selectedClinicId", id);
       sessionStorage.setItem("selectedBranchId", clinic.branches[0].id);
       sessionStorage.setItem("branch_shown", "0");
       router.replace(`/webapp/clinics/${id}/branches/${clinic.branches[0].id}`);
     }
-  }, [clinic, id, router, autoRedirected]);
+  }, [clinic, id, router, autoRedirected, entryFromDashboard]);
 
   function selectBranch(branchId: string) {
     sessionStorage.setItem("selectedClinicId", id);
@@ -99,11 +115,11 @@ export default function ClinicDetailPage() {
     );
   }
 
-  // 1 ta filial bo'lsa redirecting ko'rsatamiz
-  if (clinic.branches.length === 1) {
+  // "Tanlash" orqali kelsa yoki 1 filial bo'lsa — yo'naltirish ekrani (useEffect redirect qiladi):
+  if (!entryFromDashboard || clinic.branches.length === 1) {
     return (
-      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-400 text-sm animate-pulse">Yo&apos;naltirilmoqda...</p>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <p style={{ color: "var(--text-muted)" }} className="text-sm animate-pulse">Yo&apos;naltirilmoqda...</p>
       </div>
     );
   }
