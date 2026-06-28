@@ -10,10 +10,10 @@ import {
   showcaseAspectRatio,
 } from "@/lib/showcase/types";
 
-const ROTATE = 28;       // prototip
-const SCALE_DROP = 0.18;
-const TRANSLATE_Z = 110;
-const OPACITY_DROP = 0.36;
+const ROTATE = 34;          // 3D burilish kuchaytirildi
+const SCALE_DROP = 0.21;    // yon kartalar ozgina kichikroq → chuqurlik
+const TRANSLATE_Z = 135;    // orqaga ko'proq surilish
+const OPACITY_DROP = 0.40;  // yon kartalar ozgina xiraroq → chuqurlik
 const WIDTH_CAP_RATIO = 0.98;
 
 export function ShowcaseCoverflow({
@@ -34,6 +34,10 @@ export function ShowcaseCoverflow({
   const [activeIdx, setActiveIdx] = useState(0);
   const [maxW, setMaxW] = useState(0);
   const activeIdxRef = useRef(0);
+  const draggingRef = useRef(false);   // drag faol — onScroll'ni qulflaydi
+  const animatingRef = useRef(false);  // rAF settle faol — onScroll'ni qulflaydi
+  const animRafRef = useRef<number | null>(null);
+  const idleRef = useRef<number | null>(null); // desktop scroll-idle snap
 
   const intensityRef = useRef(intensity);
   intensityRef.current = intensity;
@@ -66,6 +70,7 @@ export function ShowcaseCoverflow({
     [H, maxW]
   );
 
+  // 1. applyTransforms — scrollLeft dan o'qib, har elementga inline style beradi
   const applyTransforms = useCallback(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -82,7 +87,6 @@ export function ShowcaseCoverflow({
       const ad = Math.min(Math.abs(dist), 2);
       if (Math.abs(dist) < nearestDist) { nearestDist = Math.abs(dist); nearest = i; }
 
-      // tizim reduced + user TANLAMAGAN bo'lsagina bostir; user surgan bo'lsa uning tanlovi ustun
       const flat = k === 0 || (reduced && !explicitRef.current);
       if (flat) {
         el.style.transform = "";
@@ -95,7 +99,7 @@ export function ShowcaseCoverflow({
       const scale = 1 - Math.min(ad, 1) * SCALE_DROP * k;
       const tz = -ad * TRANSLATE_Z * k;
       const opacity = 1 - Math.min(ad, 1) * OPACITY_DROP;
-      el.style.transform = `perspective(1150px) rotateY(${rot.toFixed(1)}deg) translateZ(${tz.toFixed(1)}px) scale(${scale.toFixed(3)})`;
+      el.style.transform = `perspective(1100px) rotateY(${rot.toFixed(1)}deg) translateZ(${tz.toFixed(1)}px) scale(${scale.toFixed(3)})`;
       el.style.opacity = opacity.toFixed(3);
       el.style.zIndex = String(100 - Math.round(ad * 20));
     });
@@ -106,19 +110,72 @@ export function ShowcaseCoverflow({
     });
   }, [reduced]);
 
-  const onScroll = useCallback(() => {
-    if (rafRef.current != null) return;
-    rafRef.current = requestAnimationFrame(() => { rafRef.current = null; applyTransforms(); });
+  // 2. animateTo — 0.5s easeOutQuart rAF settle, scrollTo o'rniga
+  const animateTo = useCallback((i: number) => {
+    const sc = scrollerRef.current;
+    const el = itemRefs.current[i];
+    if (!sc || !el) return;
+    if (animRafRef.current != null) { cancelAnimationFrame(animRafRef.current); animRafRef.current = null; }
+
+    const from = sc.scrollLeft;
+    const to = el.offsetLeft + el.offsetWidth / 2 - sc.clientWidth / 2;
+    const dist = to - from;
+
+    if (Math.abs(dist) < 0.5) {
+      sc.scrollLeft = to;
+      applyTransforms();
+      animatingRef.current = false;
+      activeIdxRef.current = i;
+      setActiveIdx(i);
+      return;
+    }
+
+    const DURATION = 500; // 0.5s — SAQLANDI
+    const t0 = performance.now();
+    animatingRef.current = true;
+
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / DURATION);
+      const e = 1 - Math.pow(1 - t, 4); // easeOutQuart — silliqlik kuchaytirildi
+      sc.scrollLeft = from + dist * e;
+      applyTransforms();
+      if (t < 1) {
+        animRafRef.current = requestAnimationFrame(step);
+      } else {
+        animRafRef.current = null;
+        animatingRef.current = false;
+        activeIdxRef.current = i;
+        setActiveIdx(i);
+      }
+    };
+    animRafRef.current = requestAnimationFrame(step);
   }, [applyTransforms]);
 
+  // 3. onScroll — drag/animating paytida o'tkazib yuboriladi; desktop idle snap
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const onScroll = useCallback(() => {
+    if (draggingRef.current || animatingRef.current) return;
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => { rafRef.current = null; applyTransforms(); });
+    if (idleRef.current != null) clearTimeout(idleRef.current);
+    idleRef.current = window.setTimeout(() => {
+      if (draggingRef.current || animatingRef.current) return;
+      animateTo(activeIdxRef.current);
+    }, 140);
+  }, [applyTransforms]); // animateTo dep'ga qo'shilmaydi — loop oldini olish uchun
+
+  // 4. centerOn — smooth yo'li animateTo ga, instant yo'li to'g'ridan-to'g'ri
   const centerOn = useCallback((i: number, smooth: boolean) => {
     const el = itemRefs.current[i];
     const sc = scrollerRef.current;
     if (!el || !sc) return;
+    if (smooth) { animateTo(i); return; }
     const target = el.offsetLeft + el.offsetWidth / 2 - sc.clientWidth / 2;
-    if (smooth) sc.scrollTo({ left: target, behavior: "smooth" });
-    else sc.scrollLeft = target;
-  }, []);
+    sc.scrollLeft = target;
+    applyTransforms();
+    activeIdxRef.current = i;
+    setActiveIdx(i);
+  }, [animateTo, applyTransforms]);
 
   // Re-center: o'lcham/media/kenglik o'zgarsa (intensity'ga BOG'LIQ EMAS)
   useLayoutEffect(() => {
@@ -129,54 +186,90 @@ export function ShowcaseCoverflow({
   // Slider o'zgarsa: faqat transformlarni qayta qo'llash (re-center YO'Q)
   useEffect(() => { applyTransforms(); }, [intensity, intensityExplicit, applyTransforms]);
 
-  useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
+  // Cleanup: barcha rAF va timeout
+  useEffect(() => () => {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    if (animRafRef.current != null) cancelAnimationFrame(animRafRef.current);
+    if (idleRef.current != null) clearTimeout(idleRef.current);
+  }, []);
 
-  // Bir silkinish = bitta item: touchmove/end orqali gorizontal chegaralash
+  // 5. Touch handlerlari — qat'iy ±1, startIdx touchstart da qullflangan
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
-    let startX = 0, startY = 0, startScroll = 0;
+
+    let startX = 0, startY = 0, startScroll = 0, startIdx = 0;
+    let lowBound = 0, highBound = 0;
     let isHoriz: boolean | null = null;
 
+    const scrollForIdx = (i: number) => {
+      const it = itemRefs.current[i];
+      if (!it) return el.scrollLeft;
+      return it.offsetLeft + it.offsetWidth / 2 - el.clientWidth / 2;
+    };
+
     const onStart = (e: TouchEvent) => {
+      if (animRafRef.current != null) { cancelAnimationFrame(animRafRef.current); animRafRef.current = null; }
+      animatingRef.current = false;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       startScroll = el.scrollLeft;
+      startIdx = activeIdxRef.current; // ← QULFLANDI (settle/drag drift'iga tegmaydi)
+      const minus = scrollForIdx(Math.max(0, startIdx - 1));
+      const plus  = scrollForIdx(Math.min(media.length - 1, startIdx + 1));
+      lowBound = Math.min(minus, plus);
+      highBound = Math.max(minus, plus);
       isHoriz = null;
     };
+
     const onMove = (e: TouchEvent) => {
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
-      if (!isHoriz) return; // vertikal — sahifa scrolliga ruxsat
+      if (isHoriz === null) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return; // mayda titrashga reaksiya yo'q
+        isHoriz = Math.abs(dx) > Math.abs(dy);
+      }
+      if (!isHoriz) return; // vertikal — sahifa scroll'iga tegmaydi
       e.preventDefault();
-      el.scrollLeft = startScroll - dx;
-      applyTransforms();
+      draggingRef.current = true;
+
+      let target = startScroll - dx;
+      // Rubber-band: startIdx∓1 chegarasidan tashqariga chiqmasin
+      if (target < lowBound) target = lowBound - (lowBound - target) / 3;
+      else if (target > highBound) target = highBound + (target - highBound) / 3;
+
+      el.scrollLeft = target;
+      applyTransforms(); // sinkron; onScroll guard tufayli ikkilanmaydi
     };
+
     const onEnd = (e: TouchEvent) => {
-      if (!isHoriz) return;
+      const wasDragging = draggingRef.current;
+      draggingRef.current = false;
+      if (!isHoriz || !wasDragging) { isHoriz = null; return; }
+
       const dx = e.changedTouches[0].clientX - startX;
-      const dir = dx < 0 ? 1 : -1;
-      const next = Math.abs(dx) >= 25
-        ? Math.max(0, Math.min(media.length - 1, activeIdxRef.current + dir))
-        : activeIdxRef.current;
-      centerOn(next, true);
+      let next = startIdx; // ← qulflangan startIdx'dan, JONLI holatdan EMAS
+      if (Math.abs(dx) >= 25) {
+        const dir = dx < 0 ? 1 : -1;
+        next = Math.max(0, Math.min(media.length - 1, startIdx + dir)); // QAT'IY ±1
+      }
+      isHoriz = null;
+      animateTo(next); // 0.5s glide markazgacha
     };
 
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchmove", onMove, { passive: false });
     el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
     return () => {
       el.removeEventListener("touchstart", onStart);
       el.removeEventListener("touchmove", onMove);
       el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
     };
-  }, [centerOn, applyTransforms, media.length]);
+  }, [animateTo, applyTransforms, media.length]);
 
-  // reduced-motion + user tanlamagan → transition ham o'chadi; user surgan bo'lsa yonadi
-  const suppress = reduced && !intensityExplicit;
-
-  // Aniq markazlash uchun chet elementlar kengligi (FIX 1)
+  // Aniq markazlash uchun chet elementlar kengligi
   const firstW = media.length ? dims(media[0]).w : 0;
   const lastW = media.length ? dims(media[media.length - 1]).w : 0;
 
@@ -187,8 +280,8 @@ export function ShowcaseCoverflow({
         onScroll={onScroll}
         className="flex items-center gap-2 overflow-x-auto scrollbar-hide"
         style={{
-          scrollSnapType: single ? "none" : "x mandatory",
-          touchAction: "pan-x pan-y",
+          scrollSnapType: "none",            // snap to'liq JS'da — native bilan kurashmaydi
+          touchAction: "pan-y",              // gorizontalni biz boshqaramiz, vertikalni browser
           overflowY: "hidden",
           overscrollBehaviorX: "contain",
           paddingLeft: `calc(50% - ${firstW / 2}px)`,
@@ -208,9 +301,7 @@ export function ShowcaseCoverflow({
               style={{
                 width: w,
                 height: H,
-                scrollSnapAlign: "center",
-                scrollSnapStop: "always",
-                transition: suppress ? undefined : "transform 0.5s ease, opacity 0.5s ease",
+                transition: "none",               // JS har frame'da boshqaradi — CSS transition qaltirash beradi
                 willChange: "transform, opacity",
                 backfaceVisibility: "hidden",
                 WebkitBackfaceVisibility: "hidden",
