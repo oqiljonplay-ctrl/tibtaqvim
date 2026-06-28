@@ -267,6 +267,7 @@ model Doctor {
   @@unique([userId, clinicId])
   @@index([clinicId])
   @@index([employeeId])
+  @@index([branchId])
   @@map("doctors")
 }
 
@@ -383,6 +384,7 @@ model Staff {
   @@unique([userId, clinicId])
   @@index([clinicId])
   @@index([employeeId])
+  @@index([branchId])
   @@map("staff")
 }
 
@@ -597,6 +599,9 @@ model Appointment {
   @@index([dependentId, clinicId, status])
   @@index([date, status])
   @@index([liveStatus, liveExpiresAt], map: "appointments_live_active_idx")
+  @@index([branchId])
+  @@index([slotId])
+  @@index([staffId])
   @@map("appointments")
 }
 
@@ -618,6 +623,8 @@ model Slot {
   appointments Appointment[]
 
   @@index([clinicId, serviceId, date])
+  @@index([branchId])
+  @@index([serviceId])
   @@map("slots")
 }
 
@@ -746,6 +753,7 @@ model Payment {
   @@index([appointmentId])
   @@index([clinicId, state])
   @@index([state, createdAt])
+  @@index([userId])
   @@map("payments")
 }
 
@@ -950,6 +958,8 @@ model EmploymentStint {
 
   @@index([employeeId])
   @@index([clinicId])
+  @@index([doctorId])
+  @@index([staffId])
   @@map("employment_stints")
 }
 
@@ -977,6 +987,7 @@ model DoctorRating {
   @@index([clinicId])
   @@index([userId])
   @@index([createdAt])
+  @@index([doctorId])
   @@map("doctor_ratings")
 }
 
