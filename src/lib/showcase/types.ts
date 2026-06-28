@@ -71,7 +71,7 @@ export function showcaseAspectRatio(m: {
 }
 
 /** Coverflow'da ko'rsatiladigan "ramkali vizual" kindlar. Qolganlari pastda stack. */
-export const GALLERY_KINDS = ["image", "gif", "youtube", "video"] as const;
+export const GALLERY_KINDS = ["image", "gif", "youtube", "video", "telegram"] as const;
 export function isGalleryKind(k: string): boolean {
   return (GALLERY_KINDS as readonly string[]).includes(k);
 }

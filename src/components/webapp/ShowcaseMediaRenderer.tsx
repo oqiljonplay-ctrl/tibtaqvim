@@ -184,6 +184,14 @@ export function ShowcaseMediaRenderer({ media, active = true, fill = false }: Pr
             Telegram post yo&apos;q
           </div>
         );
+      // fill=true (coverflow ichida): parent rounded-xl overflow-hidden clip qiladi
+      if (fill) {
+        return (
+          <div className="absolute inset-0 overflow-hidden">
+            <TelegramPostEmbed embedId={embedId} />
+          </div>
+        );
+      }
       return <TelegramPostEmbed embedId={embedId} />;
     }
 
