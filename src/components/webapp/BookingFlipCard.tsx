@@ -310,6 +310,7 @@ export function BookingFlipCard({ appointment: a, onRebook, onCancel, cancelling
           transformStyle: "preserve-3d",
           transition: "transform 0.65s ease",
           transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          willChange: "transform",
         }}
       >
 
