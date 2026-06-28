@@ -132,6 +132,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
         if (data?.data?.phone) {
           pollingRef.current = false;
           setPollingForPhone(false);
+          setShowPhoneInput(false);
           onUpdated({ phone: data.data.phone, firstName: data.data.firstName });
           onPhoneAdded?.(data.data.phone);
           return;
@@ -152,6 +153,15 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
     setShowPhoneInput(true);
   }
 
+  // Telefon paydo bo'lganda qo'lda-kiritish/polling holatini tozalaymiz:
+  useEffect(() => {
+    if (profile.phone) {
+      setShowPhoneInput(false);
+      pollingRef.current = false;
+      setPollingForPhone(false);
+    }
+  }, [profile.phone]);
+
   function handleRequestContact() {
     const tg = (window as any).Telegram?.WebApp;
 
@@ -170,7 +180,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
             "";
 
           if (isSent && phone) {
-            const norm = normalizePhone(phone);
+            const norm = normalizePhone(phone) || normalizePhone("+" + phone);
             if (norm) { savePhone(norm, firstName); } else { setShowPhoneInput(true); }
           } else if (isSent) {
             // Bot webhook orqali oladi → polling
@@ -240,7 +250,7 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
 
   return (
     // perspective konteyner — balandlikni aktiv yuzga mos qil
-    <div className="rounded-2xl overflow-hidden" style={{ perspective: "1200px" }}>
+    <div className="rounded-2xl" style={{ perspective: "1200px" }}>
       <div
         style={{
           position: "relative",
@@ -248,12 +258,13 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
           transition: "transform 0.6s ease, height 0.45s ease",
           transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
           height: containerHeight || undefined,
+          willChange: "transform",
         }}
       >
         {/* ── FRONT YUZ — compact profil (3 qator) ── */}
         <div
           ref={frontRef}
-          style={{ ...faceBase, position: "absolute", top: 0, left: 0 }}
+          style={{ ...faceBase, position: "absolute", top: 0, left: 0, transform: "translateZ(0)" }}
           className="bg-[var(--elevated)] text-[var(--text)] rounded-2xl px-4 py-3"
         >
           {/* TEPA QATOR: chap bo'sh (avatar joyi), o'ng — sana + (ID + qalam) */}
