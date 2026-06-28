@@ -108,7 +108,7 @@ function getTelegramId(tg: any): string | null {
 }
 
 // SDK yuklanishini kutadi — beforeInteractive nested layoutda ishlamasligi mumkin
-function waitForTelegramSDK(timeoutMs = 3000): Promise<any> {
+function waitForTelegramSDK(timeoutMs = 1200): Promise<any> {
   return new Promise((resolve) => {
     if (window.Telegram?.WebApp) return resolve(window.Telegram.WebApp);
     const start = Date.now();
@@ -120,7 +120,7 @@ function waitForTelegramSDK(timeoutMs = 3000): Promise<any> {
         clearInterval(interval);
         resolve(null);
       }
-    }, 50);
+    }, 30);
   });
 }
 

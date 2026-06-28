@@ -8,13 +8,13 @@ declare global { interface Window { Telegram?: { WebApp?: any } } }
 interface Dependent { id: string; firstName: string; lastName: string | null; phone: string | null; relation: string | null }
 interface Profile { id: string; fullName: string; firstName: string; lastName: string | null; phone: string | null; tibId: string | null; dependents: Dependent[]; canAddDependent: boolean }
 
-function waitForTG(ms = 3000): Promise<any> {
+function waitForTG(ms = 1200): Promise<any> {
   return new Promise((res) => {
     if (window.Telegram?.WebApp) return res(window.Telegram.WebApp);
     const s = Date.now(), t = setInterval(() => {
       if (window.Telegram?.WebApp) { clearInterval(t); res(window.Telegram.WebApp); }
       else if (Date.now() - s > ms) { clearInterval(t); res(null); }
-    }, 50);
+    }, 30);
   });
 }
 

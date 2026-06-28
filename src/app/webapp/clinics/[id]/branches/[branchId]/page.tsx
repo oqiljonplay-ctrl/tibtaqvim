@@ -28,10 +28,10 @@ function getTelegramId(tg: any): string | null {
   try { const u = JSON.parse(decodeURIComponent(new URLSearchParams(tg.initData || "").get("user") || "")); if (u?.id) return String(u.id); } catch {}
   return null;
 }
-function waitForTG(ms = 3000): Promise<any> {
+function waitForTG(ms = 1200): Promise<any> {
   return new Promise((res) => {
     if (window.Telegram?.WebApp) return res(window.Telegram.WebApp);
-    const s = Date.now(), t = setInterval(() => { if (window.Telegram?.WebApp) { clearInterval(t); res(window.Telegram.WebApp); } else if (Date.now() - s > ms) { clearInterval(t); res(null); } }, 50);
+    const s = Date.now(), t = setInterval(() => { if (window.Telegram?.WebApp) { clearInterval(t); res(window.Telegram.WebApp); } else if (Date.now() - s > ms) { clearInterval(t); res(null); } }, 30);
   });
 }
 
@@ -97,19 +97,7 @@ export default function BranchServicesPage() {
       setTelegramId(tgId);
       if (tg?.initDataUnsafe?.user?.first_name) setForm((f) => ({ ...f, name: f.name || tg.initDataUnsafe.user.first_name }));
 
-      if (tgId) {
-        try {
-          const r = await fetch(`/api/user/by-telegram?telegramId=${tgId}`);
-          const j = await r.json();
-          if (j.success && j.data) {
-            tgUserRef.current = j.data;
-            setTgUser(j.data);
-            setForm((f) => ({ ...f, name: j.data.fullName || j.data.firstName || f.name, phone: f.phone || j.data.phone || "" }));
-          }
-        } catch {}
-      }
-
-      // Clinic name olish
+      // Clinic info (fire-and-forget)
       fetch(`/api/clinics/${clinicId}`)
         .then((r) => r.json())
         .then((j) => { if (j.success && j.data?.name) setClinicName(j.data.name); })
@@ -121,10 +109,25 @@ export default function BranchServicesPage() {
         .then((j) => { if (j.success && j.data) setClinicSchedule(j.data); })
         .catch(() => {});
 
-      setLoading(true);
+      // User + services parallel (sequential emas — ~300ms tejash)
+      const [userRes, servicesRes] = await Promise.all([
+        tgId ? fetch(`/api/user/by-telegram?telegramId=${tgId}`) : Promise.resolve(null),
+        fetch(`/api/services?clinicId=${clinicId}&branchId=${branchId}&date=${todayStr()}`),
+      ]);
+
+      if (userRes) {
+        try {
+          const j = await userRes.json();
+          if (j.success && j.data) {
+            tgUserRef.current = j.data;
+            setTgUser(j.data);
+            setForm((f) => ({ ...f, name: j.data.fullName || j.data.firstName || f.name, phone: f.phone || j.data.phone || "" }));
+          }
+        } catch {}
+      }
+
       try {
-        const r = await fetch(`/api/services?clinicId=${clinicId}&branchId=${branchId}&date=${todayStr()}`);
-        const j = await r.json();
+        const j = await servicesRes.json();
         if (j.success) setServices(j.data);
         else setErr(j.error?.message ?? "Xizmatlarni yuklashda xatolik");
       } catch { setErr("Tarmoq xatosi"); }
