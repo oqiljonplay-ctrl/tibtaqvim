@@ -30,14 +30,9 @@ export async function showBranchOrService(
 
   if (branches.length === 1) {
     // Auto-skip branch selection
-    await userState.set(chatId, {
-      ...state,
-      clinicId,
-      branchId:  branches[0].id,
-      step:      "select_service",
-      _createdAt: Date.now(),
-    });
-    return showServiceSelection(bot, chatId, clinicId, branches[0].id, msgId);
+    const autoState = { ...state, clinicId, branchId: branches[0].id, step: "select_service", _createdAt: Date.now() };
+    await userState.set(chatId, autoState);
+    return showServiceSelection(bot, chatId, clinicId, branches[0].id, msgId, autoState);
   }
 
   const newMsgId = await editOrSend(
@@ -64,9 +59,10 @@ export async function showServiceSelection(
   chatId: number,
   clinicId: string,
   branchId: string,
-  msgId?: number
+  msgId?: number,
+  passedState?: Record<string, any>
 ) {
-  const state = await userState.get(chatId) ?? {};
+  const state = passedState ?? await userState.get(chatId) ?? {};
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
 
   const { services } = await fetchServices(clinicId, today, branchId);
@@ -117,8 +113,9 @@ export async function handleBranchCallback(
   msgId?: number
 ) {
   const state = await userState.get(chatId) ?? {};
-  await userState.set(chatId, { ...state, branchId, step: "select_service" });
-  return showServiceSelection(bot, chatId, state.clinicId, branchId, msgId);
+  const nextState = { ...state, branchId, step: "select_service" };
+  await userState.set(chatId, nextState);
+  return showServiceSelection(bot, chatId, state.clinicId, branchId, msgId, nextState);
 }
 
 /**

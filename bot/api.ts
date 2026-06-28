@@ -1,8 +1,9 @@
-// HTTP calls: only for booking and services (business logic lives in API routes)
-// Direct DB: all user operations — avoids self-referential HTTP timeout issues on Vercel
+// HTTP calls: only for booking and slots (business logic lives in API routes)
+// Direct DB: user ops + services — avoids self-referential HTTP cold start on Vercel
 import { getOrCreateUser } from "@/lib/services/user.service";
 import { prisma } from "@/lib/prisma";
 import { assignTibId } from "@/lib/services/tib-id.service";
+import { getClinicServices } from "@/lib/queries/getClinicServices";
 
 const API_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -11,17 +12,13 @@ export async function fetchServices(
   date?: string,
   branchId?: string
 ): Promise<{ services: any[]; enableWebapp: boolean }> {
-  const url = new URL(`${API_URL}/api/services`);
-  url.searchParams.set("clinicId", clinicId);
-  if (date) url.searchParams.set("date", date);
-  if (branchId) url.searchParams.set("branchId", branchId);
-
-  const res = await fetch(url.toString());
-  const json = await res.json();
-  return {
-    services: json.success ? json.data : [],
-    enableWebapp: json.enableWebapp ?? true,
-  };
+  // To'g'ridan DB — HTTP hop, DNS, TLS, cold start YO'Q
+  const result = await getClinicServices({
+    clinicId,
+    branchId: branchId ?? null,
+    date: date ?? null,
+  });
+  return { services: result.data, enableWebapp: result.enableWebapp };
 }
 
 export async function fetchDoctors(clinicId: string) {
