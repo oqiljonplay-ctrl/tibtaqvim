@@ -24,6 +24,9 @@ export function TelegramPostEmbed({ embedId }: Props) {
     script.setAttribute("data-width", "100%");
     script.setAttribute("data-color", "2563EB");
     script.setAttribute("data-dark-color", "1d4ed8");
+    const isDark = typeof document !== "undefined"
+      && document.documentElement.getAttribute("data-webapp-theme") === "dark";
+    script.setAttribute("data-dark", isDark ? "1" : "0");
     script.onload = () => setLoaded(true);
 
     container.appendChild(script);
@@ -34,14 +37,17 @@ export function TelegramPostEmbed({ embedId }: Props) {
   }, [embedId]);
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden border border-gray-100">
+    <div className="relative w-full rounded-2xl overflow-hidden border border-[var(--border)]">
       {/* Skeleton shimmer */}
       {!loaded && (
         <div className="absolute inset-0 z-10 rounded-2xl overflow-hidden">
-          <div className="w-full h-full bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 animate-pulse" style={{ minHeight: 120 }} />
+          <div
+            className="w-full h-full bg-gradient-to-r from-[var(--elevated)] via-[var(--surface)] to-[var(--elevated)] animate-pulse"
+            style={{ minHeight: 120 }}
+          />
         </div>
       )}
-      <div ref={containerRef} style={{ marginTop: -54 }} className="w-full min-h-[120px]" />
+      <div ref={containerRef} style={{ marginTop: -54, marginBottom: -32 }} className="w-full min-h-[120px]" />
     </div>
   );
 }
