@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useClinic, type Clinic } from '@/lib/clinic-context'
 import { ClinicLogo } from '@/components/ClinicLogo'
 import { Container, Stack } from '@/components/layout'
+import { useTelegramBack } from '@/lib/use-telegram-back'
 
 export default function MyClinicsPage() {
   const router = useRouter()
   const { clinic: current, setClinic } = useClinic()
+  useTelegramBack(() => router.push('/webapp?mode=dashboard'), true)
   const [clinics, setClinics] = useState<Clinic[]>([])
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)

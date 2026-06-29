@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useClinic } from '@/lib/clinic-context'
+import { useTelegramBack } from '@/lib/use-telegram-back'
 import { AppointmentCard, type HistoryAppointment } from '@/components/webapp/AppointmentCard'
 import { HistoryFilters, type FilterState } from './HistoryFilters'
 import { Container, ResponsiveGrid } from '@/components/layout'
@@ -108,6 +109,17 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, clinicId, filters, telegramId])
 
+  const goHome = useCallback(() => {
+    const params = new URLSearchParams(window.location.search)
+    const qs = new URLSearchParams()
+    const cId = params.get('clinic'); const tgid = params.get('tgid')
+    if (cId) qs.set('clinic', cId)
+    if (tgid) qs.set('tgid', tgid)
+    qs.set('mode', 'dashboard')
+    window.location.href = `/webapp?${qs}`
+  }, [])
+  useTelegramBack(goHome, true)
+
   if (clinicLoading) {
     return (
       <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
@@ -121,7 +133,8 @@ export default function HistoryPage() {
 
   if (!clinic) {
     return (
-      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center relative">
+        <button onClick={goHome} className="absolute top-4 left-4 text-2xl text-blue-600" aria-label="Orqaga">←</button>
         <div className="text-center p-6 text-gray-500">
           <div className="text-3xl mb-2">🏥</div>
           <p>Klinika tanlanmagan</p>

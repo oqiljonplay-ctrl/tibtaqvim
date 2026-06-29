@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container, Stack } from "@/components/layout";
+import { useTelegramBack } from "@/lib/use-telegram-back";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
 
@@ -20,6 +21,7 @@ function waitForTG(ms = 1200): Promise<any> {
 
 export default function ProfilePage() {
   const router = useRouter();
+  useTelegramBack(() => router.push('/webapp?mode=dashboard'), true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [telegramId, setTelegramId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
