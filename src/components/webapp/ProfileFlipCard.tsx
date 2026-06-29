@@ -5,6 +5,8 @@ import { normalizePhone } from "@/lib/utils/phone";
 import { ThemeToggle } from "@/components/webapp/ThemeToggle";
 
 const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME || "tibtaqvim_bot";
+// B qaror: bittada-ulanish. Qo'lda kiritish UI yashirildi (kod saqlandi — kerak bo'lsa false→true).
+const SHOW_MANUAL_PHONE_FALLBACK = false;
 
 /** Matnni konteynerga bir qatorga sig'dirish: maxPx dan minPx gacha kichraytiradi.
  *  minPx da ham sig'masa — CSS ellipsis ("…") ishlaydi. */
@@ -319,10 +321,12 @@ export function ProfileFlipCard({ profile, telegramId, headerDate, onUpdated, on
               </div>
             ) : pollingForPhone ? (
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <span className="text-xs text-white/80 animate-pulse">⏳ Botda tasdiqlang...</span>
-                <button onClick={cancelPolling} className="text-xs text-white/60 underline">
-                  Qo&apos;lda kiritish
-                </button>
+                <span className="text-xs text-white/80 animate-pulse">📞 Telefon ulanmoqda…</span>
+                {SHOW_MANUAL_PHONE_FALLBACK && (
+                  <button onClick={cancelPolling} className="text-xs text-white/60 underline">
+                    Qo&apos;lda kiritish
+                  </button>
+                )}
               </div>
             ) : showPhoneInput ? (
               <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
