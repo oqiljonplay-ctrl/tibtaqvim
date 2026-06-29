@@ -1,5 +1,5 @@
 "use client";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Calendar } from "@/components/Calendar";
 import { formatDateLabel } from "@/lib/calendar";
@@ -38,6 +38,8 @@ function waitForTG(ms = 1200): Promise<any> {
 export default function BranchServicesPage() {
   const { id: clinicId, branchId } = useParams<{ id: string; branchId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const intent = searchParams.get("intent") || "booking";
 
   const [step, setStep]             = useState<BookingStep>("services");
   const [services, setServices]     = useState<Service[]>([]);
@@ -243,8 +245,7 @@ export default function BranchServicesPage() {
         if (sessionStorage.getItem("branch_shown") === "1") {
           router.push(`/webapp/clinics/${clinicId}`);
         } else {
-          const entry = sessionStorage.getItem("booking_entry");
-          window.location.href = entry === "dashboard"
+          window.location.href = intent === "booking"
             ? `/webapp?mode=dashboard&clinicId=${clinicId}`
             : `/webapp/clinics`;
         }
@@ -259,7 +260,6 @@ export default function BranchServicesPage() {
     }
   };
   const goHome = () => {
-    sessionStorage.removeItem("booking_entry");
     sessionStorage.removeItem("branch_shown");
     window.location.href = `/webapp?mode=dashboard&clinicId=${clinicId}`;
   };

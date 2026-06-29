@@ -33,6 +33,8 @@ export default function ClinicsPage() {
   const [selecting, setSelecting] = useState<string | null>(null);
 
   const nextPath = searchParams.get("next");
+  const intent = searchParams.get("intent") || "booking";   // aniq niyat; default booking
+  const tgid = searchParams.get("tgid");
 
   const goHome = () => { window.location.href = `/webapp?mode=dashboard`; };
   const nativeBackOk = useTelegramBack(goHome, true);
@@ -65,13 +67,11 @@ export default function ClinicsPage() {
       phone: c.phone,
       rating: c.rating,
     });
-    if (nextPath) {
-      const target = nextPath.includes("?")
-        ? `${nextPath}&clinic=${c.id}`
-        : `${nextPath}?clinic=${c.id}`;
-      router.push(target);
+    const tgq = tgid ? `&tgid=${encodeURIComponent(tgid)}` : "";
+    if (intent === "select") {
+      router.push(`/webapp?mode=dashboard${tgq}`);
     } else {
-      router.push(`/webapp/clinics/${c.id}`);
+      router.push(`/webapp/clinics/${c.id}?intent=booking${tgq}`);
     }
   }
 

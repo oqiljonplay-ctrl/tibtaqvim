@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/layout";
 import { useTelegramBack } from "@/lib/use-telegram-back";
@@ -38,21 +38,14 @@ export default function ClinicDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [clinic, setClinic] = useState<ClinicDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const intent = searchParams.get("intent") || "booking";   // aniq niyat
   const [autoRedirected, setAutoRedirected] = useState(false);
-  const [entryFromDashboard] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try { return sessionStorage.getItem("booking_entry") === "dashboard"; } catch { return false; }
-  });
 
   const goBack = () => {
-    if (entryFromDashboard) {
-      window.location.href = `/webapp?mode=dashboard&clinicId=${id}`;
-    } else {
-      router.push("/webapp/clinics");
-    }
+    window.location.href = `/webapp?mode=dashboard`;   // home — har doim xavfsiz langar
   };
   const goHome = () => {
-    sessionStorage.removeItem("booking_entry");
     sessionStorage.removeItem("branch_shown");
     window.location.href = `/webapp?mode=dashboard&clinicId=${id}`;
   };
@@ -67,18 +60,13 @@ export default function ClinicDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // booking_entry tokenini bir marta o'qib darhol tozalaymiz (stale qiymat qolmasin):
-  useEffect(() => {
-    try { sessionStorage.removeItem("booking_entry"); } catch {}
-  }, []);
-
-  // Avtomatik redirect: "Tanlash" orqali → my-clinics; "Yangi bron" + 1 filial → booking:
+  // Avtomatik redirect: intent=select → home (mudofaa); intent=booking + 1 filial → skip:
   useEffect(() => {
     if (!clinic || autoRedirected) return;
 
-    if (!entryFromDashboard) {
+    if (intent === "select") {
       setAutoRedirected(true);
-      router.replace("/webapp/my-clinics");
+      router.replace("/webapp?mode=dashboard");
       return;
     }
 
@@ -87,9 +75,9 @@ export default function ClinicDetailPage() {
       sessionStorage.setItem("selectedClinicId", id);
       sessionStorage.setItem("selectedBranchId", clinic.branches[0].id);
       sessionStorage.setItem("branch_shown", "0");
-      router.replace(`/webapp/clinics/${id}/branches/${clinic.branches[0].id}`);
+      router.replace(`/webapp/clinics/${id}/branches/${clinic.branches[0].id}?intent=booking`);
     }
-  }, [clinic, id, router, autoRedirected, entryFromDashboard]);
+  }, [clinic, id, router, autoRedirected, intent]);
 
   function selectBranch(branchId: string) {
     sessionStorage.setItem("selectedClinicId", id);
@@ -115,8 +103,8 @@ export default function ClinicDetailPage() {
     );
   }
 
-  // "Tanlash" orqali kelsa yoki 1 filial bo'lsa — yo'naltirish ekrani (useEffect redirect qiladi):
-  if (!entryFromDashboard || clinic.branches.length === 1) {
+  // select niyati yoki 1 filial bo'lsa — yo'naltirish ekrani (useEffect redirect qiladi):
+  if (intent === "select" || clinic.branches.length === 1) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <p style={{ color: "var(--text-muted)" }} className="text-sm animate-pulse">Yo&apos;naltirilmoqda...</p>

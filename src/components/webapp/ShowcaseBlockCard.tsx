@@ -59,9 +59,7 @@ export function ShowcaseBlockCard({
       if (tgid) qs.set("tgid", tgid);
       window.location.href = `/webapp?${qs.toString()}`;
     } else {
-      // "Yangi bron" bilan aynan bir xil: booking_entry o'rnatiladi → orqaga = dashboard
-      sessionStorage.setItem("booking_entry", "dashboard");
-      window.location.href = `/webapp/clinics/${clinicId}`;
+      window.location.href = `/webapp/clinics/${clinicId}?intent=booking`;
     }
   };
 

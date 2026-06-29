@@ -112,7 +112,7 @@ function ClinicSwitcherSheet({ onClose }: { onClose: () => void }) {
     onClose()
   }
 
-  const handleAddNew = () => { onClose(); router.push('/webapp/clinics') }
+  const handleAddNew = () => { onClose(); router.push('/webapp/clinics?intent=select') }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">

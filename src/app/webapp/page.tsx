@@ -1061,9 +1061,8 @@ export default function WebApp() {
               </div>
               <button
                 onClick={() => {
-                  const qs = new URLSearchParams();
-                  if (telegramId) qs.set("tgid", telegramId);
-                  window.location.href = `/webapp/clinics?${qs}`;
+                  const tgq = telegramId ? `&tgid=${encodeURIComponent(telegramId)}` : "";
+                  window.location.href = `/webapp/clinics?intent=select${tgq}`;
                 }}
                 className="shrink-0 text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-medium active:scale-95 transition-all"
               >
@@ -1196,14 +1195,11 @@ export default function WebApp() {
                     return;
                   }
                   const cId = clinicIdRef.current;
+                  const tgq = telegramId ? `&tgid=${encodeURIComponent(telegramId)}` : "";
                   if (cId) {
-                    sessionStorage.setItem("booking_entry", "dashboard");
-                    window.location.href = `/webapp/clinics/${cId}`;
+                    window.location.href = `/webapp/clinics/${cId}?intent=booking${tgq}`;
                   } else {
-                    sessionStorage.setItem("booking_entry", "clinics");
-                    const qs = new URLSearchParams();
-                    if (telegramId) qs.set("tgid", telegramId);
-                    window.location.href = `/webapp/clinics?${qs}`;
+                    window.location.href = `/webapp/clinics?intent=booking${tgq}`;
                   }
                 }}
                 className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm shadow-lg shadow-blue-200 active:scale-95 transition-all"
