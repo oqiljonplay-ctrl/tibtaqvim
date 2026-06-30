@@ -25,7 +25,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const { mutate } = useSWRConfig();
   useTelegramBack(() => router.push('/webapp?mode=dashboard'), true);
-  const [telegramId, setTelegramId] = useState<string | null>(null);
+  // undefined = waitForTG hali tugamagan (useEffect kutilmoqda)
+  const [telegramId, setTelegramId] = useState<string | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -42,7 +43,8 @@ export default function ProfilePage() {
   const profileKey = telegramId ? `/api/user/by-telegram?telegramId=${telegramId}` : null;
   const { data: profileData, isLoading } = useSWR<{ success: boolean; data: Profile }>(profileKey);
   const profile = profileData?.success ? profileData.data : null;
-  const loading = isLoading && !profileData;
+  // telegramId===undefined: waitForTG hali tugamagan → skeleton ko'rsat
+  const loading = telegramId === undefined || (isLoading && !profileData);
 
   // Sync edit fields when profile loads
   useEffect(() => {

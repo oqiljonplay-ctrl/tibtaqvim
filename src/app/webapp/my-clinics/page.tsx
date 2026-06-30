@@ -13,7 +13,8 @@ export default function MyClinicsPage() {
   const { clinic: current, setClinic } = useClinic()
   useTelegramBack(() => router.push('/webapp?mode=dashboard'), true)
   const [switching, setSwitching] = useState<string | null>(null)
-  const [swrKey, setSwrKey] = useState<string | null>(null)
+  // undefined = key hali hisoblanmagan (useEffect kutilmoqda)
+  const [swrKey, setSwrKey] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
     const tgId =
@@ -24,9 +25,10 @@ export default function MyClinicsPage() {
     setSwrKey(tgId ? `/api/me/clinics?tgid=${tgId}` : '/api/me/clinics')
   }, [])
 
-  const { data, isLoading } = useSWR<{ clinics: Clinic[] }>(swrKey)
+  const { data, isLoading } = useSWR<{ clinics: Clinic[] }>(swrKey ?? null)
   const clinics = data?.clinics ?? []
-  const loading = isLoading && !data
+  // swrKey===undefined: hali hisoblanmagan → skeleton; null: tgId yo'q → fetch → skeleton
+  const loading = swrKey === undefined || (isLoading && !data)
 
   function handleSelect(c: Clinic) {
     if (c.id === current?.id) {

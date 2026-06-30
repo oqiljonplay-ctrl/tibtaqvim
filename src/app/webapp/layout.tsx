@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { SWRConfig } from "swr";
+import { SWRProvider } from "@/components/webapp/SWRProvider";
 import { ClinicProvider } from "@/lib/clinic-context";
 import { ClinicGuard } from "@/components/webapp/ClinicGuard";
 import { WebAppThemeProvider } from "@/components/webapp/WebAppThemeProvider";
@@ -64,21 +64,13 @@ export default function WebAppLayout({ children }: { children: React.ReactNode }
           </div>
         }
       >
-        <SWRConfig value={{
-          fetcher: (url: string) => fetch(url).then((r) => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
-          }),
-          keepPreviousData: true,
-          revalidateOnFocus: false,
-          dedupingInterval: 4000,
-        }}>
+        <SWRProvider>
           <ClinicProvider>
             <WebAppThemeProvider>
               <ClinicGuard>{children}</ClinicGuard>
             </WebAppThemeProvider>
           </ClinicProvider>
-        </SWRConfig>
+        </SWRProvider>
       </Suspense>
     </>
   );

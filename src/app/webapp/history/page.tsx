@@ -30,7 +30,8 @@ export default function HistoryPage() {
   const { clinic, clinicId, loading: clinicLoading } = useClinic()
 
   const [scope, setScope] = useState<Scope>('current')
-  const [telegramId, setTelegramId] = useState<string | null>(null)
+  // undefined = getTelegramId hali chaqirilmagan (useEffect kutilmoqda)
+  const [telegramId, setTelegramId] = useState<string | null | undefined>(undefined)
   const [filters, setFilters] = useState<FilterState>({
     statuses: [],
     dateFrom: '',
@@ -73,7 +74,8 @@ export default function HistoryPage() {
     { keepPreviousData: true }
   )
 
-  const loading = isLoading && !firstPage
+  // telegramId===undefined: getTelegramId hali chaqirilmagan → skeleton ko'rsat
+  const loading = telegramId === undefined || (isLoading && !firstPage)
   const error = swrError ? 'Tarmoq xatosi' : null
   const appointments = [...(firstPage?.appointments ?? []), ...extraAppointments]
   const total = firstPage?.total ?? null
