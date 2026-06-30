@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import useSWR from 'swr'
 import { useClinic, type Clinic } from '@/lib/clinic-context'
 import { ClinicLogo } from '@/components/ClinicLogo'
 import { Container, Stack } from '@/components/layout'
@@ -11,9 +12,8 @@ export default function MyClinicsPage() {
   const router = useRouter()
   const { clinic: current, setClinic } = useClinic()
   useTelegramBack(() => router.push('/webapp?mode=dashboard'), true)
-  const [clinics, setClinics] = useState<Clinic[]>([])
-  const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)
+  const [swrKey, setSwrKey] = useState<string | null>(null)
 
   useEffect(() => {
     const tgId =
@@ -21,13 +21,12 @@ export default function MyClinicsPage() {
         (new URLSearchParams(window.location.search).get('tgid') ||
           sessionStorage.getItem('tgid'))) ||
       null
-    const url = tgId ? `/api/me/clinics?tgid=${tgId}` : '/api/me/clinics'
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => setClinics(data.clinics ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    setSwrKey(tgId ? `/api/me/clinics?tgid=${tgId}` : '/api/me/clinics')
   }, [])
+
+  const { data, isLoading } = useSWR<{ clinics: Clinic[] }>(swrKey)
+  const clinics = data?.clinics ?? []
+  const loading = isLoading && !data
 
   function handleSelect(c: Clinic) {
     if (c.id === current?.id) {

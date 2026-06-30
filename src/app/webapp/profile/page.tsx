@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import useSWR, { useSWRConfig } from "swr";
 import { Container, Stack } from "@/components/layout";
 import { useTelegramBack } from "@/lib/use-telegram-back";
 
@@ -21,10 +22,9 @@ function waitForTG(ms = 1200): Promise<any> {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { mutate } = useSWRConfig();
   useTelegramBack(() => router.push('/webapp?mode=dashboard'), true);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [telegramId, setTelegramId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -38,16 +38,18 @@ export default function ProfilePage() {
   const [newDepRel, setNewDepRel] = useState("");
   const [depSaving, setDepSaving] = useState(false);
 
-  async function fetchProfile(tgId: string) {
-    const r = await fetch(`/api/user/by-telegram?telegramId=${tgId}`);
-    const j = await r.json();
-    if (j.success) {
-      setProfile(j.data);
-      setFirstName(j.data.firstName || "");
-      setLastName(j.data.lastName || "");
+  const profileKey = telegramId ? `/api/user/by-telegram?telegramId=${telegramId}` : null;
+  const { data: profileData, isLoading } = useSWR<{ success: boolean; data: Profile }>(profileKey);
+  const profile = profileData?.success ? profileData.data : null;
+  const loading = isLoading && !profileData;
+
+  // Sync edit fields when profile loads
+  useEffect(() => {
+    if (profile) {
+      setFirstName(profile.firstName || "");
+      setLastName(profile.lastName || "");
     }
-    setLoading(false);
-  }
+  }, [profile?.id]);
 
   useEffect(() => {
     waitForTG().then(async (tg) => {
@@ -56,11 +58,6 @@ export default function ProfilePage() {
       if (tg?.initDataUnsafe?.user?.id) tgId = String(tg.initDataUnsafe.user.id);
       if (!tgId) tgId = new URLSearchParams(window.location.search).get("tgid");
       setTelegramId(tgId);
-      if (tgId) {
-        await fetchProfile(tgId);
-      } else {
-        setLoading(false);
-      }
     });
   }, []);
 
@@ -68,7 +65,6 @@ export default function ProfilePage() {
     if (!telegramId) return;
     setSaving(true); setErr(null);
     try {
-      // Profile editing via /api/user/update-name
       const res = await fetch("/api/user/update-name", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -76,7 +72,7 @@ export default function ProfilePage() {
       });
       const j = await res.json();
       if (!j.success) { setErr(j.error?.message || "Xatolik"); return; }
-      await fetchProfile(telegramId);
+      await mutate(profileKey);
       setEditing(false);
     } catch { setErr("Tarmoq xatosi"); }
     finally { setSaving(false); }
@@ -94,7 +90,7 @@ export default function ProfilePage() {
       });
       const j = await res.json();
       if (!j.success) { setErr(j.error?.message || "Qo'shib bo'lmadi"); return; }
-      await fetchProfile(telegramId);
+      await mutate(profileKey);
       setAddingDep(false); setNewDepName(""); setNewDepLast(""); setNewDepRel("");
     } catch { setErr("Tarmoq xatosi"); }
     finally { setDepSaving(false); }
@@ -104,13 +100,12 @@ export default function ProfilePage() {
     if (!telegramId) return;
     if (!confirm("Rostdan ham o'chirishni xohlaysizmi?")) return;
     try {
-      // Delete by telegramId-scoped endpoint
       const res = await fetch(`/api/dependents/by-telegram/${depId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ telegramId }),
       });
-      if (res.ok) await fetchProfile(telegramId);
+      if (res.ok) await mutate(profileKey);
     } catch {}
   }
 

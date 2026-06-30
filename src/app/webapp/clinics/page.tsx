@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import useSWR from "swr";
 import { useClinic } from "@/lib/clinic-context";
 import { ClinicLogo } from "@/components/ClinicLogo";
 import { ResponsiveGrid } from "@/components/layout";
@@ -27,10 +28,9 @@ export default function ClinicsPage() {
   const searchParams = useSearchParams();
   const { setClinic } = useClinic();
 
-  const [clinics, setClinics] = useState<ClinicItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selecting, setSelecting] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const nextPath = searchParams.get("next");
   const intent = searchParams.get("intent") || "booking";   // aniq niyat; default booking
@@ -39,22 +39,18 @@ export default function ClinicsPage() {
   const goHome = () => { router.push(`/webapp?mode=dashboard`); };
   const nativeBackOk = useTelegramBack(goHome, true);
 
-  const fetchClinics = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      const res = await fetch(`/api/clinics?${params}`, { cache: "no-store" });
-      const json = await res.json();
-      if (json.success) setClinics(json.data.items ?? []);
-    } catch {}
-    finally { setLoading(false); }
+  // Debounce search for SWR key (300ms)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    const t = setTimeout(fetchClinics, 300);
-    return () => clearTimeout(t);
-  }, [fetchClinics]);
+  const clinicsUrl = debouncedSearch
+    ? `/api/clinics?search=${encodeURIComponent(debouncedSearch)}`
+    : `/api/clinics`;
+  const { data: clinicsData, isLoading } = useSWR<{ success: boolean; data: { items: ClinicItem[] } }>(clinicsUrl);
+  const clinics = clinicsData?.data?.items ?? [];
+  const loading = isLoading && !clinicsData;
 
   function handleSelect(c: ClinicItem) {
     setSelecting(c.id);

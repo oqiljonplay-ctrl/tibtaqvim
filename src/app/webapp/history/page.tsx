@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import useSWR from 'swr'
 import { useClinic } from '@/lib/clinic-context'
 import { useTelegramBack } from '@/lib/use-telegram-back'
 import { AppointmentCard, type HistoryAppointment } from '@/components/webapp/AppointmentCard'
@@ -9,6 +10,7 @@ import { HistoryFilters, type FilterState } from './HistoryFilters'
 import { Container, ResponsiveGrid } from '@/components/layout'
 
 type Scope = 'current' | 'all'
+type AppData = { appointments: HistoryAppointment[]; nextCursor: string | null; total: number }
 
 function getTelegramId(): string | null {
   if (typeof window === 'undefined') return null
@@ -27,25 +29,16 @@ export default function HistoryPage() {
   const { clinic, clinicId, loading: clinicLoading } = useClinic()
 
   const [scope, setScope] = useState<Scope>('current')
-  const [appointments, setAppointments] = useState<HistoryAppointment[]>([])
-  const [total, setTotal] = useState<number | null>(null)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [telegramId, setTelegramId] = useState<string | null>(null)
-
   const [filters, setFilters] = useState<FilterState>({
     statuses: [],
     dateFrom: '',
     dateTo: '',
     sort: 'desc',
   })
-
-  const appointmentsRef = useRef(appointments)
-  appointmentsRef.current = appointments
-  const nextCursorRef = useRef(nextCursor)
-  nextCursorRef.current = nextCursor
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [extraAppointments, setExtraAppointments] = useState<HistoryAppointment[]>([])
+  const [extraNextCursor, setExtraNextCursor] = useState<string | null>(null)
 
   useEffect(() => {
     setTelegramId(getTelegramId())
@@ -67,49 +60,48 @@ export default function HistoryPage() {
     [scope, clinicId, filters, telegramId]
   )
 
-  const fetchData = useCallback(
-    async (reset = true) => {
-      if (!telegramId) { setLoading(false); return }
-      if (scope === 'current' && !clinicId) { setLoading(false); return }
+  // SWR key: null → fetch yoq (telegramId yo'q yoki current scope da clinicId yo'q)
+  const firstPageKey = useMemo(() => {
+    if (!telegramId) return null
+    if (scope === 'current' && !clinicId) return null
+    return `/api/me/appointments?${buildQuery(null)}`
+  }, [telegramId, scope, clinicId, buildQuery])
 
-      if (reset) {
-        setLoading(true)
-        setAppointments([])
-        setNextCursor(null)
-      } else {
-        setLoadingMore(true)
-      }
-      setError(null)
-
-      try {
-        const cursor = reset ? null : nextCursorRef.current
-        const res = await fetch(`/api/me/appointments?${buildQuery(cursor)}`)
-        const data = await res.json()
-
-        if (!res.ok) {
-          setError(data.error || 'Xato yuz berdi')
-          return
-        }
-
-        setAppointments(reset ? data.appointments : [...appointmentsRef.current, ...data.appointments])
-        setNextCursor(data.nextCursor)
-        if (reset) setTotal(data.total)
-      } catch {
-        setError('Tarmoq xatosi')
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    },
-    [scope, clinicId, filters, telegramId, buildQuery]
+  const { data: firstPage, isLoading, error: swrError } = useSWR<AppData>(
+    firstPageKey,
+    { keepPreviousData: true }
   )
 
+  const loading = isLoading && !firstPage
+  const error = swrError ? 'Tarmoq xatosi' : null
+  const appointments = [...(firstPage?.appointments ?? []), ...extraAppointments]
+  const total = firstPage?.total ?? null
+  const nextCursor = extraNextCursor ?? firstPage?.nextCursor ?? null
+
+  // Filter/scope o'zgarganda (firstPageKey o'zganda) extra sahifalarni tozala
+  const prevKeyRef = useRef(firstPageKey)
   useEffect(() => {
-    if (telegramId !== null) {
-      fetchData(true)
+    if (prevKeyRef.current !== firstPageKey) {
+      prevKeyRef.current = firstPageKey
+      setExtraAppointments([])
+      setExtraNextCursor(null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, clinicId, filters, telegramId])
+  }, [firstPageKey])
+
+  // Keyingi sahifani qo'lda yuklash (pagination)
+  const loadMore = useCallback(async () => {
+    const cursor = extraNextCursor ?? firstPage?.nextCursor
+    if (!cursor || loadingMore || !telegramId) return
+    setLoadingMore(true)
+    try {
+      const res = await fetch(`/api/me/appointments?${buildQuery(cursor)}`)
+      const data = await res.json()
+      if (!res.ok) return
+      setExtraAppointments((prev) => [...prev, ...data.appointments])
+      setExtraNextCursor(data.nextCursor)
+    } catch {}
+    finally { setLoadingMore(false) }
+  }, [extraNextCursor, firstPage, loadingMore, telegramId, buildQuery])
 
   const goHome = useCallback(() => {
     const params = new URLSearchParams(window.location.search)
@@ -222,9 +214,9 @@ export default function HistoryPage() {
               ))}
             </ResponsiveGrid>
 
-            {nextCursor && (
+            {nextCursor && !isLoading && (
               <button
-                onClick={() => fetchData(false)}
+                onClick={() => loadMore()}
                 disabled={loadingMore}
                 className="w-full mt-4 py-3 bg-white rounded-xl border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 disabled:opacity-50 transition"
               >

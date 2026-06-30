@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { preload } from "swr";
 import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/utils/phone";
 import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
@@ -222,6 +223,21 @@ export default function WebApp() {
     router.prefetch("/webapp/my-clinics");
     router.prefetch("/webapp/history");
   }, [router]);
+
+  // ─── SWR data preload (fonда keyingi sahifalar uchun) ─────────────────────
+  useEffect(() => {
+    if (!telegramId) return;
+    const swrFetcher = (url: string) => fetch(url).then((r) => r.json());
+    preload(`/api/me/clinics?tgid=${encodeURIComponent(telegramId)}`, swrFetcher);
+    if (contextClinicId) {
+      const p = new URLSearchParams();
+      p.set("telegramId", telegramId);
+      p.set("scope", "current");
+      p.set("clinicId", contextClinicId);
+      p.set("sort", "desc");
+      preload(`/api/me/appointments?${p.toString()}`, swrFetcher);
+    }
+  }, [telegramId, contextClinicId]);
 
   // ─── Init ─────────────────────────────────────────────────────────────────
 

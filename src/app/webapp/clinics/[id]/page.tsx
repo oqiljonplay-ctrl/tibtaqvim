@@ -1,7 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import useSWR from "swr";
 import { Container } from "@/components/layout";
 import { useTelegramBack } from "@/lib/use-telegram-back";
 
@@ -36,11 +37,15 @@ interface ClinicDetail {
 export default function ClinicDetailPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const [clinic, setClinic] = useState<ClinicDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const intent = searchParams.get("intent") || "booking";   // aniq niyat
   const [autoRedirected, setAutoRedirected] = useState(false);
+
+  const { data: clinicRes, isLoading } = useSWR<{ success: boolean; data: ClinicDetail }>(
+    `/api/clinics/${id}`
+  );
+  const clinic = clinicRes?.success ? clinicRes.data : null;
+  const loading = isLoading && !clinicRes;
 
   const goBack = () => {
     router.push(`/webapp?mode=dashboard`);
@@ -50,15 +55,6 @@ export default function ClinicDetailPage() {
     router.push(`/webapp?mode=dashboard&clinicId=${id}`);
   };
   const nativeBackOk = useTelegramBack(goBack, true);
-
-  useEffect(() => {
-    fetch(`/api/clinics/${id}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.success) setClinic(j.data);
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
 
   // Avtomatik redirect: intent=select → home (mudofaa); intent=booking + 1 filial → skip:
   useEffect(() => {
