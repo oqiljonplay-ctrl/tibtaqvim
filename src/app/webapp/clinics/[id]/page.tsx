@@ -43,11 +43,11 @@ export default function ClinicDetailPage() {
   const [autoRedirected, setAutoRedirected] = useState(false);
 
   const goBack = () => {
-    window.location.href = `/webapp?mode=dashboard`;   // home — har doim xavfsiz langar
+    router.push(`/webapp?mode=dashboard`);
   };
   const goHome = () => {
     sessionStorage.removeItem("branch_shown");
-    window.location.href = `/webapp?mode=dashboard&clinicId=${id}`;
+    router.push(`/webapp?mode=dashboard&clinicId=${id}`);
   };
   const nativeBackOk = useTelegramBack(goBack, true);
 

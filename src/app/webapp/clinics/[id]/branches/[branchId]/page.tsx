@@ -245,9 +245,9 @@ export default function BranchServicesPage() {
         if (sessionStorage.getItem("branch_shown") === "1") {
           router.push(`/webapp/clinics/${clinicId}`);
         } else {
-          window.location.href = intent === "booking"
+          router.push(intent === "booking"
             ? `/webapp?mode=dashboard&clinicId=${clinicId}`
-            : `/webapp/clinics`;
+            : `/webapp/clinics`);
         }
         break;
       }
@@ -261,7 +261,7 @@ export default function BranchServicesPage() {
   };
   const goHome = () => {
     sessionStorage.removeItem("branch_shown");
-    window.location.href = `/webapp?mode=dashboard&clinicId=${clinicId}`;
+    router.push(`/webapp?mode=dashboard&clinicId=${clinicId}`);
   };
   const nativeBackOk = useTelegramBack(goBack, step !== "done");
 

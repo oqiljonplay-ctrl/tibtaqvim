@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/utils/phone";
 import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
 import { Calendar } from "@/components/Calendar";
@@ -210,9 +211,17 @@ export default function WebApp() {
   const tgUserRef = useRef<TgUser | null>(null);
   const rebookServiceIdRef = useRef<string | null>(null);
 
+  const router = useRouter();
   const { clinic: activeClinic, clinicId: contextClinicId } = useClinic();
   // clinicId sources: context (localStorage/URL) → URL clinicId param → env fallback
   const clinicIdRef = useRef<string>("");
+
+  // ─── Prefetch ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    router.prefetch("/webapp/clinics");
+    router.prefetch("/webapp/my-clinics");
+    router.prefetch("/webapp/history");
+  }, [router]);
 
   // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -1062,7 +1071,7 @@ export default function WebApp() {
               <button
                 onClick={() => {
                   const tgq = telegramId ? `&tgid=${encodeURIComponent(telegramId)}` : "";
-                  window.location.href = `/webapp/clinics?intent=select${tgq}`;
+                  router.push(`/webapp/clinics?intent=select${tgq}`);
                 }}
                 className="shrink-0 text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-medium active:scale-95 transition-all"
               >
@@ -1197,9 +1206,9 @@ export default function WebApp() {
                   const cId = clinicIdRef.current;
                   const tgq = telegramId ? `&tgid=${encodeURIComponent(telegramId)}` : "";
                   if (cId) {
-                    window.location.href = `/webapp/clinics/${cId}?intent=booking${tgq}`;
+                    router.push(`/webapp/clinics/${cId}?intent=booking${tgq}`);
                   } else {
-                    window.location.href = `/webapp/clinics?intent=booking${tgq}`;
+                    router.push(`/webapp/clinics?intent=booking${tgq}`);
                   }
                 }}
                 className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm shadow-lg shadow-blue-200 active:scale-95 transition-all"
@@ -1211,7 +1220,7 @@ export default function WebApp() {
               onClick={() => {
                 const qs = new URLSearchParams();
                 if (telegramId) qs.set("tgid", telegramId);
-                window.location.href = `/webapp/my-clinics?${qs}`;
+                router.push(`/webapp/my-clinics?${qs}`);
               }}
               className="w-12 py-2 rounded-2xl bg-white border border-gray-200 text-gray-700 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all"
               title="Klinikalarim"
@@ -1223,7 +1232,7 @@ export default function WebApp() {
               onClick={() => {
                 const qs = new URLSearchParams({ clinic: clinicIdRef.current });
                 if (telegramId) qs.set("tgid", telegramId);
-                window.location.href = `/webapp/history?${qs}`;
+                router.push(`/webapp/history?${qs}`);
               }}
               className="w-12 py-2 rounded-2xl bg-white border border-gray-200 text-gray-700 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all"
               title="Tarix"

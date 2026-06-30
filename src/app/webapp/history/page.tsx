@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useClinic } from '@/lib/clinic-context'
 import { useTelegramBack } from '@/lib/use-telegram-back'
 import { AppointmentCard, type HistoryAppointment } from '@/components/webapp/AppointmentCard'
@@ -22,6 +23,7 @@ function getTelegramId(): string | null {
 }
 
 export default function HistoryPage() {
+  const router = useRouter()
   const { clinic, clinicId, loading: clinicLoading } = useClinic()
 
   const [scope, setScope] = useState<Scope>('current')
@@ -116,8 +118,8 @@ export default function HistoryPage() {
     if (cId) qs.set('clinic', cId)
     if (tgid) qs.set('tgid', tgid)
     qs.set('mode', 'dashboard')
-    window.location.href = `/webapp?${qs}`
-  }, [])
+    router.push(`/webapp?${qs}`)
+  }, [router])
   useTelegramBack(goHome, true)
 
   if (clinicLoading) {
@@ -149,16 +151,14 @@ export default function HistoryPage() {
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => {
-              if (typeof window !== 'undefined') {
-                const params = new URLSearchParams(window.location.search)
-                const qs = new URLSearchParams()
-                const cId = params.get('clinic')
-                const tgid = params.get('tgid')
-                if (cId) qs.set('clinic', cId)
-                if (tgid) qs.set('tgid', tgid)
-                qs.set('mode', 'dashboard')
-                window.location.href = `/webapp?${qs}`
-              }
+              const params = new URLSearchParams(window.location.search)
+              const qs = new URLSearchParams()
+              const cId = params.get('clinic')
+              const tgid = params.get('tgid')
+              if (cId) qs.set('clinic', cId)
+              if (tgid) qs.set('tgid', tgid)
+              qs.set('mode', 'dashboard')
+              router.push(`/webapp?${qs}`)
             }}
             className="text-blue-600 text-sm"
           >

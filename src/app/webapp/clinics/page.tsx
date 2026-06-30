@@ -36,7 +36,7 @@ export default function ClinicsPage() {
   const intent = searchParams.get("intent") || "booking";   // aniq niyat; default booking
   const tgid = searchParams.get("tgid");
 
-  const goHome = () => { window.location.href = `/webapp?mode=dashboard`; };
+  const goHome = () => { router.push(`/webapp?mode=dashboard`); };
   const nativeBackOk = useTelegramBack(goHome, true);
 
   const fetchClinics = useCallback(async () => {

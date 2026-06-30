@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { ShowcaseCoverflow } from "@/components/webapp/ShowcaseCoverflow";
 import { ShowcaseMediaRenderer } from "@/components/webapp/ShowcaseMediaRenderer";
 import { type ShowcaseBlock, type ShowcaseSize, isGalleryKind } from "@/lib/showcase/types";
@@ -45,6 +46,7 @@ export function ShowcaseBlockCard({
   intensity: number;
   intensityExplicit: boolean;
 }) {
+  const router = useRouter();
   const gallery = block.media.filter((m) => isGalleryKind(m.kind));
   const rest = block.media.filter((m) => !isGalleryKind(m.kind));
 
@@ -59,7 +61,7 @@ export function ShowcaseBlockCard({
       if (tgid) qs.set("tgid", tgid);
       window.location.href = `/webapp?${qs.toString()}`;
     } else {
-      window.location.href = `/webapp/clinics/${clinicId}?intent=booking`;
+      router.push(`/webapp/clinics/${clinicId}?intent=booking`);
     }
   };
 
