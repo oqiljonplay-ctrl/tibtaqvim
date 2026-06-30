@@ -36,6 +36,7 @@ Doctor Panel → bugungi bemorlar ro'yxati
 | Database | PostgreSQL | any |
 | Bot | node-telegram-bot-api | 0.67.x |
 | Auth | JWT (jsonwebtoken) + bcryptjs | — |
+| Data fetching | SWR (keepPreviousData, preload) | 2.4.x |
 | Tests | Vitest | 4.x |
 | Runtime (bot) | ts-node (local) / webhook (prod) | — |
 
@@ -506,6 +507,52 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 ---
 
 ## 12. RECENT CHANGES LOG
+
+### 2026-06-30 — PERF: SWR cache + Skeleton animatsiyalari (tezlik optimizatsiyasi)
+
+**Maqsad:** Sahifalar orasida navigatsiyada "Yuklanmoqda..." matni o'rniga skeleton animatsiyalar. SWR keepPreviousData — filter/sahifa almashtirishda eski ma'lumotlar darhol ko'rinadi.
+
+**Asosiy o'zgarishlar:**
+
+**FAZA A — SWR migratsiya:**
+- `swr@2.4.2` o'rnatildi
+- `src/components/webapp/SWRProvider.tsx` (yangi, `"use client"`) — global fetcher, `keepPreviousData:true`, `revalidateOnFocus:false`, `dedupingInterval:4000`
+- `src/app/webapp/layout.tsx` — `<SWRProvider>` wrapper qo'shildi
+- Quyidagi sahifalar `useEffect+fetch` → `useSWR` ga o'tkazildi:
+  - `history/page.tsx` — cursor pagination saqlanadi, extra sahifalar `extraAppointments` state'da
+  - `my-clinics/page.tsx`
+  - `profile/page.tsx` — mutate() save/add/delete keyin
+  - `clinics/page.tsx` — debounced search
+  - `clinics/[id]/page.tsx`
+- `webapp/page.tsx` — `preload()` dashboard ochilishida my-clinics va appointments'ni oldindan yuklaydi
+
+**FAZA C — Skeleton komponentlar:**
+- `src/components/webapp/skeletons/DashboardSkeleton.tsx` — header+banner+2 tugma+3 karta
+- `src/components/webapp/skeletons/ProfileSkeleton.tsx` — sticky header+2 karta
+- `src/components/webapp/skeletons/ClinicDetailSkeleton.tsx` — ko'k header+2 filial karta
+- `src/components/webapp/skeletons/HistorySkeleton.tsx` — header+tablar+3 bron karta
+- `ServicePicker.tsx` — inline 3-karta skeleton
+- Barcha `animate-pulse bg-gray-200/bg-gray-100` tokenlar Kun/Tun rejimida avtomatik ishlaydi (`globals.css` CSS override orqali)
+
+**Muhim pattern — undefined initial state:**
+```tsx
+// XATO (null bilan SWR isLoading=false qaytaradi → bo'sh holat momentan chiqadi):
+const [key, setKey] = useState<string | null>(null)
+// TO'G'RI:
+const [key, setKey] = useState<string | null | undefined>(undefined)
+const loading = key === undefined || (isLoading && !data)
+// SWR: key===null → fetch yo'q (isLoading=false), key===undefined → undefined (isLoading=false ham)
+// Lekin loading formula undefined'ni alohida qo'lda ushlaymiz
+```
+
+**SWRProvider "use client" zaruriyati:**
+- `layout.tsx` Server Component — inline `fetcher: (url) => ...` funksiyasini `SWRConfig`'ga to'g'ridan berish Next.js 14'da serialization xatosi beradi
+- Yechim: `SWRProvider.tsx` — `"use client"` component, `fetcher` modul darajasida konstanta sifatida
+
+**Commitlar:** `84a00b2` (FAZA A), `0688b82` (FAZA C), `999de10` (regression fix + SWRProvider)
+**Branch:** `perf/swr-prefetch-skeleton`. **Deploy:** https://tibtaqvim.vercel.app ✅
+
+---
 
 ### 2026-06-15 — TUZATISH-05+06: Portativ profil rasmi tizimi
 
