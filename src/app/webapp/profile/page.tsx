@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import { Container, Stack } from "@/components/layout";
 import { useTelegramBack } from "@/lib/use-telegram-back";
+import { ProfileSkeleton } from "@/components/webapp/skeletons/ProfileSkeleton";
 
 declare global { interface Window { Telegram?: { WebApp?: any } } }
 
@@ -109,7 +110,7 @@ export default function ProfilePage() {
     } catch {}
   }
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-400 text-sm">Yuklanmoqda...</div>;
+  if (loading) return <ProfileSkeleton />;
   if (!profile) return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
       <div className="text-4xl mb-4">🔐</div>

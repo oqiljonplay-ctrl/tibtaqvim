@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import { useClinic } from '@/lib/clinic-context'
 import { useTelegramBack } from '@/lib/use-telegram-back'
+import { HistorySkeleton } from '@/components/webapp/skeletons/HistorySkeleton'
 import { AppointmentCard, type HistoryAppointment } from '@/components/webapp/AppointmentCard'
 import { HistoryFilters, type FilterState } from './HistoryFilters'
 import { Container, ResponsiveGrid } from '@/components/layout'
@@ -115,14 +116,7 @@ export default function HistoryPage() {
   useTelegramBack(goHome, true)
 
   if (clinicLoading) {
-    return (
-      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
-        <div className="text-center p-6 text-gray-400">
-          <div className="text-4xl mb-3">🏥</div>
-          <p className="text-sm animate-pulse">Yuklanmoqda...</p>
-        </div>
-      </div>
-    )
+    return <HistorySkeleton />
   }
 
   if (!clinic) {

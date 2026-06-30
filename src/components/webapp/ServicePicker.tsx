@@ -49,8 +49,24 @@ export function ServicePicker({ services, loading, onSelect, userLoading }: Prop
     <div>
       <h2 className="font-semibold text-gray-900 mb-4">Xizmatni tanlang</h2>
       {loading ? (
-        <div className="flex items-center justify-center h-32 text-gray-400 text-sm animate-pulse">
-          Yuklanmoqda...
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-2xl border-2 border-transparent bg-white shadow-sm p-4 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-gray-200" />
+                  <div>
+                    <div className="h-4 bg-gray-200 rounded w-28 mb-1" />
+                    <div className="h-3 bg-gray-100 rounded w-20" />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="h-4 bg-gray-200 rounded w-20 mb-1" />
+                  <div className="h-3 bg-gray-100 rounded w-14" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-3">

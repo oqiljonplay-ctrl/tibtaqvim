@@ -5,6 +5,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { Container } from "@/components/layout";
 import { useTelegramBack } from "@/lib/use-telegram-back";
+import { ClinicDetailSkeleton } from "@/components/webapp/skeletons/ClinicDetailSkeleton";
 
 interface BranchItem {
   id: string;
@@ -83,11 +84,7 @@ export default function ClinicDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
-      </div>
-    );
+    return <ClinicDetailSkeleton />;
   }
 
   if (!clinic) {

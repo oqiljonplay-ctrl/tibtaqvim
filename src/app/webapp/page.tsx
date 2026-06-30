@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { preload } from "swr";
+import { DashboardSkeleton } from "@/components/webapp/skeletons/DashboardSkeleton";
 import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/utils/phone";
 import { UZ_REGIONS, getDistricts } from "@/lib/uz-regions";
@@ -862,14 +863,7 @@ export default function WebApp() {
   // ─── Render: Loading ───────────────────────────────────────────────────────
 
   if (appMode === "loading") {
-    return (
-      <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3">🏥</div>
-          <p className="text-gray-400 text-sm animate-pulse">Yuklanmoqda...</p>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   // ─── Render: Onboarding ───────────────────────────────────────────────────
