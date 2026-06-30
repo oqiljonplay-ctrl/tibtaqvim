@@ -70,6 +70,18 @@ export async function GET(req: NextRequest) {
     const orderMap = new Map(userClinics.map((uc, i) => [uc.clinicId, i]))
     const sorted = [...clinicRows].sort((a, b) => (orderMap.get(a.id) ?? 99) - (orderMap.get(b.id) ?? 99))
 
+    // currentClinic inline — ClinicProvider ikkinchi round-trip qilmasin
+    const rawCurrent = currentClinicId ? clinicRows.find((c) => c.id === currentClinicId) ?? null : null
+    const currentClinic = rawCurrent ? {
+      id: rawCurrent.id,
+      name: rawCurrent.name,
+      city: rawCurrent.city ?? null,
+      logoUrl: rawCurrent.logoUrl ?? null,
+      address: rawCurrent.address ?? null,
+      phone: rawCurrent.phone ?? null,
+      rating: typeof rawCurrent.rating === 'number' ? rawCurrent.rating : null,
+    } : null
+
     return NextResponse.json({
       clinics: sorted.map((c) => ({
         ...c,
@@ -77,6 +89,7 @@ export async function GET(req: NextRequest) {
       })),
       currentClinicId,
       lastClinicId,
+      currentClinic,
     })
   } catch (err) {
     console.error('[GET /api/me/clinics]', err)

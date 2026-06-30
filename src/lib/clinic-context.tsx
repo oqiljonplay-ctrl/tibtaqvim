@@ -112,7 +112,8 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
           // 1. BEMOR TANLOVI USTUN: DB'da isCurrent=true bor
           if (currentId) {
-            const loaded = await loadClinic(currentId)
+            // inline currentClinic — 2-chi round-trip yo'q (mudofaa: kelmasa eski yo'l)
+            const loaded = (data.currentClinic ?? null) || await loadClinic(currentId)
             if (loaded) {
               setClinicState(loaded)
               if (typeof window !== 'undefined') {
