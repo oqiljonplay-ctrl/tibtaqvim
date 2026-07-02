@@ -508,6 +508,25 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-07-02 — UI: ETAP 3 T3 — "Yangi bron" CTA tibbiy yashil gradient + lub-dub glow (SPRINT T1..T5 YAKUNLANDI)
+
+**Maqsad:** Sticky bottom bar'dagi "➕ Yangi bron" tugmasi statik ko'k edi — tibbiy yashil gradient + nozik "lub-dub" yurak urishi glow effekti bilan jonlantirildi (Kun/Tun + `prefers-reduced-motion` bilan mos).
+
+**O'zgarishlar:**
+- `globals.css` (append-only) — `.cta-yangi-bron` klassi: yashil gradient (`#047857→#14b8a6`), nozik "+" tibbiy motiv (`::before`, opacity 0.12), `cta-heartbeat` keyframe (faqat `box-shadow`, `transform`siz — `active:scale-95` bilan ziddiyatsiz), `prefers-reduced-motion: reduce`da animatsiya o'chib statik glow qoladi.
+- `webapp/page.tsx` — tugma classi `bg-blue-600 shadow-lg shadow-blue-200` → `cta-yangi-bron`; yorliq `<span className="relative z-[1]">` bilan o'raldi ("+" pattern ustida aniq o'qilishi uchun). Profil-to'liq-emas nuqta belgisi ham ko'kdan emerald'ga o'tkazildi (ixtiyoriy, vizual uyg'unlik).
+
+**Topilgan va tuzatilgan bug (implementatsiya paytida):** webapp mavzu tizimida global qoida bor — `html[data-webapp-theme] .text-white{ color:var(--text)!important; }` (Kun mavzusida `--text` deyarli qora). Bu qoida yangi yashil tugmaning `text-white` yorlig'ini ham qora qilib qo'yardi (yashil fonda o'qish qiyin bo'lardi). Tuzatish: yuqoriroq specificity bilan `html[data-webapp-theme] .cta-yangi-bron.text-white{ color:#fff!important; }` qo'shildi — yorliq har ikkala mavzuda ham haqiqiy oq.
+
+**Test:** `tsc --noEmit` — 0 xato. Real Tailwind pipeline orqali (`npx tailwindcss -i globals.css`) compile qilingan CSS bilan Playwright orqali izolyatsiyalangan vizual tekshiruv: Kun/Tun/`reduced-motion` — 3 holatda ham screenshot + computed-style tekshirildi (gradient, `animationName` (`cta-heartbeat`→Kun/Tun, `none`→reduced-motion), label rangi `rgb(255,255,255)`, dot rangi emerald). `eslint`/`vitest` — mavjud xato/fail'lar T3'dan oldin ham bor edi (T3 kod satrlariga tegishli emas).
+
+**Commit:** `7f9f67e` — `feat(ui): T3 — "Yangi bron" CTA tibbiy yashil gradient + lub-dub yurak urishi glow`
+**Branch:** `perf/swr-prefetch-skeleton`. **Deploy:** https://tibtaqvim.vercel.app ✅
+
+> Bu commit bilan **ETAP 1..3 / T1..T5 sprint to'liq yakunlandi** (T4 reload-loop fix, T1 input kontrast, T2 Faol bron qutisiz markaz, T5 xodim kebab menyu, T3 Yangi bron CTA).
+
+---
+
 ### 2026-07-02 — FIX: T4 — EM-tasdiqlanmagan xodim uchun cheksiz reload-loop (KRITIK)
 
 **Simptom:** Qabulxona/shifokor xodimi (`Employee` yozuvi bor, `em_key` cookie yo'q yoki mos kelmaydi) `/reception` yoki `/doctor`ga kirganda: bron ko'rinmaydi, sahifa cheksiz qayta yuklanadi, chiqib bo'lmaydi.
