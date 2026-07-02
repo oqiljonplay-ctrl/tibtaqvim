@@ -109,6 +109,9 @@ interface LoginFormInnerProps {
   iconColor?: string;
   gradientFrom?: string;
   gradientTo?: string;
+  // T4 fix: RootPage EM-tasdiqlanmagan xodimni to'g'ridan-to'g'ri EM bosqichida ochishi uchun
+  initialStep?: "login" | "em";
+  emPendingUser?: PendingUser | null;
 }
 
 function LoginFormInner({
@@ -119,15 +122,17 @@ function LoginFormInner({
   iconColor = "from-violet-500/30 to-blue-500/30",
   gradientFrom = "from-violet-500",
   gradientTo = "to-blue-500",
+  initialStep = "login",
+  emPendingUser = null,
 }: LoginFormInnerProps) {
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl");
-  const [step, setStep] = useState<"login" | "em">("login");
+  const [step, setStep] = useState<"login" | "em">(initialStep);
   const [form, setForm] = useState({ identifier: "", password: "" });
   const [emInput, setEmInput] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pendingUser, setPendingUser] = useState<PendingUser | null>(null);
+  const [pendingUser, setPendingUser] = useState<PendingUser | null>(emPendingUser);
   const [anim, setAnim] = useState<AnimLevel>("full");
 
   useEffect(() => {

@@ -70,7 +70,8 @@ export default function ReceptionView({ context = "standalone" }: ReceptionViewP
       });
       const json = await res.json();
       if (res.status === 403 && json.error?.code === "EM_REQUIRED") {
-        window.location.href = "/login";
+        const ru = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/login?returnUrl=${ru}`;
         return;
       }
       if (json.success) {
