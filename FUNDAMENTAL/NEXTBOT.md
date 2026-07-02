@@ -508,6 +508,24 @@ unauthorized()    // { code: "UNAUTHORIZED", message: "Unauthorized" }
 
 ## 12. RECENT CHANGES LOG
 
+### 2026-07-02 — FIX: T4 — EM-tasdiqlanmagan xodim uchun cheksiz reload-loop (KRITIK)
+
+**Simptom:** Qabulxona/shifokor xodimi (`Employee` yozuvi bor, `em_key` cookie yo'q yoki mos kelmaydi) `/reception` yoki `/doctor`ga kirganda: bron ko'rinmaydi, sahifa cheksiz qayta yuklanadi, chiqib bo'lmaydi.
+
+**Ildiz:** `src/app/page.tsx` (`RootPage`) `auth_token` valid bo'lsa `em_key`ni tekshirmasdan shartsiz `redirect(ROLE_HOME[role])` qilardi. Middleware ham faqat `auth_token`ni tekshiradi. Natijada: `/reception` → 403 `EM_REQUIRED` → `window.location.href="/login"` → `/login` → `redirect("/")` → `RootPage` yana `/reception`ga qaytaradi → 403 → **cheksiz loop**.
+
+**Yechim (additive-only, DB o'zgarishisiz):**
+- `RootPage` endi so'rov oldidan `prisma.employee.findUnique({ where: { userId } })` bilan tekshiradi. `Employee` bor-u `em_key` cookie mos kelmasa — `ROLE_HOME`ga redirect qilish o'rniga `<LoginForm initialStep="em" emPendingUser={...} />` to'g'ridan-to'g'ri render qilinadi (loop shu yerda uziladi). `Employee` yo'q (admin/super_admin) — eski xatti-harakat o'zgarmaydi.
+- `LoginForm.tsx` — `initialStep`/`emPendingUser` ixtiyoriy proplar qo'shildi (`step`/`pendingUser` state initializerlari shulardan o'qiydi; defaultlar eski holatni saqlaydi).
+- `ReceptionView.tsx` / `DoctorQueueView.tsx` — 403 `EM_REQUIRED` handlerlariga `returnUrl` qo'shildi (deep-link uchun, loop fix'ining o'zi uchun shart emas).
+
+**Test:** Haqiqiy DB yozuvi (`user-reception`, tel `+998902222222`, `EM000014`) bilan lokal dev serverda 7 ta HTTP-darajali stsenariy (bug repro, to'g'ri/noto'g'ri EM, doctor pattern, admin regressiya, token yo'q holat) — barchasi PASS. Playwright screenshot — EM ekrani va oddiy login ekrani vizual tekshirildi, bug yo'q. Production'da ham (`https://tibtaqvim.vercel.app`) haqiqiy JWT bilan qayta tekshirildi — EM ekrani to'g'ri chiqadi (loop yo'q).
+
+**Commit:** `1494852` — `fix(auth): T4 — EM-tasdiqlanmagan xodim uchun cheksiz reload-loop tuzatildi`
+**Branch:** `perf/swr-prefetch-skeleton`. **Deploy:** https://tibtaqvim.vercel.app ✅
+
+---
+
 ### 2026-06-30 — PERF: SWR cache + Skeleton animatsiyalari (tezlik optimizatsiyasi)
 
 **Maqsad:** Sahifalar orasida navigatsiyada "Yuklanmoqda..." matni o'rniga skeleton animatsiyalar. SWR keepPreviousData — filter/sahifa almashtirishda eski ma'lumotlar darhol ko'rinadi.
