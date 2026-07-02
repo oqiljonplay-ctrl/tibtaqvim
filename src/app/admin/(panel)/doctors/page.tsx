@@ -630,50 +630,57 @@ export default function AdminDoctorsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {doctors.map((d) => (
               <div key={d.id} className={`card relative ${d.isHidden ? "opacity-60 bg-gray-50" : ""}`}>
-                <div className="absolute top-3 right-3 flex gap-1">
-                  <button
-                    onClick={() => toggleHidden(d.id, d.isHidden)}
-                    className={`p-1.5 rounded transition ${
-                      d.isHidden
-                        ? "text-green-600 hover:text-green-700 hover:bg-green-50"
-                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-                    }`}
-                    title={d.isHidden ? "Ko'rsatish" : "Yashirish"}
-                  >
-                    {d.isHidden ? "👁️" : "🙈"}
-                  </button>
-                  <button
-                    onClick={() => handleResetPassword(d.id, `${d.lastName} ${d.firstName}`)}
-                    disabled={resettingId === d.id}
-                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-40"
-                    title="Parolni tiklash"
-                  >
-                    🔑
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); router.push(`/admin/doctors/${d.id}/stats`); }}
-                    className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition"
-                    title="Statistika"
-                  >
-                    📉
-                  </button>
-                  <button
-                    onClick={() => router.push(`/admin/doctors/${d.id}/edit`)}
-                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-                    title="Tahrirlash"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => setConfirmDeleteId(d.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-                    title="Ishdan bo'shatish"
-                  >
-                    🗑️
-                  </button>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <DoctorCard doctor={d} size="md" />
+                  </div>
+                  <details className="relative shrink-0 [&_summary::-webkit-details-marker]:hidden">
+                    <summary
+                      className="list-none cursor-pointer select-none p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+                      title="Amallar"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <circle cx="12" cy="5" r="1.8" />
+                        <circle cx="12" cy="12" r="1.8" />
+                        <circle cx="12" cy="19" r="1.8" />
+                      </svg>
+                    </summary>
+                    <div className="absolute right-0 top-full mt-1 z-30 w-52 rounded-xl border border-gray-200 bg-white shadow-lg py-1 text-sm">
+                      <button
+                        onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; toggleHidden(d.id, d.isHidden); }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50"
+                      >
+                        <span>{d.isHidden ? "👁️" : "🙈"}</span> {d.isHidden ? "Ko'rsatish" : "Yashirish"}
+                      </button>
+                      <button
+                        onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; handleResetPassword(d.id, `${d.lastName} ${d.firstName}`); }}
+                        disabled={resettingId === d.id}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                      >
+                        <span>🔑</span> Parolni tiklash
+                      </button>
+                      <button
+                        onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; router.push(`/admin/doctors/${d.id}/stats`); }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50"
+                      >
+                        <span>📉</span> Statistika
+                      </button>
+                      <button
+                        onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; router.push(`/admin/doctors/${d.id}/edit`); }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50"
+                      >
+                        <span>✏️</span> Tahrirlash
+                      </button>
+                      <div className="my-1 border-t border-gray-100" />
+                      <button
+                        onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; setConfirmDeleteId(d.id); }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50"
+                      >
+                        <span>🗑️</span> Ishdan bo'shatish
+                      </button>
+                    </div>
+                  </details>
                 </div>
-
-                <DoctorCard doctor={d} size="md" />
                 <div className="flex flex-wrap gap-1 mt-1">
                   {d.emId && (
                     <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-mono">

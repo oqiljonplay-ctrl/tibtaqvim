@@ -1090,19 +1090,19 @@ export default function WebApp() {
             </div>
           )}
 
-          {/* Faol bron sanagichi */}
+          {/* Faol bron sanagichi — qutisiz, markazda (T2) */}
           {selfLimit !== null && !dashLoading && (
-            <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm ${
-              limitFull
-                ? "bg-orange-50 border-orange-200 text-orange-800"
-                : "bg-white border-gray-200 text-gray-700"
-            }`}>
-              <span>
+            <div className="text-center text-sm">
+              <span className={limitFull ? "text-amber-600" : "text-gray-500"}>
                 {limitFull ? "⚠️" : "✅"} Faol bronlaringiz:{" "}
-                <span className="font-semibold">{selfActiveCount}/{selfLimit}</span>
+                <span className={`font-semibold ${limitFull ? "text-red-600" : "text-gray-700"}`}>
+                  {selfActiveCount}/{selfLimit}
+                </span>
               </span>
               {limitFull && (
-                <span className="text-xs text-orange-600">Limit to'ldi</span>
+                <span className="ml-2 align-middle text-[11px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
+                  Limit to'ldi
+                </span>
               )}
             </div>
           )}

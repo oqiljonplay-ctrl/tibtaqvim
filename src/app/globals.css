@@ -242,3 +242,18 @@ html[data-webapp-theme="dark"] .border-blue-200,
 html[data-webapp-theme="dark"] .border-red-200,
 html[data-webapp-theme="dark"] .border-yellow-200,
 html[data-webapp-theme="dark"] .border-amber-200{ border-color:var(--border)!important; }
+
+/* === T1: .input matn/fon/placeholder — bemor yozganini har mavzuda aniq ko'radi === */
+
+/* Barcha kontekst (admin panellar ham) — o'qiladigan placeholder */
+.input::placeholder { color: #9ca3af; opacity: 1; }
+
+/* Webapp mavzu (Kun/Tun): matn rangi tokenlanadi (Kun=to'q, Tun=och) */
+html[data-webapp-theme] .input { color: var(--text); }
+html[data-webapp-theme] .input::placeholder { color: var(--text-muted); opacity: 1; }
+
+/* Tun mavzu: input foni ham qorong'i bo'ladi — och matn oq fonda yo'qolib qolmasin */
+html[data-webapp-theme="dark"] .input {
+  background: var(--elevated);
+  border-color: var(--border);
+}
